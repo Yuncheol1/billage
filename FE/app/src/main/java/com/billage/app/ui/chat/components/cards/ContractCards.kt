@@ -1,4 +1,4 @@
-package com.billage.app.ui.chat.components
+package com.billage.app.ui.chat.components.cards
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,11 +23,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,7 +49,10 @@ import com.billage.app.ui.chat.models.ConditionProposalMessage
 import com.billage.app.ui.chat.models.ContractCompleteMessage
 import com.billage.app.ui.chat.models.DraftRequestMessage
 import com.billage.app.ui.chat.models.MessageSender
+import com.billage.app.ui.chat.models.ProposalRequestMessage
 import com.billage.app.ui.chat.models.SignatureRequestMessage
+import com.billage.app.ui.chat.models.SystemNoticeMessage
+import androidx.compose.material3.Surface
 import com.billage.app.ui.theme.BillageTheme
 import java.time.LocalDateTime
 
@@ -47,8 +60,10 @@ import java.time.LocalDateTime
 fun DraftRequestCard(
     message: DraftRequestMessage,
     onAcceptClick: () -> Unit,
-    onProposeClick: () -> Unit
+    onProposeClick: () -> Unit,
+    onViewDetailsClick: () -> Unit = {} // 상세 문서 보기 클릭
 ) {
+
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
             MaterialTheme.colorScheme.onPrimaryContainer
@@ -66,8 +81,9 @@ fun DraftRequestCard(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
+                val titleText = if (message.sender == MessageSender.ME) "내가 돈을 빌려줬어요!" else "${message.senderName}님이 돈을 빌려줬어요!"
                 Text(
-                    text = "차용증 초안 확인 요청",
+                    text = titleText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor
@@ -83,44 +99,73 @@ fun DraftRequestCard(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "계약명: ${message.contractTitle}", 
-                        style = MaterialTheme.typography.bodyMedium, 
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "내용을 확인하고 서명을 진행하거나, 수정이 필요한 경우 조건을 제안해 주세요.", 
-                        style = MaterialTheme.typography.bodySmall, 
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        text = message.summary, 
+                        style = MaterialTheme.typography.bodyMedium, 
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 차용증 전문 보기 (네비게이션 액션)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onViewDetailsClick() }
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "차용증 원본 보기",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "차용증 전문 보기",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // 액션 버튼 영역 (상태에 따른 분기)
-            when (message.actionStatus) {
-                ActionStatus.PENDING -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onProposeClick,
-                            modifier = Modifier.weight(1f)
+            if (message.sender == MessageSender.OTHER) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // 액션 버튼 영역 (상태에 따른 분기)
+                when (message.actionStatus) {
+                    ActionStatus.PENDING -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("수정 제안", style = MaterialTheme.typography.labelLarge)
-                        }
-                        Button(
-                            onClick = onAcceptClick,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("수락하기", style = MaterialTheme.typography.labelLarge)
+                            OutlinedButton(
+                                onClick = onProposeClick,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("수정 제안", style = MaterialTheme.typography.labelLarge)
+                            }
+                            Button(
+                                onClick = onAcceptClick,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("동의", style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
+                    ActionStatus.COMPLETED -> ActionCompletedView("초안에 동의했습니다.")
+                    ActionStatus.REJECTED -> ActionCompletedView("수정을 제안했습니다.")
                 }
-                ActionStatus.COMPLETED -> ActionCompletedView("초안이 수락되었습니다.")
-                ActionStatus.REJECTED -> ActionCompletedView("수정을 제안했습니다.")
             }
         }
     }
@@ -187,29 +232,31 @@ fun ConditionProposalCard(
             Spacer(modifier = Modifier.height(12.dp))
             
             // 액션 영역
-            when (message.actionStatus) {
-                ActionStatus.PENDING -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onRejectClick,
-                            modifier = Modifier.weight(1f)
+            if (message.sender == MessageSender.OTHER) {
+                when (message.actionStatus) {
+                    ActionStatus.PENDING -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("거절", style = MaterialTheme.typography.labelLarge)
-                        }
-                        Button(
-                            onClick = onAcceptClick,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("수락하기", style = MaterialTheme.typography.labelLarge)
+                            OutlinedButton(
+                                onClick = onRejectClick,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("거절", style = MaterialTheme.typography.labelLarge)
+                            }
+                            Button(
+                                onClick = onAcceptClick,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Text("수락하기", style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
+                    ActionStatus.COMPLETED -> ActionCompletedView("제안을 수락했습니다.")
+                    ActionStatus.REJECTED -> ActionCompletedView("제안을 거절했습니다.")
                 }
-                ActionStatus.COMPLETED -> ActionCompletedView("제안을 수락했습니다.")
-                ActionStatus.REJECTED -> ActionCompletedView("제안을 거절했습니다.")
             }
         }
     }
@@ -372,12 +419,117 @@ private fun ActionCompletedView(text: String) {
     }
 }
 
+@Composable
+fun SystemNoticeCard(message: SystemNoticeMessage) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ) {
+            Text(
+                text = message.text,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun ProposalRequestCard(
+    message: ProposalRequestMessage,
+    onAcceptClick: () -> Unit,
+    onRejectClick: () -> Unit
+) {
+    BaseChatCard(sender = message.sender) {
+        val contentColor = if (message.sender == MessageSender.ME) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+
+        Column(modifier = Modifier.width(260.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "차용증 수정 제안",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "대상: ${message.contractTitle}", 
+                        style = MaterialTheme.typography.bodyMedium, 
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "상대방이 위 계약건에 대해 조건 수정을 제안했습니다. 수락하시면 협의 모드가 켜집니다.", 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            if (message.sender == MessageSender.OTHER) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                when (message.actionStatus) {
+                    ActionStatus.PENDING -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onRejectClick,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("거절", style = MaterialTheme.typography.labelLarge)
+                            }
+                            Button(
+                                onClick = onAcceptClick,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("수락", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                    ActionStatus.COMPLETED -> ActionCompletedView("제안을 수락하여 협의를 시작했습니다.")
+                    ActionStatus.REJECTED -> ActionCompletedView("제안을 거절했습니다.")
+                }
+            }
+        }
+    }
+}
+
+
 // ==========================================
 // 도메인 맞춤 카드 프리뷰
 // ==========================================
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "1. 초안 카드 (작업 대기)")
 @Composable
-fun PreviewContractCards() {
+fun PreviewDraftRequest_Pending() {
     BillageTheme(dynamicColor = false) {
         Column(
             modifier = Modifier
@@ -396,11 +548,89 @@ fun PreviewContractCards() {
                 onAcceptClick = {},
                 onProposeClick = {}
             )
-            
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "2. 초안 카드 (작업 완료 - 거절)")
+@Composable
+fun PreviewDraftRequest_Rejected() {
+    BillageTheme(dynamicColor = false) {
+        Column(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp), 
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            DraftRequestCard(
+                message = DraftRequestMessage(
+                    id = "1",
+                    sender = MessageSender.OTHER,
+                    timestamp = LocalDateTime.now(),
+                    contractTitle = "100만원 소액 대출 건",
+                    actionStatus = ActionStatus.REJECTED
+                ),
+                onAcceptClick = {},
+                onProposeClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "3. 초안 카드 (작업 완료 - 수락)")
+@Composable
+fun PreviewDraftRequest_Accepted() {
+    BillageTheme(dynamicColor = false) {
+        Column(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp), 
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            DraftRequestCard(
+                message = DraftRequestMessage(
+                    id = "1",
+                    sender = MessageSender.OTHER,
+                    timestamp = LocalDateTime.now(),
+                    contractTitle = "100만원 소액 대출 건",
+                    actionStatus = ActionStatus.COMPLETED
+                ),
+                onAcceptClick = {},
+                onProposeClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "4. 브릿지 카드 (수정 제안 수락 대기)")
+@Composable
+fun PreviewProposalRequest_Pending() {
+    BillageTheme(dynamicColor = false) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+            ProposalRequestCard(
+                message = ProposalRequestMessage(
+                    id = "2",
+                    sender = MessageSender.OTHER,
+                    timestamp = LocalDateTime.now(),
+                    contractTitle = "100만원 소액 대출 건",
+                    actionStatus = ActionStatus.PENDING
+                ),
+                onAcceptClick = {},
+                onRejectClick = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "5. 최종 조건 제안 카드")
+@Composable
+fun PreviewConditionProposal() {
+    BillageTheme(dynamicColor = false) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
             ConditionProposalCard(
                 message = ConditionProposalMessage(
-                    id = "2",
-                    sender = MessageSender.ME,
+                    id = "3",
+                    sender = MessageSender.SYSTEM,
                     timestamp = LocalDateTime.now(),
                     modifications = listOf("상환 기한을 1개월 연장", "이자율을 3%로 변경"),
                     actionStatus = ActionStatus.COMPLETED
@@ -408,28 +638,21 @@ fun PreviewContractCards() {
                 onAcceptClick = {},
                 onRejectClick = {}
             )
-            
-            SignatureRequestCard(
-                message = SignatureRequestMessage(
-                    id = "3",
-                    sender = MessageSender.SYSTEM,
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "6. 시스템 중앙 알림 카드")
+@Composable
+fun PreviewSystemNotice() {
+    BillageTheme(dynamicColor = false) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+            SystemNoticeCard(
+                message = SystemNoticeMessage(
+                    id = "notice1",
                     timestamp = LocalDateTime.now(),
-                    isMySignatureDone = true,
-                    isOtherSignatureDone = false
-                ),
-                onSignClick = {}
-            )
-            
-            ContractCompleteCard(
-                message = ContractCompleteMessage(
-                    id = "4",
-                    sender = MessageSender.SYSTEM,
-                    timestamp = LocalDateTime.now(),
-                    contractId = "CONT001",
-                    contractTitle = "100만원 소액 대출 건"
-                ),
-                onDashboardClick = {},
-                onDownloadPdfClick = {}
+                    text = "김철수님이 [100만원 소액 대출 건] 초안 수정을 제안했습니다."
+                )
             )
         }
     }

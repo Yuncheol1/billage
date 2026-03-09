@@ -1,4 +1,4 @@
-package com.billage.app.ui.chat.components
+package com.billage.app.ui.chat.components.cards
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
