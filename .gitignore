@@ -1,0 +1,5 @@
+# JetBrains IDEs (IntelliJ, Android Studio, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
