@@ -15,6 +15,10 @@ sealed interface AppDestination {
     data object ConditionsOfUse : AppDestination {
         override val route: String = "conditions_of_use"
     }
+
+    data object Home : AppDestination {
+        override val route: String = "home"
+    }
 }
 
 class AppNavController(
@@ -28,6 +32,12 @@ class AppNavController(
 
     fun navigateToConditionsOfUse() {
         navController.navigate(AppDestination.ConditionsOfUse.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToHome() {
+        navController.navigate(AppDestination.Home.route) {
             launchSingleTop = true
         }
     }

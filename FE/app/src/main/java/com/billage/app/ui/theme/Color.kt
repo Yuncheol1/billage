@@ -18,6 +18,8 @@ val BillageTextSecondary = Color(0xFF7A9490)  // 부제목, 날짜, 힌트
 val BillageDanger = Color(0xFFFF6B6B)         // 경고, 연체, 에러
 val BillageWarning = Color(0xFFFFA000)        // 주의 (알림 아이콘)
 val BillageWarningBackground = Color(0xFFFFF8E1) // 알림 배너 배경
+val BillageSuccess = Color(0xFF4CAF50)        // 입금/완료
+val BillageInfo = Color(0xFF26C6DA)           // 협의/진행 중
 
 // 구분선 색상
 val BillageDivider = Color(0xFFF0F0F0)        // 목록 구분선

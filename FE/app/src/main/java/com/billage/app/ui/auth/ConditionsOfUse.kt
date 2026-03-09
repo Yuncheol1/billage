@@ -31,6 +31,7 @@ import com.billage.app.ui.theme.BillagePrimary
 @Composable
 fun ConditionsOfUseScreen(
     onBackClick: () -> Unit,
+    onAgreeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var ageConsent by remember { mutableStateOf(false) }
@@ -140,7 +141,7 @@ fun ConditionsOfUseScreen(
                         color = if (allRequiredChecked) Color(0xFFF3D54E) else Color(0xFFB6DAD6),
                         shape = RoundedCornerShape(8.dp)
                     )
-                    .clickable(enabled = allRequiredChecked, onClick = onBackClick),
+                    .clickable(enabled = allRequiredChecked, onClick = onAgreeClick),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
