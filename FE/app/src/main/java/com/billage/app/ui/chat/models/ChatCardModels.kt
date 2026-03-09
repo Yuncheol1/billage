@@ -62,11 +62,28 @@ data class LinkMessage(
 // ==========================================
 // 도메인 특화: 계약 핑퐁(인터랙티브) 메시지 모델
 // ==========================================
+data class SystemNoticeMessage(
+    override val id: String,
+    override val timestamp: LocalDateTime,
+    val text: String,
+    override val sender: MessageSender = MessageSender.SYSTEM
+) : BaseChatMessage
+
+data class ProposalRequestMessage(
+    override val id: String,
+    override val sender: MessageSender,
+    override val timestamp: LocalDateTime,
+    val contractTitle: String,
+    val actionStatus: ActionStatus = ActionStatus.PENDING
+) : BaseChatMessage
 data class DraftRequestMessage(
     override val id: String,
     override val sender: MessageSender,
     override val timestamp: LocalDateTime,
     val contractTitle: String,
+    val senderName: String = "김철수",
+    val summary: String = "원금 100만원 · 연이율 5%",
+    val details: String = "상환 기한: 2026.12.31\n지연 배상금률: 15%\n특약: 매월 10일 이자 이체",
     val actionStatus: ActionStatus = ActionStatus.PENDING
 ) : BaseChatMessage
 
