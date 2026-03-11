@@ -1,6 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.RepaymentScheduleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,9 +42,9 @@ public class RepaymentSchedule {
     @Column(name = "remaining_balance_after", precision = 15, scale = 2)
     private BigDecimal remainingBalanceAfter;
 
-    @Enumerated(EnumType.STRING)
+    /** NONPAID / SOMEPAID / PAID / WAIVED / OVERDUE */
     @Column(name = "status")
-    private RepaymentScheduleStatus status;
+    private String status;
 
     @Column(name = "paid_dttm")
     private LocalDateTime paidDttm;

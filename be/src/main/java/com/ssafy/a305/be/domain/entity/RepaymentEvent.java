@@ -1,8 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.EvidenceGrade;
-import com.ssafy.a305.be.domain.enums.RepaymentEventStatus;
-import com.ssafy.a305.be.domain.enums.RepaymentEventType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,13 +27,9 @@ public class RepaymentEvent {
     @JoinColumn(name = "contract_seq", nullable = false)
     private Contract contract;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "event_type")
-    private RepaymentEventType eventType;
-
-    @Enumerated(EnumType.STRING)
+    /** BRONZE / SILVER / GOLD / WAIVER */
     @Column(name = "evidence_grade")
-    private EvidenceGrade evidenceGrade;
+    private String evidenceGrade;
 
     @Column(name = "amount_paid", precision = 15, scale = 2)
     private BigDecimal amountPaid;
@@ -49,9 +42,9 @@ public class RepaymentEvent {
     @JoinColumn(name = "confirmed_by_user_seq", nullable = false)
     private User confirmedByUser;
 
-    @Enumerated(EnumType.STRING)
+    /** REQUESTED / CONFIRMED / REJECTED / AUTO_CONFIRMED / FAILED */
     @Column(name = "status")
-    private RepaymentEventStatus status;
+    private String status;
 
     @Column(name = "note")
     private String note;
@@ -61,4 +54,11 @@ public class RepaymentEvent {
 
     @Column(name = "confirmed_dttm")
     private LocalDateTime confirmedDttm;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tx_seq")
+    private BankTransaction bankTransaction;
+
+    @Column(name = "Field")
+    private String field;
 }

@@ -5,16 +5,13 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-/**
- * Expo 푸시 알림 토큰 (90일 미사용 토큰 정리용 last_used_dttm)
- */
 @Entity
-@Table(name = "expo_token")
+@Table(name = "fcm_token")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-public class ExpoToken {
+public class FcmToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,9 +21,6 @@ public class ExpoToken {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_seq", nullable = false)
     private User user;
-
-    @Column(name = "device_id")
-    private String deviceId;
 
     @Column(name = "token")
     private String token;

@@ -1,6 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.ClauseNegotiationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,9 +32,9 @@ public class ClauseNegotiation {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
-    @Enumerated(EnumType.STRING)
+    /** IN_PROGRESS / AGREED / REJECTED */
     @Column(name = "status")
-    private ClauseNegotiationStatus status;
+    private String status;
 
     @Column(name = "created_dttm")
     private LocalDateTime createdDttm;

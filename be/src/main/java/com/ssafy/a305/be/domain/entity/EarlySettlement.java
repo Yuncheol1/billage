@@ -1,6 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.EarlySettlementStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -37,9 +36,9 @@ public class EarlySettlement {
     @Column(name = "settlement_amount", precision = 15, scale = 2)
     private BigDecimal settlementAmount;
 
-    @Enumerated(EnumType.STRING)
+    /** REQUESTED / AGREED / REJECTED */
     @Column(name = "status")
-    private EarlySettlementStatus status;
+    private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_seq", nullable = false)

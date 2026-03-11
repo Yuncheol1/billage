@@ -1,15 +1,10 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.NotificationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
-/**
- * event_key: REPAYMENT_D7/D3/D1, SIGN_COMPLETE, CONTRACT_SHARED, CONTRACT_MODIFIED,
- * CONTRACT_AGREED, MANUAL_TRANSFER_REQUEST, CASH_CONFIRM_REQUEST, WAIVER_ISSUED, OVERDUE 등
- */
 @Entity
 @Table(name = "notification_log")
 @Getter
@@ -43,12 +38,12 @@ public class NotificationLog {
     @Column(name = "is_read")
     private Boolean isRead;
 
-    @Enumerated(EnumType.STRING)
+    /** SENT / FAILED */
     @Column(name = "status")
-    private NotificationStatus status;
+    private String status;
 
-    @Column(name = "expo_message_id")
-    private String expoMessageId;
+    @Column(name = "fcm_message_id")
+    private String fcmMessageId;
 
     @Column(name = "sent_dttm")
     private LocalDateTime sentDttm;

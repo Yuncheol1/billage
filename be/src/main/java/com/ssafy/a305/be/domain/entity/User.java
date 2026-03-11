@@ -1,6 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,9 +24,9 @@ public class User {
     @Column(name = "phone", unique = true)
     private String phone;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "state")  // ERD 컬럼명: state (ACTIVE / DELETED / BLOCKED)
-    private UserStatus state;
+    /** PENDING / ACTIVE / DELETED / BLOCKED */
+    @Column(name = "state")
+    private String state;
 
     @Column(name = "created_dttm")
     private LocalDateTime createdDttm;
@@ -38,7 +37,7 @@ public class User {
     @Column(name = "deleted_dttm")
     private LocalDateTime deletedDttm;
 
-    public void changeState(UserStatus state) {
+    public void changeState(String state) {
         this.state = state;
     }
 
@@ -50,9 +49,8 @@ public class User {
         this.phone = phone;
     }
 
-    /** 탈퇴 처리 시 deleted_dttm 설정 */
     public void markDeleted() {
-        this.state = UserStatus.DELETED;
+        this.state = "DELETED";
         this.deletedDttm = LocalDateTime.now();
     }
 }

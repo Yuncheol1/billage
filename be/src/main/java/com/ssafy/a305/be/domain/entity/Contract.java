@@ -1,8 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.ContractStatus;
-import com.ssafy.a305.be.domain.enums.ContractTemplateType;
-import com.ssafy.a305.be.domain.enums.RepaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -28,9 +25,9 @@ public class Contract {
     @Column(name = "contract_id")
     private String contractId;
 
-    @Enumerated(EnumType.STRING)
+    /** FRIEND_SMALL / FAMILY_JEONSE / PARTNER_BIZ / COLLEAGUE_EMERGENCY */
     @Column(name = "template_type")
-    private ContractTemplateType templateType;
+    private String templateType;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creditor_user_seq", nullable = false)
@@ -46,9 +43,9 @@ public class Contract {
     @Column(name = "interest_rate", precision = 5, scale = 4)
     private BigDecimal interestRate;
 
-    @Enumerated(EnumType.STRING)
+    /** BULLET / INSTALLMENT / CUSTOM */
     @Column(name = "repayment_method")
-    private RepaymentMethod repaymentMethod;
+    private String repaymentMethod;
 
     @Column(name = "total_installments")
     private Integer totalInstallments;
@@ -59,9 +56,9 @@ public class Contract {
     @Column(name = "end_dt")
     private LocalDate endDt;
 
-    @Enumerated(EnumType.STRING)
+    /** DRAFT / NEGOTIATING / SIGNED / ACTIVE / OVERDUE / CLOSED / DISPUTED */
     @Column(name = "status")
-    private ContractStatus status;
+    private String status;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ai_draft_content", columnDefinition = "json")

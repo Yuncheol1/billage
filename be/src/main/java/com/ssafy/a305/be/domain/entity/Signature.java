@@ -1,6 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.SignatureMethod;
 import com.ssafy.a305.be.domain.enums.SignatureRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -34,9 +33,9 @@ public class Signature {
     @Column(name = "role")
     private SignatureRole role;
 
-    @Enumerated(EnumType.STRING)
+    /** BIOMETRIC / PATTERN / DEVICE_ID */
     @Column(name = "method")
-    private SignatureMethod method;
+    private String method;
 
     @Column(name = "device_id_hash")
     private String deviceIdHash;

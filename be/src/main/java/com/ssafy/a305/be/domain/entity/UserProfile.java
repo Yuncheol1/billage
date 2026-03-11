@@ -1,7 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.BadgeLevel;
-import com.ssafy.a305.be.domain.enums.LockType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,9 +39,9 @@ public class UserProfile {
     @Column(name = "lock_enabled")
     private Boolean lockEnabled;
 
-    @Enumerated(EnumType.STRING)
+    /** BIOMETRIC / PATTERN / NONE */
     @Column(name = "lock_type")
-    private LockType lockType;
+    private String lockType;
 
     @Column(name = "pattern_hash")
     private String patternHash;
@@ -60,9 +58,9 @@ public class UserProfile {
     @Column(name = "avg_delay_days", precision = 5, scale = 2)
     private BigDecimal avgDelayDays;
 
-    @Enumerated(EnumType.STRING)
+    /** BRONZE / SILVER / GOLD / PLATINUM */
     @Column(name = "badge_level")
-    private BadgeLevel badgeLevel;
+    private String badgeLevel;
 
     @Column(name = "badge_is_public")
     private Boolean badgeIsPublic;

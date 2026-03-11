@@ -1,7 +1,6 @@
 package com.ssafy.a305.be.domain.entity;
 
 import com.ssafy.a305.be.domain.enums.BankTransactionDirection;
-import com.ssafy.a305.be.domain.enums.MatchStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -60,7 +59,7 @@ public class BankTransaction {
     @Column(name = "match_confidence", precision = 5, scale = 4)
     private BigDecimal matchConfidence;
 
-    @Enumerated(EnumType.STRING)
+    /** UNMATCHED / MATCHED / IGNORED / PENDING_REVIEW */
     @Column(name = "match_status")
-    private MatchStatus matchStatus;
+    private String matchStatus;
 }

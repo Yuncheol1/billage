@@ -1,7 +1,5 @@
 package com.ssafy.a305.be.domain.entity;
 
-import com.ssafy.a305.be.domain.enums.DocumentType;
-import com.ssafy.a305.be.domain.enums.GeneratedBy;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,9 +22,9 @@ public class Document {
     @JoinColumn(name = "contract_seq", nullable = false)
     private Contract contract;
 
-    @Enumerated(EnumType.STRING)
+    /** CONTRACT_ORIGINAL / WAIVER_AGREEMENT / EARLY_SETTLEMENT / TAX_PACKAGE */
     @Column(name = "doc_type")
-    private DocumentType docType;
+    private String docType;
 
     @Column(name = "version")
     private Integer version;
@@ -37,9 +35,9 @@ public class Document {
     @Column(name = "sha256_hash")
     private String sha256Hash;
 
-    @Enumerated(EnumType.STRING)
+    /** SYSTEM / USER */
     @Column(name = "generated_by")
-    private GeneratedBy generatedBy;
+    private String generatedBy;
 
     @Column(name = "generated_dttm")
     private LocalDateTime generatedDttm;
