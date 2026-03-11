@@ -30,9 +30,12 @@ class AppNavController(
         }
     }
 
-    fun navigateToConditionsOfUse() {
+    fun navigateToConditionsOfUse(clearBackStack: Boolean = false) {
         navController.navigate(AppDestination.ConditionsOfUse.route) {
             launchSingleTop = true
+            if (clearBackStack) {
+                popUpTo(AppDestination.Login.route) { inclusive = true }
+            }
         }
     }
 
