@@ -108,7 +108,7 @@ fun BottomBar(onAddContractClick: () -> Unit) {
                 selected = true,
                 onClick = {},
                 icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                label = { Text("Home") },
+                label = { Text("홈") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = BillagePrimary,
                     selectedTextColor = BillagePrimary,
@@ -119,7 +119,7 @@ fun BottomBar(onAddContractClick: () -> Unit) {
                 selected = false,
                 onClick = {},
                 icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
-                label = { Text("Chat") },
+                label = { Text("채팅") },
                 colors = NavigationBarItemDefaults.colors(
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
@@ -137,7 +137,7 @@ fun BottomBar(onAddContractClick: () -> Unit) {
                 selected = false,
                 onClick = {},
                 icon = { Icon(Icons.Default.Description, contentDescription = "Contracts") },
-                label = { Text("Contracts") },
+                label = { Text("내 계약") },
                 colors = NavigationBarItemDefaults.colors(
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
@@ -147,7 +147,7 @@ fun BottomBar(onAddContractClick: () -> Unit) {
                 selected = false,
                 onClick = {},
                 icon = { Icon(Icons.Default.Menu, contentDescription = "Menu") },
-                label = { Text("Menu") },
+                label = { Text("메뉴") },
                 colors = NavigationBarItemDefaults.colors(
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
