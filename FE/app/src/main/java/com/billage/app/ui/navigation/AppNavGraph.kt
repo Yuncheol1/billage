@@ -4,6 +4,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
+import com.billage.app.ui.contract.ContractScreen
 import com.billage.app.ui.home.HomeScreen
 
 fun NavGraphBuilder.appNavGraph(
@@ -26,8 +27,15 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { /* TODO: 계약 상세 화면으로 이동 */ },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { /* TODO: 계약 작성 화면으로 이동 */ },
+            onAddContractClick = { appNavController.navigateToContract() },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ }
+        )
+    }
+
+    composable(route = AppDestination.Contract.route) {
+        ContractScreen(
+            onNavigateBack = { appNavController.popBackStack() },
+            onContractComplete = { /* TODO: 전송 완료 대기 화면으로 이동 */ }
         )
     }
 }
