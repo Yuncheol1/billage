@@ -24,6 +24,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.billage.app.ui.common.BottomBar
+import com.billage.app.ui.common.TopBar
 import com.billage.app.ui.theme.*
 
 @Composable
@@ -40,14 +42,14 @@ fun HomeScreen(
     Scaffold(
         containerColor = BillageBackground,
         topBar = {
-            HomeTopBar(
+            TopBar(
                 userName = uiState.userName,
                 hasNotification = uiState.hasNotification,
                 onNotificationClick = onNotificationClick
             )
         },
         bottomBar = {
-            HomeBottomBar(onAddContractClick = onAddContractClick)
+            BottomBar(onAddContractClick = onAddContractClick)
         }
     ) { paddingValues ->
         Column(
@@ -154,6 +156,7 @@ fun HomeScreen(
     }
 }
 
+/*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopBar(
@@ -208,6 +211,7 @@ private fun HomeTopBar(
         }
     )
 }
+*/
 
 @Composable
 private fun NotificationBanner(
@@ -521,6 +525,7 @@ private fun ActivityItemRow(activity: ActivityItem) {
     HorizontalDivider(color = BillageDivider)
 }
 
+/*
 @Composable
 private fun HomeBottomBar(onAddContractClick: () -> Unit) {
     Box {
@@ -595,6 +600,7 @@ private fun HomeBottomBar(onAddContractClick: () -> Unit) {
     }
 }
 
+*/
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenPreview() {
