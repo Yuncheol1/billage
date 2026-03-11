@@ -1,0 +1,72 @@
+package com.ssafy.a305.be.domain.entity;
+
+import com.ssafy.a305.be.domain.enums.BadgeLevel;
+import com.ssafy.a305.be.domain.enums.LockType;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "user_profile")
+@Getter
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+public class UserProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_profile_seq")
+    private Long userProfileSeq;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_seq", nullable = false, unique = true)
+    private User user;
+
+    @Column(name = "rrn", nullable = false)
+    private String rrn;
+
+    @Column(name = "real_name")
+    private String realName;
+
+    @Column(name = "phone_verified")
+    private Boolean phoneVerified;
+
+    @Column(name = "profile_completed_dt")
+    private LocalDate profileCompletedDt;
+
+    @Column(name = "lock_enabled")
+    private Boolean lockEnabled;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lock_type")
+    private LockType lockType;
+
+    @Column(name = "pattern_hash")
+    private String patternHash;
+
+    @Column(name = "on_time_count")
+    private Integer onTimeCount;
+
+    @Column(name = "overdue_count")
+    private Integer overdueCount;
+
+    @Column(name = "resolved_count")
+    private Integer resolvedCount;
+
+    @Column(name = "avg_delay_days", precision = 5, scale = 2)
+    private BigDecimal avgDelayDays;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "badge_level")
+    private BadgeLevel badgeLevel;
+
+    @Column(name = "badge_is_public")
+    private Boolean badgeIsPublic;
+
+    @Column(name = "updated_dttm")
+    private LocalDateTime updatedDttm;
+}
