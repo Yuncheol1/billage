@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 // 메인 색상
 val BillagePrimary = Color(0xFF2EC4A9)        // 민트 그린 (버튼, 강조)
 val BillagePrimaryLight = Color(0xFFE8F7F5)   // 연한 민트 (배경 강조)
+val BillagePrimaryDisabled = Color(0xFFB2DDD8) // 비활성 버튼 (연한 민트)
 
 // 배경 색상
 val BillageBackground = Color(0xFFF5F9F8)     // 앱 전체 배경
