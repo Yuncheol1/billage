@@ -69,7 +69,8 @@ import com.billage.app.ui.theme.BillageWarningBackground
 fun MypageScreen(
     onNavigateHome: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
-    onAddContractClick: () -> Unit = {}
+    onAddContractClick: () -> Unit = {},
+    onChatClick: () -> Unit = {}
 ) {
     val contracts = remember { sampleContracts() }
     var selectedFilter by rememberSaveable { mutableStateOf(ContractFilter.All) }
@@ -104,6 +105,7 @@ fun MypageScreen(
                 selectedTab = BottomBarTab.Contract,
                 onAddContractClick = onAddContractClick,
                 onHomeClick = onNavigateHome,
+                onChatClick = onChatClick,
                 onContractClick = {}
             )
         }

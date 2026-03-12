@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
+import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.theme.*
 
 data class ChatPreviewItem(
@@ -42,7 +43,8 @@ val dummyChatList = listOf(
 fun ChatListScreen(
     onChatRoomClick: (String) -> Unit,
     onHomeClick: () -> Unit,
-    onAddContractClick: () -> Unit
+    onAddContractClick: () -> Unit,
+    onContractClick: () -> Unit = {}
 ) {
     Scaffold(
         containerColor = BillageBackground,
@@ -70,10 +72,11 @@ fun ChatListScreen(
         },
         bottomBar = {
             BottomBar(
-                currentRoute = "chat_list",
+                selectedTab = BottomBarTab.ChatList,
                 onAddContractClick = onAddContractClick,
                 onHomeClick = onHomeClick,
-                onChatClick = {} // We are already here
+                onChatClick = {}, // We are already here
+                onContractClick = onContractClick
             )
         }
     ) { paddingValues ->
