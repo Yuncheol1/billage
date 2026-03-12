@@ -35,6 +35,7 @@ fun HomeScreen(
     onAddContractClick: () -> Unit = {},
     onActivityClick: () -> Unit = {},
     onScheduleAllClick: () -> Unit = {},
+    onChatClick: () -> Unit = {},
     onMypageClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -51,6 +52,9 @@ fun HomeScreen(
         },
         bottomBar = {
             BottomBar(
+                selectedTab = BottomBarTab.Home,
+                onChatClick = onChatClick,
+                onHomeClick = {},
                 onAddContractClick = onAddContractClick,
                 onContractClick = onMypageClick
             )

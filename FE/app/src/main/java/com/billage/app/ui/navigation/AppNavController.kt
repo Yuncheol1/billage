@@ -24,6 +24,14 @@ sealed interface AppDestination {
         override val route: String = "contract"
     }
 
+    data object ChatList : AppDestination {
+        override val route: String = "chat_list"
+    }
+
+    data object ChatRoom : AppDestination {
+        override val route: String = "chat_room"
+    }
+
     data object Mypage : AppDestination {
         override val route: String = "mypage"
     }
@@ -55,6 +63,19 @@ class AppNavController(
 
     fun navigateToContract() {
         navController.navigate(AppDestination.Contract.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToChatList() {
+        navController.navigate(AppDestination.ChatList.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToChatRoom(roomId: String? = null) {
+        // 나중에 roomId를 argument로 넘기도록 수정할 수 있습니다.
+        navController.navigate(AppDestination.ChatRoom.route) {
             launchSingleTop = true
         }
     }
