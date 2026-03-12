@@ -53,6 +53,14 @@ import com.billage.app.ui.chat.models.ProposalRequestMessage
 import com.billage.app.ui.chat.models.SignatureRequestMessage
 import com.billage.app.ui.chat.models.SystemNoticeMessage
 import androidx.compose.material3.Surface
+import com.billage.app.ui.theme.BillageBackground
+import com.billage.app.ui.theme.BillageDanger
+import com.billage.app.ui.theme.BillageDivider
+import com.billage.app.ui.theme.BillageInfo
+import com.billage.app.ui.theme.BillagePrimary
+import com.billage.app.ui.theme.BillageSurface
+import com.billage.app.ui.theme.BillageTextPrimary
+import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.theme.BillageTheme
 import java.time.LocalDateTime
 
@@ -66,9 +74,9 @@ fun DraftRequestCard(
 
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            BillageTextPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            BillageTextSecondary
         }
 
         Column(modifier = Modifier.width(260.dp)) {
@@ -77,7 +85,7 @@ fun DraftRequestCard(
                 Icon(
                     imageVector = Icons.Default.Assignment,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = BillagePrimary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -93,7 +101,7 @@ fun DraftRequestCard(
             
             // 내용 영역
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = BillageSurface),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -101,13 +109,13 @@ fun DraftRequestCard(
                         text = "계약명: ${message.contractTitle}", 
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = BillageTextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = message.summary, 
                         style = MaterialTheme.typography.bodyMedium, 
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = BillageTextPrimary
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -126,12 +134,12 @@ fun DraftRequestCard(
                             text = "차용증 원본 보기",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = BillagePrimary
                         )
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowRight,
                             contentDescription = "차용증 전문 보기",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = BillagePrimary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -157,7 +165,7 @@ fun DraftRequestCard(
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
                             ) {
                                 Text("동의", style = MaterialTheme.typography.labelLarge)
                             }
@@ -179,9 +187,9 @@ fun ConditionProposalCard(
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            BillageTextPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            BillageTextSecondary
         }
 
         Column(modifier = Modifier.width(260.dp)) {
@@ -190,7 +198,7 @@ fun ConditionProposalCard(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
+                    tint = BillageInfo,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -205,7 +213,7 @@ fun ConditionProposalCard(
             
             // 내용 영역 (변경된 특약리스트 하이라이트)
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f)),
+                colors = CardDefaults.cardColors(containerColor = BillageDivider.copy(alpha=0.5f)),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -213,14 +221,14 @@ fun ConditionProposalCard(
                         text = "수정된 항목:", 
                         fontWeight = FontWeight.SemiBold, 
                         style = MaterialTheme.typography.bodyMedium, 
-                        color = MaterialTheme.colorScheme.primary
+                        color = BillagePrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     message.modifications.forEachIndexed { index, mod ->
                         Text(
                             text = "${index + 1}. $mod", 
                             style = MaterialTheme.typography.bodySmall, 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = BillageTextSecondary
                         )
                         if (index < message.modifications.size - 1) {
                             Spacer(modifier = Modifier.height(4.dp))
@@ -248,7 +256,7 @@ fun ConditionProposalCard(
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillageInfo)
                             ) {
                                 Text("수락하기", style = MaterialTheme.typography.labelLarge)
                             }
@@ -273,7 +281,7 @@ fun SignatureRequestCard(
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = BillageDanger,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -281,7 +289,7 @@ fun SignatureRequestCard(
                     text = "최종 서명 대기 중",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = BillageTextSecondary
                 )
             }
             
@@ -292,7 +300,7 @@ fun SignatureRequestCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(BillageSurface)
                     .padding(12.dp)
             ) {
                 // 내 서명 상태
@@ -301,11 +309,11 @@ fun SignatureRequestCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("나의 서명", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text("나의 서명", style = MaterialTheme.typography.bodyMedium, color = BillageTextPrimary)
                     if (message.isMySignatureDone) {
-                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "완료", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "완료", tint = BillagePrimary, modifier = Modifier.size(16.dp))
                     } else {
-                        Text("대기중", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.5f))
+                        Text("대기중", style = MaterialTheme.typography.bodySmall, color = BillageTextPrimary.copy(alpha=0.5f))
                     }
                 }
                 
@@ -317,11 +325,11 @@ fun SignatureRequestCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("상대방 서명", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text("상대방 서명", style = MaterialTheme.typography.bodyMedium, color = BillageTextPrimary)
                     if (message.isOtherSignatureDone) {
-                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "완료", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "완료", tint = BillagePrimary, modifier = Modifier.size(16.dp))
                     } else {
-                        Text("대기중", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.5f))
+                        Text("대기중", style = MaterialTheme.typography.bodySmall, color = BillageTextPrimary.copy(alpha=0.5f))
                     }
                 }
             }
@@ -333,7 +341,7 @@ fun SignatureRequestCard(
                 Button(
                     onClick = onSignClick,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = BillageDanger)
                 ) {
                     Text("전자 서명 진행하기", style = MaterialTheme.typography.labelLarge)
                 }
@@ -355,7 +363,7 @@ fun ContractCompleteCard(
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = BillagePrimary,
                 modifier = Modifier.size(48.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -363,13 +371,13 @@ fun ContractCompleteCard(
                 text = "계약이 성사되었습니다!",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = BillageTextSecondary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "양측 모두 전자서명을 완료하여 상환 타임라인이 시작되었습니다.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                color = BillageTextSecondary.copy(alpha = 0.8f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             
@@ -378,7 +386,7 @@ fun ContractCompleteCard(
             Button(
                 onClick = { onDashboardClick(message.contractId) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
             ) {
                 Text("계약 대시보드로 이동", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.width(4.dp))
@@ -406,14 +414,14 @@ private fun ActionCompletedView(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .background(BillageDivider.copy(alpha = 0.4f))
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text, 
             style = MaterialTheme.typography.bodyMedium, 
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), 
+            color = BillageTextSecondary.copy(alpha = 0.7f), 
             fontWeight = FontWeight.SemiBold
         )
     }
@@ -429,13 +437,13 @@ fun SystemNoticeCard(message: SystemNoticeMessage) {
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            color = BillageDivider.copy(alpha = 0.6f)
         ) {
             Text(
                 text = message.text,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = BillageTextSecondary
             )
         }
     }
@@ -449,9 +457,9 @@ fun ProposalRequestCard(
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            BillageTextPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            BillageTextSecondary
         }
 
         Column(modifier = Modifier.width(260.dp)) {
@@ -459,7 +467,7 @@ fun ProposalRequestCard(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = BillagePrimary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -473,20 +481,20 @@ fun ProposalRequestCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = BillageSurface),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "대상: ${message.contractTitle}", 
                         style = MaterialTheme.typography.bodyMedium, 
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = BillageTextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "상대방이 위 계약건에 대해 조건 수정을 제안했습니다. 수락하시면 협의 모드가 켜집니다.", 
                         style = MaterialTheme.typography.bodySmall, 
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = BillageTextPrimary.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -509,7 +517,7 @@ fun ProposalRequestCard(
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
                             ) {
                                 Text("수락", style = MaterialTheme.typography.labelLarge)
                             }
@@ -533,7 +541,7 @@ fun PreviewDraftRequest_Pending() {
     BillageTheme(dynamicColor = false) {
         Column(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
+                .background(BillageBackground)
                 .padding(16.dp), 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -558,7 +566,7 @@ fun PreviewDraftRequest_Rejected() {
     BillageTheme(dynamicColor = false) {
         Column(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
+                .background(BillageBackground)
                 .padding(16.dp), 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -583,7 +591,7 @@ fun PreviewDraftRequest_Accepted() {
     BillageTheme(dynamicColor = false) {
         Column(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.background)
+                .background(BillageBackground)
                 .padding(16.dp), 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -606,7 +614,7 @@ fun PreviewDraftRequest_Accepted() {
 @Composable
 fun PreviewProposalRequest_Pending() {
     BillageTheme(dynamicColor = false) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+        Column(modifier = Modifier.background(BillageBackground).padding(16.dp)) {
             ProposalRequestCard(
                 message = ProposalRequestMessage(
                     id = "2",
@@ -626,7 +634,7 @@ fun PreviewProposalRequest_Pending() {
 @Composable
 fun PreviewConditionProposal() {
     BillageTheme(dynamicColor = false) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+        Column(modifier = Modifier.background(BillageBackground).padding(16.dp)) {
             ConditionProposalCard(
                 message = ConditionProposalMessage(
                     id = "3",
@@ -646,7 +654,7 @@ fun PreviewConditionProposal() {
 @Composable
 fun PreviewSystemNotice() {
     BillageTheme(dynamicColor = false) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+        Column(modifier = Modifier.background(BillageBackground).padding(16.dp)) {
             SystemNoticeCard(
                 message = SystemNoticeMessage(
                     id = "notice1",

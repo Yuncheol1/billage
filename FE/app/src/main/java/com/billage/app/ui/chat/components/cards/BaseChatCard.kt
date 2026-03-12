@@ -18,6 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.billage.app.ui.chat.models.MessageSender
+import com.billage.app.ui.theme.BillageBackground
+import com.billage.app.ui.theme.BillageDivider
+import com.billage.app.ui.theme.BillagePrimaryLight
+import com.billage.app.ui.theme.BillageTextPrimary
+import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.theme.BillageTheme
 
 /**
@@ -42,8 +47,8 @@ fun BaseChatCard(
 
     // 발신자에 따른 말풍선 색상 분기 (테마 구조 연동)
     val backgroundColor = when (sender) {
-        MessageSender.ME -> MaterialTheme.colorScheme.primaryContainer
-        MessageSender.OTHER -> MaterialTheme.colorScheme.surfaceVariant
+        MessageSender.ME -> BillagePrimaryLight
+        MessageSender.OTHER -> BillageDivider
         MessageSender.SYSTEM -> Color.Transparent
     }
 
@@ -93,23 +98,23 @@ fun BaseChatCard(
 @Composable
 fun PreviewBaseChatCardMe() {
     BillageTheme(dynamicColor = false) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.background(BillageBackground)) {
             BaseChatCard(sender = MessageSender.OTHER) {
                 Text(
                     text = "이 카드는 상대방이 보낸 카드의 틀입니다.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = BillageTextSecondary
                 )
             }
             BaseChatCard(sender = MessageSender.ME) {
                 Text(
                     text = "이 카드는 내가 보낸 카드(오른쪽 정렬)의 기본 틀입니다.",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = BillageTextPrimary
                 )
             }
             BaseChatCard(sender = MessageSender.SYSTEM) {
                 Text(
                     text = "System: 오늘의 채팅이 시작되었습니다.",
-                    color = MaterialTheme.colorScheme.outline
+                    color = BillageTextSecondary
                 )
             }
         }

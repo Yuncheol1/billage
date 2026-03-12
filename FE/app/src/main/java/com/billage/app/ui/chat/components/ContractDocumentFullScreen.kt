@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import com.billage.app.ui.theme.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,7 +32,7 @@ fun ContractDocumentFullScreen(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+            color = BillageBackground
         ) {
             Column(
                 modifier = Modifier
@@ -49,7 +50,7 @@ fun ContractDocumentFullScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
                             contentDescription = "닫기",
-                            tint = MaterialTheme.colorScheme.onBackground
+                            tint = BillageTextPrimary
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -57,11 +58,11 @@ fun ContractDocumentFullScreen(
                         text = "차용증 전문 보기",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = BillageTextPrimary
                     )
                 }
                 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f))
+                HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
 
                 // 스크롤 가능한 본문 영역
                 Column(
@@ -74,7 +75,7 @@ fun ContractDocumentFullScreen(
                         text = title,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = BillagePrimary
                     )
                     
                     Spacer(modifier = Modifier.height(24.dp))
@@ -82,7 +83,7 @@ fun ContractDocumentFullScreen(
                     Text(
                         text = details,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = BillageTextPrimary,
                         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.6f // 가독성을 위한 줄간격 조정
                     )
                     

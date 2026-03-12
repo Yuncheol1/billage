@@ -33,6 +33,9 @@ import com.billage.app.ui.chat.models.FileMessage
 import com.billage.app.ui.chat.models.ImageMessage
 import com.billage.app.ui.chat.models.LinkMessage
 import com.billage.app.ui.chat.models.MessageSender
+import com.billage.app.ui.theme.BillageBackground
+import com.billage.app.ui.theme.BillageTextPrimary
+import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.theme.BillageTheme
 import java.time.LocalDateTime
 
@@ -43,9 +46,9 @@ fun FileChatCard(
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            BillageTextPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            BillageTextSecondary
         }
 
         Row(
@@ -59,7 +62,7 @@ fun FileChatCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                    .background(BillageTextPrimary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -123,12 +126,12 @@ fun ImageChatCard(
                             message.thumbnailWidth.toFloat() / message.thumbnailHeight.toFloat()
                         else 1f
                     )
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                    .background(BillageTextPrimary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "Image Placeholder", 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                    color = BillageTextSecondary, 
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -143,9 +146,9 @@ fun LinkChatCard(
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            BillageTextPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            BillageTextSecondary
         }
 
         Column(
@@ -159,7 +162,7 @@ fun LinkChatCard(
                     .fillMaxWidth()
                     .height(120.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                    .background(BillageTextPrimary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -210,7 +213,7 @@ fun LinkChatCard(
 @Composable
 fun PreviewMediaCards() {
     BillageTheme(dynamicColor = false) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.background(BillageBackground)) {
             FileChatCard(
                 message = FileMessage(
                     id = "1",
