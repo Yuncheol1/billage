@@ -42,6 +42,13 @@ import com.billage.app.ui.theme.BillageSurface
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 
+enum class BottomBarTab {
+    Home,
+    Chat,
+    Contract,
+    Menu
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(
@@ -98,29 +105,41 @@ fun TopBar(
 }
 
 @Composable
-fun BottomBar(onAddContractClick: () -> Unit) {
+fun BottomBar(
+    selectedTab: BottomBarTab = BottomBarTab.Home,
+    onAddContractClick: () -> Unit,
+    onHomeClick: () -> Unit = {},
+    onChatClick: () -> Unit = {},
+    onContractClick: () -> Unit = {},
+    onMenuClick: () -> Unit = {}
+) {
     Box {
         NavigationBar(
             containerColor = BillageSurface,
             tonalElevation = 8.dp
         ) {
             NavigationBarItem(
-                selected = true,
-                onClick = {},
+                selected = selectedTab == BottomBarTab.Home,
+                onClick = onHomeClick,
                 icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                 label = { Text("홈") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = BillagePrimary,
                     selectedTextColor = BillagePrimary,
-                    indicatorColor = BillagePrimaryLight
+                    indicatorColor = BillagePrimaryLight,
+                    unselectedIconColor = BillageTextSecondary,
+                    unselectedTextColor = BillageTextSecondary
                 )
             )
             NavigationBarItem(
-                selected = false,
-                onClick = {},
+                selected = selectedTab == BottomBarTab.Chat,
+                onClick = onChatClick,
                 icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
                 label = { Text("채팅") },
                 colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = BillagePrimary,
+                    selectedTextColor = BillagePrimary,
+                    indicatorColor = BillagePrimaryLight,
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
                 )
@@ -134,21 +153,27 @@ fun BottomBar(onAddContractClick: () -> Unit) {
                 label = { Text("") }
             )
             NavigationBarItem(
-                selected = false,
-                onClick = {},
+                selected = selectedTab == BottomBarTab.Contract,
+                onClick = onContractClick,
                 icon = { Icon(Icons.Default.Description, contentDescription = "Contracts") },
                 label = { Text("내 계약") },
                 colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = BillagePrimary,
+                    selectedTextColor = BillagePrimary,
+                    indicatorColor = BillagePrimaryLight,
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
                 )
             )
             NavigationBarItem(
-                selected = false,
-                onClick = {},
+                selected = selectedTab == BottomBarTab.Menu,
+                onClick = onMenuClick,
                 icon = { Icon(Icons.Default.Menu, contentDescription = "Menu") },
                 label = { Text("메뉴") },
                 colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = BillagePrimary,
+                    selectedTextColor = BillagePrimary,
+                    indicatorColor = BillagePrimaryLight,
                     unselectedIconColor = BillageTextSecondary,
                     unselectedTextColor = BillageTextSecondary
                 )

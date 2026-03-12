@@ -35,6 +35,7 @@ fun HomeScreen(
     onAddContractClick: () -> Unit = {},
     onActivityClick: () -> Unit = {},
     onScheduleAllClick: () -> Unit = {},
+    onMypageClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -49,7 +50,10 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            BottomBar(onAddContractClick = onAddContractClick)
+            BottomBar(
+                onAddContractClick = onAddContractClick,
+                onContractClick = onMypageClick
+            )
         }
     ) { paddingValues ->
         Column(
