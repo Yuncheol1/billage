@@ -35,3 +35,18 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### application configuration ###
+application-dev.yaml
+application-dev.yml
+application-local.yaml
+application-local.yml
+application-secret.yaml
+application-secret.yml
+application-prod.yaml
+application-prod.yml
+
+### OS files ###
+.DS_Store
+Thumbs.db
+schema.sql
