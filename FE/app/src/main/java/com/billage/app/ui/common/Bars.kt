@@ -44,8 +44,8 @@ import com.billage.app.ui.theme.BillageTextSecondary
 
 enum class BottomBarTab {
     Home,
-    Chat,
     Contract,
+    ChatList,
     Menu
 }
 
@@ -132,7 +132,7 @@ fun BottomBar(
                 )
             )
             NavigationBarItem(
-                selected = selectedTab == BottomBarTab.Chat,
+                selected = selectedTab == BottomBarTab.ChatList,
                 onClick = onChatClick,
                 icon = { Icon(Icons.Default.ChatBubble, contentDescription = "Chat") },
                 label = { Text("채팅") },

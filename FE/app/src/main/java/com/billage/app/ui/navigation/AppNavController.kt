@@ -57,24 +57,35 @@ class AppNavController(
 
     fun navigateToHome() {
         navController.navigate(AppDestination.Home.route) {
+            popUpTo(AppDestination.Home.route) {
+                saveState = true
+            }
             launchSingleTop = true
+            restoreState = true
         }
     }
 
     fun navigateToContract() {
         navController.navigate(AppDestination.Contract.route) {
+            popUpTo(AppDestination.Home.route) {
+                saveState = true
+            }
             launchSingleTop = true
+            restoreState = true
         }
     }
 
     fun navigateToChatList() {
         navController.navigate(AppDestination.ChatList.route) {
+            popUpTo(AppDestination.Home.route) {
+                saveState = true
+            }
             launchSingleTop = true
+            restoreState = true
         }
     }
 
     fun navigateToChatRoom(roomId: String? = null) {
-        // 나중에 roomId를 argument로 넘기도록 수정할 수 있습니다.
         navController.navigate(AppDestination.ChatRoom.route) {
             launchSingleTop = true
         }
@@ -82,7 +93,11 @@ class AppNavController(
 
     fun navigateToMypage() {
         navController.navigate(AppDestination.Mypage.route) {
+            popUpTo(AppDestination.Home.route) {
+                saveState = true
+            }
             launchSingleTop = true
+            restoreState = true
         }
     }
 

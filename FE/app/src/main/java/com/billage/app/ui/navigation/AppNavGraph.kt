@@ -48,7 +48,8 @@ fun NavGraphBuilder.appNavGraph(
         com.billage.app.ui.chat.ChatListScreen(
             onChatRoomClick = { roomId -> appNavController.navigateToChatRoom(roomId) },
             onHomeClick = { appNavController.navigateToHome() },
-            onAddContractClick = { appNavController.navigateToContract() }
+            onAddContractClick = { appNavController.navigateToContract() },
+            onContractClick = { appNavController.navigateToMypage() }
         )
     }
 
@@ -70,7 +71,8 @@ fun NavGraphBuilder.appNavGraph(
         MypageScreen(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { appNavController.navigateToContract() }
+            onAddContractClick = { appNavController.navigateToContract() },
+            onChatClick = { appNavController.navigateToChatList() }
         )
     }
 }
