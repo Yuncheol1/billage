@@ -3,11 +3,11 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0
-    container_name: mysql_csai
+    container_name: mysql_billage
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 1234
-      MYSQL_DATABASE: csai
+      MYSQL_DATABASE: billage
       MYSQL_USER: user
       MYSQL_PASSWORD: 1234
       TZ: Asia/Seoul
@@ -18,7 +18,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:latest
-    container_name: phpmyadmin_csai
+    container_name: phpmyadmin_billage
     restart: always
     depends_on:
       - db
@@ -30,9 +30,23 @@ services:
       PMA_ARBITRARY: 0
       TZ: Asia/Seoul
 
+  mongodb:
+    image: mongo:7
+    container_name: mongo_billage
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: 1234
+      MONGO_INITDB_DATABASE: billage
+      TZ: Asia/Seoul
+    volumes:
+      - mongo-data:/data/db
+
   redis:
     image: redis:7
-    container_name: redis_csai
+    container_name: redis_billage
     restart: always
     ports:
       - "6379:6379"
@@ -41,4 +55,5 @@ services:
 
 volumes:
   mysql-data:
+  mongo-data:
   redis-data:
