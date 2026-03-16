@@ -45,7 +45,6 @@ application-secret.yaml
 application-secret.yml
 application-prod.yaml
 application-prod.yml
-application.yaml
 
 ### OS files ###
 .DS_Store
