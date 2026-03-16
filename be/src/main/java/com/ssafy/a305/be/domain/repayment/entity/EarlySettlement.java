@@ -20,7 +20,7 @@ public class EarlySettlement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "settlement_seq")
-    private Long settlementSeq;
+    private Integer settlementSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)

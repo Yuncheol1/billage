@@ -20,7 +20,7 @@ public class TermsMaster {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "terms_seq")
-    private Long termsSeq;
+    private Integer termsSeq;
 
     @Column(name = "terms_key", nullable = false)
     private String termsKey;

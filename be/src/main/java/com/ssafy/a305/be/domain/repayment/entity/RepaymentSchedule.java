@@ -19,7 +19,7 @@ public class RepaymentSchedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "schedule_seq")
-    private Long scheduleSeq;
+    private Integer scheduleSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)

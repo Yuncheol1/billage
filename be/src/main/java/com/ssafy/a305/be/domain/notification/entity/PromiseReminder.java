@@ -18,7 +18,7 @@ public class PromiseReminder {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "reminder_seq")
-    private Long reminderSeq;
+    private Integer reminderSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creator_seq", nullable = false)

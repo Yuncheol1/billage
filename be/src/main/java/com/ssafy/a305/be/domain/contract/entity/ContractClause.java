@@ -19,7 +19,7 @@ public class ContractClause {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "clause_seq")
-    private Long clauseSeq;
+    private Integer clauseSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)

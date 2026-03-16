@@ -28,7 +28,7 @@ public class ContractController {
         // 실제 환경에서는 SecurityContext나 인터셉터/ArgumentResolver 등에서 
         // JWT 검증 후 회원 PK(User Seq)를 꺼내옵니다.
         // 현재는 구현 예시로 임의의 creditorUserSeq(1L)를 주입한다고 가정합니다.
-        Long creditorUserSeq = 1L; 
+        Integer creditorUserSeq = 1; 
 
         ContractDraftResponseDto responseDto = contractService.createDraft(creditorUserSeq, requestDto);
 

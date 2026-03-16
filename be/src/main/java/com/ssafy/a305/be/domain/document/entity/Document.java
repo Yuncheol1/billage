@@ -3,6 +3,8 @@ package com.ssafy.a305.be.domain.document.entity;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -17,7 +19,7 @@ public class Document {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "document_seq")
-    private Long documentSeq;
+    private Integer documentSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)
@@ -42,4 +44,8 @@ public class Document {
 
     @Column(name = "generated_dttm")
     private LocalDateTime generatedDttm;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "doc_content_json", nullable = false, columnDefinition = "json")
+    private String docContentJson;
 }

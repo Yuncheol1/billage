@@ -36,13 +36,13 @@ public class ContractService {
     // private final AIService aiService;
 
     @Transactional
-    public ContractDraftResponseDto createDraft(Long creditorUserSeq, ContractDraftRequestDto requestDto) {
+    public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
         
         // 1. 도메인 유효성 및 엣지 케이스 점검
         validateBusinessRules(creditorUserSeq, requestDto);
 
         // 2. 채권자/채무자 회원 엔티티 조회
-        User creditor = userRepository.findById(creditorUserSeq.intValue())
+        User creditor = userRepository.findById(creditorUserSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
         
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
@@ -126,9 +126,9 @@ public class ContractService {
                 .build();
     }
 
-    private void validateBusinessRules(Long creditorUserSeq, ContractDraftRequestDto request) {
+    private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
         // 본인 거래 방지
-        if (creditorUserSeq.intValue() == request.getDebtorUserSeq()) {
+        if (creditorUserSeq.equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
         }
 
@@ -161,7 +161,7 @@ public class ContractService {
                     .principalDue(request.getPrincipalAmount())
                     .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt()))
                     .totalDue(request.getPrincipalAmount().add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt())))
-                    .status("PENDING")
+                    .status("NONPAID")
                     .createdDttm(LocalDateTime.now())
                     .build();
             contract.addRepaymentSchedule(schedule);
@@ -199,7 +199,7 @@ public class ContractService {
                         .interestDue(interestPerMth)
                         .totalDue(currentPrincipalDue.add(interestPerMth))
                         .remainingBalanceAfter(remainingPrincipal)
-                        .status("PENDING")
+                        .status("NONPAID")
                         .createdDttm(LocalDateTime.now())
                         .build();
 

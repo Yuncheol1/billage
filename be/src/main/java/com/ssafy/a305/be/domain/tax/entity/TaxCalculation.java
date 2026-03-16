@@ -18,7 +18,7 @@ public class TaxCalculation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "tax_seq")
-    private Long taxSeq;
+    private Integer taxSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)

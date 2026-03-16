@@ -10,7 +10,7 @@ import java.util.List;
 @Builder
 public class ContractDraftResponseDto {
 
-    private Long contractSeq;
+    private Integer contractSeq;
     private String contractId;
     private String status;
     private AiDraftContent aiDraftContent;
@@ -26,7 +26,7 @@ public class ContractDraftResponseDto {
     @Getter
     @Builder
     public static class ClauseResponse {
-        private Long clauseSeq;
+        private Integer clauseSeq;
         private String clauseId;
         private String title;
         private String content;

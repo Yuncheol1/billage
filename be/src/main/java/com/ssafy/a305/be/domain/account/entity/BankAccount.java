@@ -18,7 +18,7 @@ public class BankAccount {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "account_seq")
-    private Long accountSeq;
+    private Integer accountSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_seq", nullable = false)

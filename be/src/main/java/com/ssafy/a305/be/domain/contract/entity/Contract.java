@@ -22,7 +22,7 @@ public class Contract {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "contract_seq")
-    private Long contractSeq;
+    private Integer contractSeq;
 
     @Column(name = "contract_id")
     private String contractId;
