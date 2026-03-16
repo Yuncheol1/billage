@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +58,10 @@ fun ContractScreen(
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val formState by viewModel.formState.collectAsState()
+
+    val isNextEnabled by remember(currentStep, formState) {
+        derivedStateOf { viewModel.isNextEnabled() }
+    }
 
     // ── 뒤로가기 처리 ─────────────────────
     // Step 1이면 홈으로, 그 외엔 이전 스텝으로
@@ -151,7 +157,7 @@ fun ContractScreen(
         // Step 8의 전송 버튼은 Step8PreviewScreen 내부에서 처리
         if (currentStep < ContractViewModel.TOTAL_STEPS) {
             ContractNextButton(
-                enabled = viewModel.isNextEnabled(),
+                enabled = isNextEnabled,
                 onClick = { viewModel.nextStep() }
             )
         }
