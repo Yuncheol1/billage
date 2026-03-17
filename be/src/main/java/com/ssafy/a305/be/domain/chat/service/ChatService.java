@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.chat.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.ssafy.a305.be.domain.user.entity.UserProfile;
 import org.springframework.stereotype.Service;
 
 import com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto;
@@ -56,7 +57,7 @@ public class ChatService {
         chatRoom.updateLastMessage(savedMessage.getContent());
         chatRoomRepository.save(chatRoom);
 
-        String senderName = userProfileRepository.findByUser_UserSeq(requestDto.senderSeq().longValue())
+        String senderName = userProfileRepository.findByUserUserSeq(requestDto.senderSeq())
             .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
             .orElse("알 수 없음");
 
@@ -66,7 +67,7 @@ public class ChatService {
     public List<ChatMessageResponseDto> getMessagesByRoomId(String roomId) {
         return chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId).stream()
                 .map(msg -> {
-                    String senderName = userProfileRepository.findByUser_UserSeq(msg.getSenderSeq().longValue())
+                    String senderName = userProfileRepository.findByUserUserSeq(msg.getSenderSeq())
                         .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
                         .orElse("알 수 없음");
                     return ChatMessageResponseDto.of(msg, senderName);
@@ -78,12 +79,7 @@ public class ChatService {
         return chatRoomRepository.findByParticipantsContainingOrderByLastModifiedAtDesc(userSeq).stream()
                 .map(room -> {
                     List<ParticipantDto> participantDtos = room.getParticipants().stream()
-                        .map(seq -> {
-                            String name = userProfileRepository.findByUser_UserSeq(seq.longValue())
-                                .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
-                                .orElse("알 수 없음");
-                            return ParticipantDto.of(seq, name);
-                        })
+                        .map(this::apply)
                         .collect(Collectors.toList());
                     return ChatRoomResponseDto.of(room, participantDtos);
                 })
@@ -95,7 +91,7 @@ public class ChatService {
         com.ssafy.a305.be.domain.user.entity.User targetUser = userRepository.findByEmail(targetEmail)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + targetEmail));
         
-        Integer targetUserSeq = targetUser.getUserSeq().intValue();
+        Integer targetUserSeq = targetUser.getUserSeq();
         
         if (myUserSeq.equals(targetUserSeq)) {
             throw new IllegalArgumentException("자기 자신과 채팅방을 생성할 수 없습니다.");
@@ -122,12 +118,7 @@ public class ChatService {
 
         // DTO 반환
         List<ParticipantDto> participantDtos = chatRoom.getParticipants().stream()
-            .map(seq -> {
-                String name = userProfileRepository.findByUser_UserSeq(seq.longValue())
-                    .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
-                    .orElse("알 수 없음");
-                return ParticipantDto.of(seq, name);
-            })
+            .map(this::apply2)
             .collect(Collectors.toList());
 
         return ChatRoomResponseDto.of(chatRoom, participantDtos);
@@ -151,5 +142,19 @@ public class ChatService {
                 chatRoomRepository.save(room);
             }
         }
+    }
+
+    private ParticipantDto apply(Integer seq) {
+        String name = userProfileRepository.findByUserUserSeq(seq)
+                .map(UserProfile::getRealName)
+                .orElse("알 수 없음");
+        return ParticipantDto.of(seq, name);
+    }
+
+    private ParticipantDto apply2(Integer seq) {
+        String name = userProfileRepository.findByUserUserSeq(seq)
+                .map(UserProfile::getRealName)
+                .orElse("알 수 없음");
+        return ParticipantDto.of(seq, name);
     }
 }
