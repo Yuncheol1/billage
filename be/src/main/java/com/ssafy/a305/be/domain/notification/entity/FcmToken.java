@@ -37,4 +37,9 @@ public class FcmToken {
 
     @Column(name = "invalidated_dttm")
     private LocalDateTime invalidatedDttm;
+
+    public void deactivate() {
+        this.isActive = false;
+        this.invalidatedDttm = LocalDateTime.now();
+    }
 }

@@ -34,4 +34,9 @@ public class UserConsent {
 
     @Column(name = "agreed_dttm", nullable = false)
     private LocalDateTime agreedDttm;
+
+    public void changeAgreement(boolean agreed) {
+        this.isAgreed = agreed;
+        this.agreedDttm = LocalDateTime.now();
+    }
 }

@@ -9,7 +9,12 @@ import java.time.LocalDateTime;
  * 소셜 로그인 (KAKAO, NAVER, GOOGLE 등)
  */
 @Entity
-@Table(name = "social_auth")
+@Table(
+        name = "social_auth",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_social_auth_provider_user", columnNames = {"provider", "provider_user_id"})
+        }
+)
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

@@ -3,3 +3,23 @@ spring:
     name: be
   profiles:
     active: dev
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+auth:
+  jwt:
+    issuer: ${JWT_ISSUER:be}
+    secret: ${JWT_SECRET:}
+    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
+    refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:1209600}
+
+oauth:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    scope: ${KAKAO_SCOPE:account_email,name,gender,birthday,birthyear,phone_number,friends,talk_message}
+    token-uri: ${KAKAO_TOKEN_URI:https://kauth.kakao.com/oauth/token}
+    user-info-uri: ${KAKAO_USER_INFO_URI:https://kapi.kakao.com/v2/user/me}
