@@ -22,6 +22,7 @@ data class ContractSummary(
  */
 data class ChatRoomState(
     val roomId: String = "",
+    val roomName: String = "대화방",
     val mode: ChatRoomMode = ChatRoomMode.NORMAL,
     val selectedContract: ContractSummary? = null
 )

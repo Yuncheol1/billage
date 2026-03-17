@@ -27,7 +27,7 @@ fun ChatRoomScreen(
     Scaffold(
         topBar = {
             ChatTopBar(
-                title = "김철수", // 추후 state에서 가져오도록 확장 가능
+                title = state.roomName, // state에서 가져온 방 제목 표시
                 onBackClick = onBackClick
             )
         },
