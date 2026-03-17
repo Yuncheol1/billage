@@ -60,10 +60,16 @@ class AppNavController(
         }
     }
 
-    fun navigateToHome() {
+    fun navigateToHome(clearBackStack: Boolean = false) {
         navController.navigate(AppDestination.Home.route) {
-            popUpTo(AppDestination.Home.route) {
-                saveState = true
+            if (clearBackStack) {
+                popUpTo(AppDestination.Login.route) {
+                    inclusive = true
+                }
+            } else {
+                popUpTo(AppDestination.Home.route) {
+                    saveState = true
+                }
             }
             launchSingleTop = true
             restoreState = true
