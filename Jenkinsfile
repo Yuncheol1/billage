@@ -20,15 +20,40 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh '''
-                    docker stop billage-be || true
-                    docker rm billage-be || true
-                    docker run -d \
-                        --name billage-be \
-                        -p 8080:8080 \
-                        -v /etc/billage/application-prod.yml:/app/config/application-prod.yml \
-                        billage-be
-                '''
+                withCredentials([
+                    string(credentialsId: 'mysql-url', variable: 'MYSQL_URL'),
+                    string(credentialsId: 'mysql-username', variable: 'MYSQL_USERNAME'),
+                    string(credentialsId: 'mysql-password', variable: 'MYSQL_PASSWORD'),
+                    string(credentialsId: 'mongodb-uri', variable: 'MONGODB_URI'),
+                    string(credentialsId: 'redis-host', variable: 'REDIS_HOST'),
+                    string(credentialsId: 'redis-port', variable: 'REDIS_PORT'),
+                    string(credentialsId: 'redis-password', variable: 'REDIS_PASSWORD'),
+                    string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
+                    string(credentialsId: 'kakao-client-id', variable: 'KAKAO_CLIENT_ID'),
+                    string(credentialsId: 'kakao-client-secret', variable: 'KAKAO_CLIENT_SECRET')
+                ]) {
+                    sh '''
+                        docker stop billage-be || true
+                        docker rm billage-be || true
+                        docker run -d \
+                            --name billage-be \
+                            --restart unless-stopped \
+                            -p 8080:8080 \
+                            -v /etc/billage/application-prod.yml:/app/config/application-prod.yml \
+                            -e SPRING_DATASOURCE_URL=$MYSQL_URL \
+                            -e SPRING_DATASOURCE_USERNAME=$MYSQL_USERNAME \
+                            -e SPRING_DATASOURCE_PASSWORD=$MYSQL_PASSWORD \
+                            -e SPRING_DATA_MONGODB_URI=$MONGODB_URI \
+                            -e SPRING_DATA_REDIS_HOST=$REDIS_HOST \
+                            -e SPRING_DATA_REDIS_PORT=$REDIS_PORT \
+                            -e SPRING_DATA_REDIS_PASSWORD=$REDIS_PASSWORD \
+                            -e JWT_SECRET=$JWT_SECRET \
+                            -e KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID \
+                            -e KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET \
+                            billage-be
+                        docker image prune -f
+                    '''
+                }
             }
         }
     }
