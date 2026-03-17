@@ -5,7 +5,7 @@ pipeline {
         stage('Pull') {
             steps {
                 git branch: 'develop-be',
-                    credentialsId: 'gitlab-api-token',
+                    credentialsId: 'gitlab-git-credentials',
                     url: 'https://lab.ssafy.com/s14-fintech-finance-sub1/S14P21A305.git'
             }
         }
