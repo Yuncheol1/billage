@@ -1,8 +1,9 @@
-﻿package com.billage.app.ui.auth
+package com.billage.app.ui.auth
 
-import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -11,13 +12,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,19 +29,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.BuildConfig
 import com.billage.app.R
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
-import com.kakao.sdk.common.model.ClientError
-import com.kakao.sdk.common.model.ClientErrorCause
-import com.kakao.sdk.user.UserApiClient
 
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit,
+    onDevBypassClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -68,7 +64,7 @@ fun LoginScreen(
             )
 
             Text(
-                text = "쉽게 빌려주고 빌려요",
+                text = "Borrow and lend with less friction",
                 color = Color.White.copy(alpha = 0.92f),
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -89,7 +85,7 @@ fun LoginScreen(
                     .padding(horizontal = 28.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = "빌리지를 소개합니다.",
+                    text = "Start your Billage login",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
@@ -105,18 +101,13 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .height(56.dp)
                     .clickable {
-                        val activity = context.findActivity()
-                        if (activity == null) {
-                            Log.e("KakaoLogin", "Login failed: Activity not found from context")
-                            return@clickable
-                        }
-                        startKakaoLogin(activity, onLoginClick)
+                        startKakaoLogin(context)
                     }
             )
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = onLoginClick,
+                onClick = onDevBypassClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -126,60 +117,25 @@ fun LoginScreen(
                 )
             ) {
                 Text(
-                    text = "홈 바로가기(개발용)",
+                    text = "Go home (dev)",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
             }
             Spacer(modifier = Modifier.height(38.dp))
-
         }
     }
 }
 
-private fun startKakaoLogin(
-    activity: Activity,
-    onSuccess: () -> Unit
-) {
-    val callback: (com.kakao.sdk.auth.model.OAuthToken?, Throwable?) -> Unit = { _, error ->
-        if (error != null) {
-            Log.e("KakaoLogin", "Login failed", error)
-            Toast.makeText(
-                activity,
-                "Kakao login failed: ${error.localizedMessage}",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            onSuccess()
-        }
-    }
+private fun startKakaoLogin(context: Context) {
+    val authorizeUri = Uri.parse("${BuildConfig.BACKEND_BASE_URL}/api/v1/auth/kakao/authorize")
+    val intent = Intent(Intent.ACTION_VIEW, authorizeUri)
 
-    if (UserApiClient.instance.isKakaoTalkLoginAvailable(activity)) {
-        UserApiClient.instance.loginWithKakaoTalk(activity) { _, error ->
-            if (error != null) {
-                val clientError = error as? ClientError
-                if (clientError?.reason == ClientErrorCause.Cancelled) {
-                    Log.i("KakaoLogin", "Login cancelled by user")
-                    Toast.makeText(
-                        activity,
-                        "Kakao login cancelled",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@loginWithKakaoTalk
-                }
-                UserApiClient.instance.loginWithKakaoAccount(activity, callback = callback)
-            } else {
-                onSuccess()
-            }
-        }
-    } else {
-        UserApiClient.instance.loginWithKakaoAccount(activity, callback = callback)
+    try {
+        context.startActivity(intent)
+    } catch (error: ActivityNotFoundException) {
+        Log.e("KakaoLogin", "Browser launch failed", error)
+        Toast.makeText(context, "Cannot open browser.", Toast.LENGTH_SHORT).show()
     }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
