@@ -15,17 +15,17 @@ enum class RepaymentMethod {
 }
 
 enum class RepaymentDayType {
-    FIRST,   // 매월 1일
-    LAST,    // 매월 말일
-    CUSTOM   // 직접 지정 (1~28일)
+    FIRST,   // 첫째 날
+    LAST,    // 마지막 날
+    CUSTOM   // 직접 지정 (1~31일)
 }
 
 data class ContractFormState(
     val isFamily: Boolean? = null,
     val amount: String = "",
     val interestRate: String = "",
-    val startDate: String = "",         // Step 4 (yyyy-MM-dd)
-    val endDate: String = "",           // Step 4 (yyyy-MM-dd)
+    val startDate: String = "",
+    val endDate: String = "",
     val repaymentMethod: RepaymentMethod? = null,
     val repaymentDayType: RepaymentDayType? = null,
     val repaymentCustomDay: Int? = null,
@@ -64,12 +64,27 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(interestRate = rate) }
     }
 
+    // 날짜 변경 시 상환 방식 초기화 — 기간이 바뀌면 이전 선택이 유효하지 않을 수 있음
     fun updateStartDate(date: String) {
-        _formState.update { it.copy(startDate = date) }
+        _formState.update {
+            it.copy(
+                startDate = date,
+                repaymentMethod = null,
+                repaymentDayType = null,
+                repaymentCustomDay = null
+            )
+        }
     }
 
     fun updateEndDate(date: String) {
-        _formState.update { it.copy(endDate = date) }
+        _formState.update {
+            it.copy(
+                endDate = date,
+                repaymentMethod = null,
+                repaymentDayType = null,
+                repaymentCustomDay = null
+            )
+        }
     }
 
     fun updateRepaymentMethod(method: RepaymentMethod) {
