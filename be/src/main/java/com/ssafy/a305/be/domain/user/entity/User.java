@@ -39,18 +39,22 @@ public class User {
 
     public void changeState(String state) {
         this.state = state;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void updateEmail(String email) {
         this.email = email;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void updatePhone(String phone) {
         this.phone = phone;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void markDeleted() {
         this.state = "DELETED";
         this.deletedDttm = LocalDateTime.now();
+        this.updatedDttm = this.deletedDttm;
     }
 }
