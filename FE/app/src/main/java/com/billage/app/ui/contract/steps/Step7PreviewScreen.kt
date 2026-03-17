@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import com.billage.app.ui.contract.ContractFormState
 
 @Composable
-fun Step8PreviewScreen(
+fun Step7PreviewScreen(
     formState: ContractFormState,
     onEditStep: (Int) -> Unit,
     onSubmit: () -> Unit

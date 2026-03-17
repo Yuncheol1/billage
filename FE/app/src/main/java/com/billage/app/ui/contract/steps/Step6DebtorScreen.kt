@@ -8,15 +8,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 @Composable
-fun Step5EndDateScreen(
-    endDate: String,
-    startDate: String,
-    onDateSelect: (String) -> Unit
+fun Step6DebtorScreen(
+    phone: String,
+    onPhoneChange: (String) -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text("Step 5 - 만기일")
+        Text("Step 7 - 채무자 연락처")
     }
 }

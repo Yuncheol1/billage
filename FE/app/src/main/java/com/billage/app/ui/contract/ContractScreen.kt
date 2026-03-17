@@ -7,27 +7,27 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,45 +40,37 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.contract.steps.Step1FamilyScreen
 import com.billage.app.ui.contract.steps.Step2AmountScreen
 import com.billage.app.ui.contract.steps.Step3InterestScreen
-import com.billage.app.ui.contract.steps.Step4StartDateScreen
-import com.billage.app.ui.contract.steps.Step5EndDateScreen
-import com.billage.app.ui.contract.steps.Step6RepaymentScreen
-import com.billage.app.ui.contract.steps.Step7DebtorScreen
-import com.billage.app.ui.contract.steps.Step8PreviewScreen
+import com.billage.app.ui.contract.steps.Step4DateScreen
+import com.billage.app.ui.contract.steps.Step5RepaymentScreen
+import com.billage.app.ui.contract.steps.Step6DebtorScreen
+import com.billage.app.ui.contract.steps.Step7PreviewScreen
 import com.billage.app.ui.theme.BillagePrimary
-import com.billage.app.ui.theme.BillageTextPrimary
-import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillagePrimaryDisabled
+import com.billage.app.ui.theme.BillagePrimaryLight
+import com.billage.app.ui.theme.BillageTextPrimary
 
 @Composable
 fun ContractScreen(
-    onNavigateBack: () -> Unit,          // 홈으로 나가기 (Step 1에서 뒤로가기)
-    onContractComplete: () -> Unit,      // 전송 완료 후 대기 화면으로 이동
+    onNavigateBack: () -> Unit,
+    onContractComplete: () -> Unit,
     viewModel: ContractViewModel = viewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val formState by viewModel.formState.collectAsState()
-
     val isNextEnabled by remember(currentStep, formState) {
         derivedStateOf { viewModel.isNextEnabled() }
     }
 
-    // ── 뒤로가기 처리 ─────────────────────
-    // Step 1이면 홈으로, 그 외엔 이전 스텝으로
     BackHandler {
-        if (currentStep == 1) {
-            onNavigateBack()
-        } else {
-            viewModel.prevStep()
-        }
+        if (currentStep == 1) onNavigateBack()
+        else viewModel.prevStep()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .navigationBarsPadding() // 하단 네비게이션 바 높이만큼 패딩
+            .navigationBarsPadding()
     ) {
-        // ── 상단 영역: 뒤로가기 + 스텝 표시 + 진행바 ──
         ContractTopBar(
             currentStep = currentStep,
             onBackClick = {
@@ -87,14 +79,10 @@ fun ContractScreen(
             }
         )
 
-        // ── 스텝별 화면 전환 ──────────────────
-        // AnimatedContent: 스텝 이동 시 슬라이드 애니메이션
         AnimatedContent(
             targetState = currentStep,
-            modifier = Modifier.weight(1f), // 남은 공간 전부 차지
+            modifier = Modifier.weight(1f),
             transitionSpec = {
-                // 다음 스텝: 오른쪽에서 슬라이드인
-                // 이전 스텝: 왼쪽에서 슬라이드인
                 if (targetState > initialState) {
                     (slideInHorizontally { it } + fadeIn()) togetherWith
                             (slideOutHorizontally { -it } + fadeOut())
@@ -120,16 +108,13 @@ fun ContractScreen(
                     amount = formState.amount,
                     onRateChange = { viewModel.updateInterestRate(it) }
                 )
-                4 -> Step4StartDateScreen(
+                4 -> Step4DateScreen(
                     startDate = formState.startDate,
-                    onDateSelect = { viewModel.updateStartDate(it) }
-                )
-                5 -> Step5EndDateScreen(
                     endDate = formState.endDate,
-                    startDate = formState.startDate,
-                    onDateSelect = { viewModel.updateEndDate(it) }
+                    onStartDateSelect = { viewModel.updateStartDate(it) },
+                    onEndDateSelect = { viewModel.updateEndDate(it) }
                 )
-                6 -> Step6RepaymentScreen(
+                5 -> Step5RepaymentScreen(
                     startDate = formState.startDate,
                     endDate = formState.endDate,
                     selectedMethod = formState.repaymentMethod,
@@ -139,11 +124,11 @@ fun ContractScreen(
                     onDayTypeSelect = { viewModel.updateRepaymentDayType(it) },
                     onCustomDaySelect = { viewModel.updateRepaymentCustomDay(it) }
                 )
-                7 -> Step7DebtorScreen(
+                6 -> Step6DebtorScreen(
                     phone = formState.debtorPhone,
                     onPhoneChange = { viewModel.updateDebtorPhone(it) }
                 )
-                8 -> Step8PreviewScreen(
+                7 -> Step7PreviewScreen(
                     formState = formState,
                     onEditStep = { viewModel.goToStep(it) },
                     onSubmit = { onContractComplete() }
@@ -152,9 +137,6 @@ fun ContractScreen(
             }
         }
 
-        // ── 하단 다음 버튼 ────────────────────
-        // Step 8(미리보기)에서는 버튼을 숨김
-        // Step 8의 전송 버튼은 Step8PreviewScreen 내부에서 처리
         if (currentStep < ContractViewModel.TOTAL_STEPS) {
             ContractNextButton(
                 enabled = isNextEnabled,
@@ -164,8 +146,6 @@ fun ContractScreen(
     }
 }
 
-// ── 상단 TopBar ────────────────────────────
-// 뒤로가기 아이콘 + "현재스텝 / 전체스텝" + 진행바
 @Composable
 private fun ContractTopBar(
     currentStep: Int,
@@ -183,7 +163,6 @@ private fun ContractTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // 뒤로가기 버튼
             IconButton(onClick = onBackClick) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -191,8 +170,6 @@ private fun ContractTopBar(
                     tint = BillageTextPrimary
                 )
             }
-
-            // "4 / 8" 스텝 표시
             Text(
                 text = "$currentStep / ${ContractViewModel.TOTAL_STEPS}",
                 fontSize = 14.sp,
@@ -204,7 +181,6 @@ private fun ContractTopBar(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 진행바
         LinearProgressIndicator(
             progress = { currentStep.toFloat() / ContractViewModel.TOTAL_STEPS },
             modifier = Modifier
@@ -217,7 +193,6 @@ private fun ContractTopBar(
     }
 }
 
-// ── 하단 다음 버튼 ──────────────────────────
 @Composable
 private fun ContractNextButton(
     enabled: Boolean,
@@ -232,9 +207,9 @@ private fun ContractNextButton(
             .height(56.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = BillagePrimary,
-            disabledContainerColor = BillagePrimaryDisabled, // 비활성 시 연한 민트
-            contentColor = Color.White,           // 활성 시 텍스트
-            disabledContentColor = Color.White.copy(alpha = 0.5f) // 비활성 시 텍스트 (반투명)
+            disabledContainerColor = BillagePrimaryDisabled,
+            contentColor = Color.White,
+            disabledContentColor = Color.White.copy(alpha = 0.5f)
         )
     ) {
         Text(
