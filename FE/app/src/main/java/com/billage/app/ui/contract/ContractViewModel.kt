@@ -29,6 +29,7 @@ data class ContractFormState(
     val repaymentMethod: RepaymentMethod? = null,
     val repaymentDayType: RepaymentDayType? = null,
     val repaymentCustomDay: Int? = null,
+    val debtorName: String = "",
     val debtorPhone: String = "",
 )
 
@@ -110,6 +111,10 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(repaymentCustomDay = day) }
     }
 
+    fun updateDebtorName(name: String) {
+        _formState.update { it.copy(debtorName = name) }
+    }
+
     fun updateDebtorPhone(phone: String) {
         _formState.update { it.copy(debtorPhone = phone) }
     }
@@ -121,7 +126,8 @@ class ContractViewModel : ViewModel() {
             3 -> _formState.value.interestRate.isNotBlank()
             4 -> _formState.value.startDate.isNotBlank() && _formState.value.endDate.isNotBlank()
             5 -> isRepaymentStepComplete()
-            6 -> isValidPhoneNumber(_formState.value.debtorPhone)
+            6 -> _formState.value.debtorName.isNotBlank()
+                    && isValidPhoneNumber(_formState.value.debtorPhone)
             else -> true
         }
     }

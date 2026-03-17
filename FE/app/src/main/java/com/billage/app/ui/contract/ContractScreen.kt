@@ -125,6 +125,8 @@ fun ContractScreen(
                     onCustomDaySelect = { viewModel.updateRepaymentCustomDay(it) }
                 )
                 6 -> Step6DebtorScreen(
+                    name = formState.debtorName,
+                    onNameChange = { viewModel.updateDebtorName(it) },
                     phone = formState.debtorPhone,
                     onPhoneChange = { viewModel.updateDebtorPhone(it) }
                 )
