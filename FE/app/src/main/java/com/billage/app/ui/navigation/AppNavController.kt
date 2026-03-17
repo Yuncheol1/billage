@@ -90,8 +90,17 @@ class AppNavController(
         }
     }
 
-    fun navigateToChatRoom(roomId: String? = null) {
-        navController.navigate(AppDestination.ChatRoom.route) {
+    fun navigateToChatRoom(roomId: String? = null, opponentName: String? = null) {
+        val route = buildString {
+            append(AppDestination.ChatRoom.route)
+            if (roomId != null) {
+                append("/$roomId")
+                if (opponentName != null) {
+                    append("/$opponentName")
+                }
+            }
+        }
+        navController.navigate(route) {
             launchSingleTop = true
         }
     }

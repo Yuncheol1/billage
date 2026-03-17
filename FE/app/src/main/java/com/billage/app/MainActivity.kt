@@ -3,23 +3,23 @@ package com.billage.app
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.ui.navigation.AppDestination
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import com.billage.app.ui.navigation.AppNavHost
 import com.billage.app.ui.theme.BillageTheme
 
-class MainActivity : ComponentActivity() {
-
-    private lateinit var authSessionStorage: AuthSessionStorage
+@AndroidEntryPoint
+class MainActivity : FragmentActivity() {
+private lateinit var authSessionStorage: AuthSessionStorage
     private var startDestination by mutableStateOf(AppDestination.Login.route)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authSessionStorage = AuthSessionStorage(applicationContext)
