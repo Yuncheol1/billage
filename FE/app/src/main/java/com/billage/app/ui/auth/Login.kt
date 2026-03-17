@@ -64,7 +64,7 @@ fun LoginScreen(
             )
 
             Text(
-                text = "Borrow and lend with less friction",
+                text = "쉽게 빌리고 쉽게 갚아요",
                 color = Color.White.copy(alpha = 0.92f),
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -85,7 +85,7 @@ fun LoginScreen(
                     .padding(horizontal = 28.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = "Start your Billage login",
+                    text = "더 알아보기",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
@@ -117,7 +117,7 @@ fun LoginScreen(
                 )
             ) {
                 Text(
-                    text = "Go home (dev)",
+                    text = "개발용 홈버튼",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp

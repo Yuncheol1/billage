@@ -33,7 +33,7 @@ fun NavGraphBuilder.appNavGraph(
 ) {
     composable(route = AppDestination.Login.route) {
         LoginScreen(
-            onDevBypassClick = { appNavController.navigateToConditionsOfUse() }
+            onDevBypassClick = { appNavController.navigateToHome(clearBackStack = true) }
         )
     }
 
