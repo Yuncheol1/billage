@@ -21,8 +21,7 @@ public class TestDataInit {
     }
 
     /**
-     * ApplicationReadyEvent를 사용하여 모든 스프링 빈과 프록시가 로드된 후 실행되도록 함.
-     * @PostConstruct 대신 이 방식을 권장.
+     * ApplicationReadyEvent를 사용하여 모든 스프링 빈과 프록시가 로드된 후 실행되도록 함.     * @PostConstruct 대신 이 방식을 권장.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
@@ -36,7 +35,7 @@ public class TestDataInit {
                 // 2. 기존 데이터 삭제 (채팅방 연관 데이터 등은 몽고DB나 다른 테이블에 있을 수 있음)
                 // 여기서는 user와 user_profile만 확실히 초기화
                 em.createNativeQuery("DELETE FROM `user_profile` WHERE user_seq IN (100, 101, 102)").executeUpdate();
-                em.createNativeQuery("DELETE FROM `user` WHERE user_seq IN (100, 101, 102)").executeUpdate();
+                em.createNativeQuery("DELETE FROM `users` WHERE user_seq IN (100, 101, 102)").executeUpdate();
                 
                 log.info("   - 기존 테스트 계정 삭제 완료");
 
@@ -60,10 +59,10 @@ public class TestDataInit {
 
     private void insertUser(int userSeq, String email, String phone, String realName, String rrn) {
         // 중복 가입 방지를 위해 이메일/폰번호 기준 기존 데이터 삭제 (다른 seq로 가입된 경우 대비)
-        em.createNativeQuery("DELETE FROM `user` WHERE email = '" + email + "' OR phone = '" + phone + "'").executeUpdate();
+        em.createNativeQuery("DELETE FROM `users` WHERE email = '" + email + "' OR phone = '" + phone + "'").executeUpdate();
 
         // User 삽입
-        em.createNativeQuery("INSERT INTO `user` (user_seq, email, phone, state, created_dttm) VALUES " +
+        em.createNativeQuery("INSERT INTO `users` (user_seq, email, phone, state, created_dttm) VALUES " +
                 "(" + userSeq + ", '" + email + "', '" + phone + "', 'ACTIVE', NOW())").executeUpdate();
 
         // Profile 삽입
