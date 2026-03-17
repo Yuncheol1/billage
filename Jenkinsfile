@@ -30,7 +30,8 @@ pipeline {
                     string(credentialsId: 'redis-password', variable: 'REDIS_PASSWORD'),
                     string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
                     string(credentialsId: 'kakao-client-id', variable: 'KAKAO_CLIENT_ID'),
-                    string(credentialsId: 'kakao-client-secret', variable: 'KAKAO_CLIENT_SECRET')
+                    string(credentialsId: 'kakao-client-secret', variable: 'KAKAO_CLIENT_SECRET'),
+                    string(credentialsId: 'jpa-ddl-auto', variable: 'JPA_DDL_AUTO')
                 ]) {
                     sh '''
                         docker stop billage-be || true
@@ -39,7 +40,6 @@ pipeline {
                             --name billage-be \
                             --restart unless-stopped \
                             -p 8080:8080 \
-                            -v /etc/billage/application-prod.yml:/app/config/application-prod.yml \
                             -e SPRING_DATASOURCE_URL=$MYSQL_URL \
                             -e SPRING_DATASOURCE_USERNAME=$MYSQL_USERNAME \
                             -e SPRING_DATASOURCE_PASSWORD=$MYSQL_PASSWORD \
@@ -50,6 +50,7 @@ pipeline {
                             -e JWT_SECRET=$JWT_SECRET \
                             -e KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID \
                             -e KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET \
+                            -e JPA_DDL_AUTO=$JPA_DDL_AUTO \
                             billage-be
                         docker image prune -f
                     '''
