@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.TopBar
+import com.billage.app.ui.common.rememberLogoutUiState
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageDivider
 import com.billage.app.ui.theme.BillagePrimary
@@ -70,9 +71,11 @@ fun MypageScreen(
     onNavigateHome: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onAddContractClick: () -> Unit = {},
-    onChatClick: () -> Unit = {}
+    onChatClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {}
 ) {
     val contracts = remember { sampleContracts() }
+    val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
     var selectedFilter by rememberSaveable { mutableStateOf(ContractFilter.All) }
     val expandedSections = remember {
         mutableStateMapOf(
@@ -97,7 +100,9 @@ fun MypageScreen(
             TopBar(
                 userName = "빌리지",
                 hasNotification = true,
-                onNotificationClick = onNotificationClick
+                onNotificationClick = onNotificationClick,
+                onLogoutClick = logoutUiState.onLogoutClick,
+                isLogoutInProgress = logoutUiState.isLoggingOut
             )
         },
         bottomBar = {

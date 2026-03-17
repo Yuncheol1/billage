@@ -40,9 +40,14 @@ sealed interface AppDestination {
 class AppNavController(
     val navController: NavHostController
 ) {
-    fun navigateToLogin() {
+    fun navigateToLogin(clearBackStack: Boolean = false) {
         navController.navigate(AppDestination.Login.route) {
             launchSingleTop = true
+            if (clearBackStack) {
+                popUpTo(AppDestination.Home.route) {
+                    inclusive = true
+                }
+            }
         }
     }
 

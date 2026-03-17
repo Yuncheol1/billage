@@ -15,7 +15,7 @@ fun NavGraphBuilder.appNavGraph(
 ) {
     composable(route = AppDestination.Login.route) {
         LoginScreen(
-            onLoginClick = { appNavController.navigateToConditionsOfUse() }
+            onDevBypassClick = { appNavController.navigateToConditionsOfUse() }
         )
     }
 
@@ -33,7 +33,8 @@ fun NavGraphBuilder.appNavGraph(
             onAddContractClick = { appNavController.navigateToContract() },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
-            onMypageClick = { appNavController.navigateToMypage() }
+            onMypageClick = { appNavController.navigateToMypage() },
+            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) }
         )
     }
 
@@ -72,7 +73,8 @@ fun NavGraphBuilder.appNavGraph(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
-            onChatClick = { appNavController.navigateToChatList() }
+            onChatClick = { appNavController.navigateToChatList() },
+            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) }
         )
     }
 }

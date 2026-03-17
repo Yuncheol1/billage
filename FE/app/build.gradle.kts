@@ -7,6 +7,7 @@ if (localPropertiesFile.exists()) {
 }
 // 여기서 변수를 정의합니다.
 val kakaoKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY") ?: ""
+val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL") ?: "http://10.0.2.2:8080"
 
 plugins {
     alias(libs.plugins.android.application)
@@ -30,6 +31,7 @@ android {
         versionName = "1.0"
         manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = kakaoKey
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoKey\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

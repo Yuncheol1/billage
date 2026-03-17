@@ -27,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.TopBar
+import com.billage.app.ui.common.rememberLogoutUiState
 import com.billage.app.ui.theme.*
 
 @Composable
@@ -38,9 +39,11 @@ fun HomeScreen(
     onScheduleAllClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onMypageClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
 
     Scaffold(
         containerColor = BillageBackground,
@@ -48,7 +51,9 @@ fun HomeScreen(
             TopBar(
                 userName = uiState.userName,
                 hasNotification = uiState.hasNotification,
-                onNotificationClick = onNotificationClick
+                onNotificationClick = onNotificationClick,
+                onLogoutClick = logoutUiState.onLogoutClick,
+                isLogoutInProgress = logoutUiState.isLoggingOut
             )
         },
         bottomBar = {
