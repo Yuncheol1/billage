@@ -7,17 +7,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 enum class RepaymentMethod {
-    LUMP_SUM,    // 일시상환
-    MONTHLY,     // 월별
-    QUARTERLY,   // 분기별 (3개월)
-    SEMI_ANNUAL, // 반기별 (6개월)
-    ANNUAL       // 연별
+    LUMP_SUM,
+    MONTHLY,
+    QUARTERLY,
+    SEMI_ANNUAL,
+    ANNUAL
 }
 
 enum class RepaymentDayType {
-    FIRST,   // 첫째 날
-    LAST,    // 마지막 날
-    CUSTOM   // 직접 지정 (1~31일)
+    FIRST,
+    LAST,
+    CUSTOM
 }
 
 data class ContractFormState(
@@ -31,6 +31,7 @@ data class ContractFormState(
     val repaymentCustomDay: Int? = null,
     val debtorName: String = "",
     val debtorPhone: String = "",
+    val specialTerms: List<String> = emptyList(), // Step 7: 선택된 특약 목록
 )
 
 class ContractViewModel : ViewModel() {
@@ -65,7 +66,6 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(interestRate = rate) }
     }
 
-    // 날짜 변경 시 상환 방식 초기화 — 기간이 바뀌면 이전 선택이 유효하지 않을 수 있음
     fun updateStartDate(date: String) {
         _formState.update {
             it.copy(
@@ -119,6 +119,16 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(debtorPhone = phone) }
     }
 
+    fun addSpecialTerm(term: String) {
+        if (term.isNotBlank() && !_formState.value.specialTerms.contains(term)) {
+            _formState.update { it.copy(specialTerms = it.specialTerms + term) }
+        }
+    }
+
+    fun removeSpecialTerm(term: String) {
+        _formState.update { it.copy(specialTerms = it.specialTerms - term) }
+    }
+
     fun isNextEnabled(): Boolean {
         return when (_currentStep.value) {
             1 -> _formState.value.isFamily != null
@@ -128,6 +138,7 @@ class ContractViewModel : ViewModel() {
             5 -> isRepaymentStepComplete()
             6 -> _formState.value.debtorName.isNotBlank()
                     && isValidPhoneNumber(_formState.value.debtorPhone)
+            7 -> true // 특약은 선택사항
             else -> true
         }
     }

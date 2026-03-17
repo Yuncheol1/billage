@@ -2,12 +2,17 @@ package com.billage.app.ui.navigation
 
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
 import com.billage.app.ui.auth.MypageScreen
 import com.billage.app.ui.contract.ContractScreen
+import com.billage.app.ui.contract.ContractCompleteScreen
+import com.billage.app.ui.contract.ContractViewModel
 import com.billage.app.ui.home.HomeScreen
-import com.billage.app.ui.chat.ChatRoomScreen
 import com.billage.app.ui.chat.models.ChatRoomState
 
 fun NavGraphBuilder.appNavGraph(
@@ -40,7 +45,7 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Contract.route) {
         ContractScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { /* TODO: 전송 완료 대기 화면으로 이동 */ }
+            onContractComplete = { appNavController.navigateToContractComplete() }
         )
     }
 
@@ -73,6 +78,22 @@ fun NavGraphBuilder.appNavGraph(
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() }
+        )
+    }
+
+    composable(route = AppDestination.ContractComplete.route) { entry ->
+        // Contract 화면의 ViewModel을 공유 — 백스택에 남아있는 Contract 화면의 ViewModel 참조
+        val parentEntry = remember(entry) {
+            appNavController.navController.getBackStackEntry(AppDestination.Contract.route)
+        }
+        val viewModel: ContractViewModel = viewModel(parentEntry)
+        val formState by viewModel.formState.collectAsState()
+
+        ContractCompleteScreen(
+            formState = formState,
+            onHomeClick = { appNavController.navigateToHome() },
+            onKakaoClick = { /* TODO: 카카오톡 공유 SDK 연동 */ },
+            onSmsClick = { /* TODO: 문자 공유 연동 */ }
         )
     }
 }

@@ -35,6 +35,10 @@ sealed interface AppDestination {
     data object Mypage : AppDestination {
         override val route: String = "mypage"
     }
+
+    data object ContractComplete : AppDestination {
+        override val route: String = "contract_complete"
+    }
 }
 
 class AppNavController(
@@ -103,6 +107,12 @@ class AppNavController(
 
     fun popBackStack() {
         navController.popBackStack()
+    }
+
+    fun navigateToContractComplete() {
+        navController.navigate(AppDestination.ContractComplete.route) {
+            launchSingleTop = true
+        }
     }
 }
 

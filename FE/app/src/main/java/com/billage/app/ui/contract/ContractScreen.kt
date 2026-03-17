@@ -43,7 +43,7 @@ import com.billage.app.ui.contract.steps.Step3InterestScreen
 import com.billage.app.ui.contract.steps.Step4DateScreen
 import com.billage.app.ui.contract.steps.Step5RepaymentScreen
 import com.billage.app.ui.contract.steps.Step6DebtorScreen
-import com.billage.app.ui.contract.steps.Step7PreviewScreen
+import com.billage.app.ui.contract.steps.Step7SpecialTermsScreen
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryDisabled
 import com.billage.app.ui.theme.BillagePrimaryLight
@@ -130,21 +130,24 @@ fun ContractScreen(
                     phone = formState.debtorPhone,
                     onPhoneChange = { viewModel.updateDebtorPhone(it) }
                 )
-                7 -> Step7PreviewScreen(
-                    formState = formState,
-                    onEditStep = { viewModel.goToStep(it) },
-                    onSubmit = { onContractComplete() }
+                7 -> Step7SpecialTermsScreen(
+                    specialTerms = formState.specialTerms,
+                    onAddTerm = { viewModel.addSpecialTerm(it) },
+                    onRemoveTerm = { viewModel.removeSpecialTerm(it) }
                 )
                 else -> Unit
             }
         }
 
-        if (currentStep < ContractViewModel.TOTAL_STEPS) {
-            ContractNextButton(
-                enabled = isNextEnabled,
-                onClick = { viewModel.nextStep() }
-            )
-        }
+        // Step 7에서는 "완료하기" 버튼, 그 외에는 "다음" 버튼
+        ContractNextButton(
+            text = if (currentStep == ContractViewModel.TOTAL_STEPS) "완료하기" else "다음",
+            enabled = isNextEnabled,
+            onClick = {
+                if (currentStep == ContractViewModel.TOTAL_STEPS) onContractComplete()
+                else viewModel.nextStep()
+            }
+        )
     }
 }
 
@@ -197,6 +200,7 @@ private fun ContractTopBar(
 
 @Composable
 private fun ContractNextButton(
+    text: String,
     enabled: Boolean,
     onClick: () -> Unit
 ) {
@@ -215,7 +219,7 @@ private fun ContractNextButton(
         )
     ) {
         Text(
-            text = "다음",
+            text = text,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White

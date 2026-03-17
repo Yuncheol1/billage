@@ -27,3 +27,7 @@ val BillageInfo = Color(0xFF26C6DA)           // 협의/진행 중
 val BillageDivider = Color(0xFFF0F0F0)        // 목록 구분선
 val BillageDialogDivider = Color(0xFFEEEEEE)  // 다이얼로그 구분선
 val BillageCardBorder = Color(0xFFE0E8E6)     // 카드 비선택 테두리
+
+// 카카오톡 관련 색상
+val KakaoYellow = Color(0xFFFEE500)      // 카카오톡 버튼 배경
+val KakaoTextBrown = Color(0xFF3A1D1D)   // 카카오톡 버튼 텍스트
