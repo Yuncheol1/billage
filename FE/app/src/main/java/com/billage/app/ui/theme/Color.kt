@@ -10,6 +10,7 @@ val BillagePrimaryDisabled = Color(0xFFB2DDD8) // 비활성 버튼 (연한 민�
 // 배경 색상
 val BillageBackground = Color(0xFFF5F9F8)     // 앱 전체 배경
 val BillageSurface = Color.White              // 카드, 바텀시트 배경
+val BillageIconBackground = Color(0xFFF2F4F3) // 아이콘/이모지 박스 배경
 
 // 텍스트 색상
 val BillageTextPrimary = Color(0xFF1A2E2B)    // 제목, 본문
@@ -24,3 +25,5 @@ val BillageInfo = Color(0xFF26C6DA)           // 협의/진행 중
 
 // 구분선 색상
 val BillageDivider = Color(0xFFF0F0F0)        // 목록 구분선
+val BillageDialogDivider = Color(0xFFEEEEEE)  // 다이얼로그 구분선
+val BillageCardBorder = Color(0xFFE0E8E6)     // 카드 비선택 테두리

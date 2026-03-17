@@ -35,6 +35,8 @@ import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
+import com.billage.app.ui.theme.BillageCardBorder
+import com.billage.app.ui.theme.BillageIconBackground
 
 @Composable
 fun Step1FamilyScreen(
@@ -187,7 +189,7 @@ private fun FamilyOptionCard(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) BillagePrimary else Color(0xFFE0E8E6)
+            color = if (isSelected) BillagePrimary else BillageCardBorder
         ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) BillagePrimaryLight else Color.White
@@ -205,7 +207,7 @@ private fun FamilyOptionCard(
                 modifier = Modifier
                     .size(52.dp)
                     .background(
-                        color = Color(0xFFF2F4F3),
+                        color = BillageIconBackground,
                         shape = RoundedCornerShape(14.dp)
                     ),
                 contentAlignment = Alignment.Center
