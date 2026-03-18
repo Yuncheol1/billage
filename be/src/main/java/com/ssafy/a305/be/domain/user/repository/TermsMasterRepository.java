@@ -10,6 +10,9 @@ import java.util.List;
 
 @Repository
 public interface TermsMasterRepository extends JpaRepository<TermsMaster, Integer> {
+
+    boolean existsByTermsKeyAndTermsVersion(String termsKey, String termsVersion);
+
     List<TermsMaster> findByTermsType(TermsType termsType);
     List<TermsMaster> findByTermsSeqIn(Collection<Integer> termsSeqs);
     List<TermsMaster> findAllByOrderByTermsSeqAsc();
