@@ -11,10 +11,5 @@ import java.util.List;
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Integer> {
 
-    @Query("SELECT DISTINCT c FROM Contract c " +
-            "JOIN FETCH c.creditor cr LEFT JOIN FETCH cr.profile " +
-            "JOIN FETCH c.debtor db LEFT JOIN FETCH db.profile " +
-            "LEFT JOIN FETCH c.repaymentSchedules " +
-            "WHERE cr.userSeq = :userSeq OR db.userSeq = :userSeq")
-    List<Contract> findAllByUser(@Param("userSeq") Integer userSeq);
+
 }
