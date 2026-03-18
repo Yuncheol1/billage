@@ -75,7 +75,8 @@ fun ContractCompleteScreen(
     formState: ContractFormState,
     onHomeClick: () -> Unit,
     onKakaoClick: () -> Unit,
-    onSmsClick: () -> Unit
+    onSmsClick: () -> Unit,
+    role: ContractRole = ContractRole.CREDITOR
 ) {
     Column(
         modifier = Modifier
@@ -111,7 +112,10 @@ fun ContractCompleteScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "${formState.debtorName}님에게 알림을 보내\n수락을 요청해보세요",
+            text = if (role == ContractRole.CREDITOR)
+                "${formState.debtorName}님에게 알림을 보내\n수락을 요청해보세요"
+            else
+                "${formState.debtorName}님께 차용 요청을 보내보세요",
             fontSize = 14.sp,
             color = BillageTextSecondary,
             textAlign = TextAlign.Center,
@@ -157,34 +161,7 @@ fun ContractCompleteScreen(
                 label = "상환",
                 value = formatRepaymentMethod(formState.repaymentMethod)
             )
-            SummaryRow(
-                label = "특약",
-                value = if (formState.specialTerms.isEmpty()) "없음"
-                else "${formState.specialTerms.size}개"
-            )
-
-            // 특약 목록 (있을 때만 표시)
-            if (formState.specialTerms.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = BillagePrimaryLight,
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    formState.specialTerms.forEach { term ->
-                        Text(
-                            text = "• $term",
-                            fontSize = 13.sp,
-                            color = BillageTextPrimary,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-            }
+            // 특약은 채팅방에서 추가 — 초안 단계에서는 표시 안 함
         }
 
         Spacer(modifier = Modifier.height(24.dp))

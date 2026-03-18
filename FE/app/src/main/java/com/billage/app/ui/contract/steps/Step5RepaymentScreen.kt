@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,16 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.billage.app.ui.contract.RepaymentDayType
 import com.billage.app.ui.contract.RepaymentMethod
-import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
@@ -53,7 +46,6 @@ import java.time.temporal.ChronoUnit
 
 private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
-// 시작일~만기일 사이 개월 수 계산
 private fun calculateMonthsBetween(startDate: String, endDate: String): Long {
     return runCatching {
         val start = LocalDate.parse(startDate, DATE_FORMATTER)
@@ -62,8 +54,6 @@ private fun calculateMonthsBetween(startDate: String, endDate: String): Long {
     }.getOrDefault(0L)
 }
 
-// 기간에 따라 선택 가능한 상환 주기 결정
-// 2년 이상이면 연마다 추가, 기간보다 긴 주기는 표시 안 함
 private fun getAvailableMethods(months: Long): List<Pair<RepaymentMethod, String>> {
     return buildList {
         if (months >= 1) add(RepaymentMethod.MONTHLY to "월마다")
@@ -73,25 +63,35 @@ private fun getAvailableMethods(months: Long): List<Pair<RepaymentMethod, String
     }
 }
 
+// 잔여 개월 수 계산 — 상환 주기로 나누어 떨어지지 않는 나머지
+private fun calculateRemainderMonths(months: Long, method: RepaymentMethod): Int {
+    return when (method) {
+        RepaymentMethod.MONTHLY -> 0
+        RepaymentMethod.QUARTERLY -> (months % 3).toInt()
+        RepaymentMethod.SEMI_ANNUAL -> (months % 6).toInt()
+        RepaymentMethod.ANNUAL -> (months % 12).toInt()
+        else -> 0
+    }
+}
+
 @Composable
 fun Step5RepaymentScreen(
     startDate: String,
     endDate: String,
     selectedMethod: RepaymentMethod?,
-    selectedDayType: RepaymentDayType?,
-    customDay: Int?,
-    onMethodSelect: (RepaymentMethod) -> Unit,
-    onDayTypeSelect: (RepaymentDayType) -> Unit,
-    onCustomDaySelect: (Int) -> Unit
+    onMethodSelect: (RepaymentMethod) -> Unit
 ) {
     val isInstallment = selectedMethod != null && selectedMethod != RepaymentMethod.LUMP_SUM
     val months = remember(startDate, endDate) { calculateMonthsBetween(startDate, endDate) }
     val availableMethods = remember(months) { getAvailableMethods(months) }
 
-    // 현재 선택된 주기가 기간보다 긴 경우 경고 표시
     val isMethodInvalid = selectedMethod != null
             && selectedMethod != RepaymentMethod.LUMP_SUM
             && availableMethods.none { it.first == selectedMethod }
+
+    val remainder = if (selectedMethod != null && selectedMethod != RepaymentMethod.LUMP_SUM) {
+        calculateRemainderMonths(months, selectedMethod)
+    } else 0
 
     Column(
         modifier = Modifier
@@ -119,7 +119,6 @@ fun Step5RepaymentScreen(
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // 한 번에 / 나눠서 카드 선택
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -139,7 +138,6 @@ fun Step5RepaymentScreen(
                 description = "일정 기간마다\n원금 일부를 갚아요",
                 isSelected = isInstallment,
                 onClick = {
-                    // 나눠서 클릭 시 사용 가능한 첫 번째 옵션으로 자동 선택
                     val firstAvailable = availableMethods.firstOrNull()?.first
                     if (firstAvailable != null) onMethodSelect(firstAvailable)
                 }
@@ -148,7 +146,6 @@ fun Step5RepaymentScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 한 번에 선택 시 안내 박스
         AnimatedVisibility(
             visible = selectedMethod == RepaymentMethod.LUMP_SUM,
             enter = fadeIn() + expandVertically(),
@@ -157,7 +154,6 @@ fun Step5RepaymentScreen(
             InfoBox(text = "원금은 만기에 한 번에 갚고, 이자는 매달 납부하는 방식이에요")
         }
 
-        // 나눠서 선택 시 주기 + 상환일 선택
         AnimatedVisibility(
             visible = isInstallment,
             enter = fadeIn() + expandVertically(),
@@ -173,7 +169,6 @@ fun Step5RepaymentScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 기간에 따라 동적으로 표시되는 상환 주기 칩
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -188,7 +183,7 @@ fun Step5RepaymentScreen(
                     }
                 }
 
-                // 선택한 주기가 계약 기간보다 길 때 경고
+                // 계약 기간보다 긴 주기 선택 시 경고
                 if (isMethodInvalid) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
@@ -204,100 +199,20 @@ fun Step5RepaymentScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = "몇 일에 갚을까요?",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = BillageTextPrimary
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 첫째 날 / 마지막 날 / 직접 입력 칩 한 행
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(
-                        RepaymentDayType.FIRST to "첫째 날",
-                        RepaymentDayType.LAST to "마지막 날",
-                        RepaymentDayType.CUSTOM to "직접 입력"
-                    ).forEach { (dayType, label) ->
-                        PeriodChip(
-                            modifier = Modifier.weight(1f),
-                            label = label,
-                            isSelected = selectedDayType == dayType,
-                            onClick = { onDayTypeSelect(dayType) }
-                        )
-                    }
-                }
-
-                // 직접 입력 선택 시 날짜 입력 필드
-                AnimatedVisibility(
-                    visible = selectedDayType == RepaymentDayType.CUSTOM,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column {
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(
-                                        color = BillageBackground,
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .padding(horizontal = 20.dp, vertical = 14.dp)
-                            ) {
-                                BasicTextField(
-                                    value = customDay?.toString() ?: "",
-                                    onValueChange = { input ->
-                                        val digits = input.filter { it.isDigit() }
-                                        val day = digits.toIntOrNull() ?: return@BasicTextField
-                                        if (day in 1..31) onCustomDaySelect(day)
-                                    },
-                                    textStyle = TextStyle(
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = BillageTextPrimary
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    cursorBrush = SolidColor(BillagePrimary),
-                                    decorationBox = { innerTextField ->
-                                        if (customDay == null) {
-                                            Text(
-                                                text = "날짜 입력",
-                                                fontSize = 20.sp,
-                                                color = BillageTextSecondary
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                )
-                            }
-
-                            Text(
-                                text = "일",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = BillageTextSecondary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
+                // 잔여 개월 안내 — 상환 주기로 나누어 떨어지지 않을 때
+                if (remainder > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "💡", fontSize = 12.sp)
                         Text(
-                            text = "31일 선택 시 해당 월 마지막 날에 상환돼요",
+                            text = "계약 기간이 상환 주기로 딱 나누어 떨어지지 않아요. " +
+                                    "마지막 ${remainder}개월은 상환 일정에서 제외되고 만기일에 함께 정산돼요",
                             fontSize = 12.sp,
-                            color = BillageTextSecondary
+                            color = BillageTextSecondary,
+                            lineHeight = 18.sp
                         )
                     }
                 }
@@ -310,7 +225,6 @@ fun Step5RepaymentScreen(
     }
 }
 
-// 한 번에 / 나눠서 선택 카드
 @Composable
 private fun RepaymentMethodCard(
     modifier: Modifier = Modifier,
@@ -362,7 +276,6 @@ private fun RepaymentMethodCard(
     }
 }
 
-// 주기 / 상환일 선택 칩 버튼
 @Composable
 private fun PeriodChip(
     modifier: Modifier = Modifier,
@@ -389,7 +302,6 @@ private fun PeriodChip(
     }
 }
 
-// 안내 박스
 @Composable
 private fun InfoBox(text: String) {
     Row(

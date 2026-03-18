@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.billage.app.ui.contract.ContractRole
 
 sealed interface AppDestination {
     val route: String
@@ -22,6 +23,7 @@ sealed interface AppDestination {
 
     data object Contract : AppDestination {
         override val route: String = "contract"
+        const val routeWithArg = "contract/{role}"
     }
 
     data object ChatList : AppDestination {
@@ -69,11 +71,9 @@ class AppNavController(
         }
     }
 
-    fun navigateToContract() {
-        navController.navigate(AppDestination.Contract.route) {
-            popUpTo(AppDestination.Home.route) {
-                saveState = true
-            }
+    fun navigateToContract(role: ContractRole = ContractRole.CREDITOR) {
+        navController.navigate("${AppDestination.Contract.route}/${role.name}") {
+            popUpTo(AppDestination.Home.route) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }

@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,7 +44,6 @@ import com.billage.app.ui.contract.steps.Step3InterestScreen
 import com.billage.app.ui.contract.steps.Step4DateScreen
 import com.billage.app.ui.contract.steps.Step5RepaymentScreen
 import com.billage.app.ui.contract.steps.Step6DebtorScreen
-import com.billage.app.ui.contract.steps.Step7SpecialTermsScreen
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryDisabled
 import com.billage.app.ui.theme.BillagePrimaryLight
@@ -53,6 +53,7 @@ import com.billage.app.ui.theme.BillageTextPrimary
 fun ContractScreen(
     onNavigateBack: () -> Unit,
     onContractComplete: () -> Unit,
+    role: ContractRole = ContractRole.CREDITOR,
     viewModel: ContractViewModel = viewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
@@ -60,6 +61,7 @@ fun ContractScreen(
     val isNextEnabled by remember(currentStep, formState) {
         derivedStateOf { viewModel.isNextEnabled() }
     }
+    LaunchedEffect(role) { viewModel.updateRole(role) }
 
     BackHandler {
         if (currentStep == 1) onNavigateBack()
@@ -94,52 +96,53 @@ fun ContractScreen(
             label = "StepTransition"
         ) { step ->
             when (step) {
-                1 -> Step1FamilyScreen(
-                    isFamily = formState.isFamily,
-                    onSelect = { viewModel.updateIsFamily(it) }
+                1 -> Step6DebtorScreen(
+                    name = formState.debtorName,
+                    onNameChange = { viewModel.updateDebtorName(it) },
+                    phone = formState.debtorPhone,
+                    onPhoneChange = { viewModel.updateDebtorPhone(it) },
+                    selectedUserSeq = formState.debtorUserSeq,
+                    onUserSelect = { userSeq: Int, name: String, phone: String ->
+                        if (userSeq == -1) {
+                            viewModel.updateDebtorPhone(phone)
+                        } else {
+                            viewModel.updateDebtorUser(userSeq, name, phone)
+                        }
+                    },
+                    role = formState.role
                 )
-                2 -> Step2AmountScreen(
+                2 -> Step1FamilyScreen(
+                    isFamily = formState.isFamily,
+                    onSelect = { viewModel.updateIsFamily(it) },
+                    role = formState.role
+                )
+                3 -> Step2AmountScreen(
                     amount = formState.amount,
                     onAmountChange = { viewModel.updateAmount(it) }
                 )
-                3 -> Step3InterestScreen(
+                4 -> Step3InterestScreen(
                     interestRate = formState.interestRate,
                     isFamily = formState.isFamily ?: false,
                     amount = formState.amount,
                     onRateChange = { viewModel.updateInterestRate(it) }
                 )
-                4 -> Step4DateScreen(
+                5 -> Step4DateScreen(
                     startDate = formState.startDate,
                     endDate = formState.endDate,
                     onStartDateSelect = { viewModel.updateStartDate(it) },
                     onEndDateSelect = { viewModel.updateEndDate(it) }
                 )
-                5 -> Step5RepaymentScreen(
+                6 -> Step5RepaymentScreen(
                     startDate = formState.startDate,
                     endDate = formState.endDate,
                     selectedMethod = formState.repaymentMethod,
-                    selectedDayType = formState.repaymentDayType,
-                    customDay = formState.repaymentCustomDay,
-                    onMethodSelect = { viewModel.updateRepaymentMethod(it) },
-                    onDayTypeSelect = { viewModel.updateRepaymentDayType(it) },
-                    onCustomDaySelect = { viewModel.updateRepaymentCustomDay(it) }
-                )
-                6 -> Step6DebtorScreen(
-                    name = formState.debtorName,
-                    onNameChange = { viewModel.updateDebtorName(it) },
-                    phone = formState.debtorPhone,
-                    onPhoneChange = { viewModel.updateDebtorPhone(it) }
-                )
-                7 -> Step7SpecialTermsScreen(
-                    specialTerms = formState.specialTerms,
-                    onAddTerm = { viewModel.addSpecialTerm(it) },
-                    onRemoveTerm = { viewModel.removeSpecialTerm(it) }
+                    onMethodSelect = { viewModel.updateRepaymentMethod(it) }
                 )
                 else -> Unit
             }
         }
 
-        // Step 7에서는 "완료하기" 버튼, 그 외에는 "다음" 버튼
+        // 마지막 스텝(6)에서는 "완료하기" 버튼, 그 외에는 "다음" 버튼
         ContractNextButton(
             text = if (currentStep == ContractViewModel.TOTAL_STEPS) "완료하기" else "다음",
             enabled = isNextEnabled,

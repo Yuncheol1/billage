@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.contract.ContractRole
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageTextPrimary
@@ -41,7 +42,8 @@ import com.billage.app.ui.theme.BillageIconBackground
 @Composable
 fun Step1FamilyScreen(
     isFamily: Boolean?,
-    onSelect: (Boolean) -> Unit
+    onSelect: (Boolean) -> Unit,
+    role: ContractRole = ContractRole.CREDITOR
 ) {
     Column(
         modifier = Modifier
@@ -61,7 +63,7 @@ fun Step1FamilyScreen(
 
         // ── 메인 질문 (한 줄) ────────────────────
         Text(
-            text = "누구에게 빌려주시나요?",
+            text = if (role == ContractRole.CREDITOR) "누구에게 빌려주시나요?" else "누구에게 빌리시나요?",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BillageTextPrimary,
