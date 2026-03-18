@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.contract.controller;
 
+import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.service.ContractService;
@@ -17,17 +18,15 @@ import java.util.Map;
 @RequestMapping("/api/v1/contracts")
 @RequiredArgsConstructor
 public class ContractController {
-
+    private final Integer tempUserSeq=1;//임시 하드코딩
     private final ContractService contractService;
     @PostMapping
     public ResponseEntity<Map<String, Object>> createContractDraft(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @Valid @RequestBody ContractDraftRequestDto requestDto) {
 
-        // 임시 하드코딩
-        Integer creditorUserSeq = 1;
 
-        ContractDraftResponseDto responseDto = contractService.createDraft(creditorUserSeq, requestDto);
+        ContractDraftResponseDto responseDto = contractService.createDraft(tempUserSeq, requestDto);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", HttpStatus.CREATED.value(),
@@ -35,4 +34,19 @@ public class ContractController {
                 "data", responseDto
         ));
     }
+
+    @PostMapping("/{contractSeq}/clauses")
+    public ResponseEntity<Map<String, Object>> addAiClauses(
+            @PathVariable Integer contractSeq,
+            @Valid @RequestBody ClauseRequestDto requestDto) {
+
+
+        contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), tempUserSeq);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "status", HttpStatus.CREATED.value(),
+                "message", "특약사항이 성공적으로 저장되었습니다."
+        ));
+    }
+
 }

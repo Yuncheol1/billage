@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.contract.service;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
@@ -88,6 +89,41 @@ public class ContractService {
                 .contractSeq(savedContract.getContractSeq())
                 .contractId(savedContract.getContractId())
                 .build();
+    }
+
+    @Transactional
+    public void addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+        // 1. 계약 조회
+        Contract contract = contractRepository.findById(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
+
+        // 2. 상태 검증
+        if (!"DRAFT".equals(contract.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS);
+        }
+
+        // 3. 권한 검증
+        if (!contract.getCreditor().getUserSeq().equals(userSeq)
+                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // 4. AI 서비스 호출 (Mock 처리)
+        String refinedContent = "[AI 변환] " + clauseContent;
+
+        // 5. ContractClause 엔티티 생성 및 추가
+        int nextOrderNo = contract.getClauses().size() + 1;
+
+        ContractClause clause = ContractClause.builder()
+                .contract(contract)
+                .clauseId("SPECIAL_" + nextOrderNo)
+                .title("특약사항 " + nextOrderNo)
+                .content(refinedContent)
+                .orderNo(nextOrderNo)
+                .createdDttm(LocalDateTime.now())
+                .build();
+
+        contract.addClause(clause);
     }
 
     private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
