@@ -28,8 +28,8 @@ public class Contract {
     private String contractId;
 
     /** FRIEND_SMALL / FAMILY_JEONSE / PARTNER_BIZ / COLLEAGUE_EMERGENCY */
-    @Column(name = "template_type")
-    private String templateType;
+    @Column(name = "is_family")
+    private Boolean family;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creditor_user_seq", nullable = false)

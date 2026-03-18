@@ -2,6 +2,7 @@ package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
@@ -48,7 +49,7 @@ public class ContractService {
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET));
 
-        if (!"ACTIVE".equals(debtor.getState())) {
+        if (!"ACTIVE".equals(debtor.getState())||!"ACTIVE".equals(creditor.getState())) {
             throw new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET);
         }
 
@@ -57,15 +58,15 @@ public class ContractService {
 
         // 4. AI 서비스 연결 (Mock data 가정)
         // AIDraftResult aiResult = aiService.generateDraft(...);
-        List<String> warningFlags = new ArrayList<>();
+        /*List<String> warningFlags = new ArrayList<>();
         if (requestDto.getInterestRate().compareTo(new BigDecimal("0.046")) < 0) {
             warningFlags.add("LOW_INTEREST_RATE_TAX_WARNING");
-        }
+        }*/
 
         // 5. Contract 엔티티 생성
         Contract contract = Contract.builder()
                 .contractId(contractId)
-                .templateType(requestDto.getTemplateType())
+                .family(requestDto.getFamily())
                 .creditor(creditor)
                 .debtor(debtor)
                 .principalAmount(requestDto.getPrincipalAmount())
@@ -78,26 +79,7 @@ public class ContractService {
                 .createdDttm(LocalDateTime.now())
                 .build();
 
-        // 6. 조항 세팅 (AI에서 넘어왔다고 가정)
-        ContractClause principalClause = ContractClause.builder()
-                .contract(contract)
-                .clauseId("PRINCIPAL")
-                .title("원금")
-                .content("금 " + requestDto.getPrincipalAmount() + "원")
-                .orderNo(1)
-                .createdDttm(LocalDateTime.now())
-                .build();
-        contract.addClause(principalClause);
 
-        ContractClause interestClause = ContractClause.builder()
-                .contract(contract)
-                .clauseId("INTEREST")
-                .title("이자")
-                .content("연 " + requestDto.getInterestRate().multiply(new BigDecimal("100")) + "%")
-                .orderNo(2)
-                .createdDttm(LocalDateTime.now())
-                .build();
-        contract.addClause(interestClause);
 
         // 7. 상환 계획 레코드 계산 및 생성
         generateRepaymentSchedules(contract, requestDto);
@@ -109,20 +91,6 @@ public class ContractService {
         return ContractDraftResponseDto.builder()
                 .contractSeq(savedContract.getContractSeq())
                 .contractId(savedContract.getContractId())
-                .status(savedContract.getStatus())
-                .aiDraftContent(ContractDraftResponseDto.AiDraftContent.builder()
-                        .summary("AI 요약 내용...")
-                        .warningFlags(warningFlags)
-                        .build())
-                .clauses(savedContract.getClauses().stream()
-                        .map(c -> ContractDraftResponseDto.ClauseResponse.builder()
-                                .clauseSeq(c.getClauseSeq())
-                                .clauseId(c.getClauseId())
-                                .title(c.getTitle())
-                                .content(c.getContent())
-                                .orderNo(c.getOrderNo())
-                                .build())
-                        .toList())
                 .build();
     }
 
@@ -142,7 +110,7 @@ public class ContractService {
         }
 
         // 상환 방식 정합성 검증
-        if ("INSTALLMENT".equals(request.getRepaymentMethod())) {
+        if (!"LUMP_SUM".equals(request.getRepaymentMethod())) {
             if (request.getTotalInstallments() == null || request.getTotalInstallments() < 1) {
                 throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "할부상환은 총 상환 횟수가 1 이상이어야 합니다.");
             }
@@ -153,7 +121,7 @@ public class ContractService {
     }
 
     private void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
-        if ("BULLET".equals(request.getRepaymentMethod())) {
+        if ("LUMP_SUM".equals(request.getRepaymentMethod())) {
             RepaymentSchedule schedule = RepaymentSchedule.builder()
                     .contract(contract)
                     .installmentNo(1)
@@ -166,7 +134,7 @@ public class ContractService {
                     .build();
             contract.addRepaymentSchedule(schedule);
 
-        } else if ("INSTALLMENT".equals(request.getRepaymentMethod())) {
+        } else /*if ("INSTALLMENT".equals(request.getRepaymentMethod()))*/ {
             int installments = request.getTotalInstallments();
             BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
             
