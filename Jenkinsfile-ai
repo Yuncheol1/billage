@@ -21,7 +21,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'gms-key', variable: 'GMS_KEY')
+                    string(credentialsId: 'gms-key', variable: 'GMS_KEY'),
+                    string(credentialsId: 'internal-api-key', variable: 'INTERNAL_API_KEY')
                 ]) {
                     sh '''
                         docker stop billage-ai || true
@@ -33,6 +34,7 @@ pipeline {
                             -p 8000:8000 \
                             --memory="8g" \
                             -e GMS_KEY=$GMS_KEY \
+                            -e INTERNAL_API_KEY=$INTERNAL_API_KEY \
                             -e API_V1_STR=/internal/v1 \
                             -e CHROMA_DB_DIR=/app/chroma_db \
                             -v /data/chroma_db:/app/chroma_db \
