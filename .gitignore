@@ -1,0 +1,23 @@
+# Environments
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Data & Database
+data/
+chroma_db/
+
+# Outputs & Logs
+output/
+*.log
+eval_output.txt
+output.txt
+temp_untracked.txt
+
+# OS Generated Files
+.DS_Store
+
+# .idea 추가
+.idea/
