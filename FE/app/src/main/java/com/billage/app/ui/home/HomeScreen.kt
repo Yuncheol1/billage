@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -15,6 +16,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.TopBar
+import com.billage.app.ui.contract.ContractRole
 import com.billage.app.ui.common.rememberLogoutUiState
 import com.billage.app.ui.theme.*
 
@@ -34,7 +39,7 @@ import com.billage.app.ui.theme.*
 fun HomeScreen(
     onContractClick: (String) -> Unit = {},
     onNotificationClick: () -> Unit = {},
-    onAddContractClick: () -> Unit = {},
+    onAddContractClick: (ContractRole) -> Unit = {},
     onActivityClick: () -> Unit = {},
     onScheduleAllClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
@@ -43,6 +48,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showContractTypeSheet by remember { mutableStateOf(false) }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
 
     Scaffold(
@@ -61,7 +67,7 @@ fun HomeScreen(
                 selectedTab = BottomBarTab.Home,
                 onChatClick = onChatClick,
                 onHomeClick = {},
-                onAddContractClick = onAddContractClick,
+                onAddContractClick = { showContractTypeSheet = true },
                 onContractClick = onMypageClick
             )
         }
@@ -168,64 +174,120 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(28.dp))
         }
     }
+
+    // 계약 만들기 타입 선택 바텀시트
+    if (showContractTypeSheet) {
+        ContractTypeBottomSheet(
+            onDismiss = { showContractTypeSheet = false },
+            onSelect = { role ->
+                showContractTypeSheet = false
+                onAddContractClick(role)
+            }
+        )
+    }
 }
 
-/*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeTopBar(
-    userName: String,
-    hasNotification: Boolean,
-    onNotificationClick: () -> Unit
+private fun ContractTypeBottomSheet(
+    onDismiss: () -> Unit,
+    onSelect: (ContractRole) -> Unit
 ) {
-    TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = BillageSurface),
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(BillagePrimary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "B",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = userName.ifEmpty { "빌리지" },
-                    color = BillageTextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
-        },
-        actions = {
-            BadgedBox(
-                badge = {
-                    if (hasNotification) {
-                        Badge(containerColor = BillageDanger)
-                    }
-                }
-            ) {
-                IconButton(onClick = onNotificationClick) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "알림",
-                        tint = BillageTextPrimary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = BillageSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp)
+        ) {
+            Text(
+                text = "계약 만들기",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = BillageTextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            ContractTypeItem(
+                emoji = "🤝",
+                title = "돈 빌려주기",
+                description = "차용증을 생성하고 상환 일정을 관리해요",
+                onClick = { onSelect(ContractRole.CREDITOR) }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ContractTypeItem(
+                emoji = "🙏",
+                title = "돈 빌리기",
+                description = "차용 요청을 보내고 계약을 진행해요",
+                onClick = { onSelect(ContractRole.DEBTOR) }
+            )
         }
-    )
+    }
 }
-*/
+
+@Composable
+private fun ContractTypeItem(
+    emoji: String,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = BillageBackground,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick() }
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(
+                    color = BillagePrimaryLight,
+                    shape = RoundedCornerShape(14.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = emoji, fontSize = 26.sp)
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = BillageTextPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = description,
+                fontSize = 13.sp,
+                color = BillageTextSecondary,
+                lineHeight = 18.sp
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = BillageTextSecondary
+        )
+    }
+}
 
 @Composable
 private fun NotificationBanner(
@@ -499,9 +561,9 @@ private fun AiBannerCard() {
 @Composable
 private fun ActivityItemRow(activity: ActivityItem) {
     val iconTint = when (activity.type) {
-        "transfer" -> BillageSuccess   // 초록 — 돈 받음
-        "chat"     -> BillageInfo      // 민트 — 협의 중
-        else       -> BillagePrimary
+        "transfer" -> BillageSuccess
+        "chat" -> BillageInfo
+        else -> BillagePrimary
     }
 
     Row(
@@ -539,82 +601,6 @@ private fun ActivityItemRow(activity: ActivityItem) {
     HorizontalDivider(color = BillageDivider)
 }
 
-/*
-@Composable
-private fun HomeBottomBar(onAddContractClick: () -> Unit) {
-    Box {
-        NavigationBar(
-            containerColor = BillageSurface,
-            tonalElevation = 8.dp
-        ) {
-            NavigationBarItem(
-                selected = true,
-                onClick = {},
-                icon = { Icon(Icons.Default.Home, contentDescription = "홈") },
-                label = { Text("홈") },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = BillagePrimary,
-                    selectedTextColor = BillagePrimary,
-                    indicatorColor = BillagePrimaryLight
-                )
-            )
-            NavigationBarItem(
-                selected = false,
-                onClick = {},
-                icon = { Icon(Icons.Default.ChatBubble, contentDescription = "메시지") },
-                label = { Text("메시지") },
-                colors = NavigationBarItemDefaults.colors(
-                    unselectedIconColor = BillageTextSecondary,
-                    unselectedTextColor = BillageTextSecondary
-                )
-            )
-            // FAB(+버튼)이 가운데 자리를 차지하므로 빈 자리를 확보하기 위한 더미 아이템
-            NavigationBarItem(
-                selected = false,
-                onClick = {},
-                enabled = false,  // 터치 비활성화
-                icon = { Spacer(modifier = Modifier.size(48.dp)) },
-                label = { Text("") }
-            )
-            NavigationBarItem(
-                selected = false,
-                onClick = {},
-                icon = { Icon(Icons.Default.Description, contentDescription = "내 계약") },
-                label = { Text("내 계약") },
-                colors = NavigationBarItemDefaults.colors(
-                    unselectedIconColor = BillageTextSecondary,
-                    unselectedTextColor = BillageTextSecondary
-                )
-            )
-            NavigationBarItem(
-                selected = false,
-                onClick = {},
-                icon = { Icon(Icons.Default.Menu, contentDescription = "메뉴") },
-                label = { Text("메뉴") },
-                colors = NavigationBarItemDefaults.colors(
-                    unselectedIconColor = BillageTextSecondary,
-                    unselectedTextColor = BillageTextSecondary
-                )
-            )
-        }
-        FloatingActionButton(
-            onClick = onAddContractClick,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-20).dp),
-            containerColor = BillagePrimary,
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "계약 추가",
-                tint = Color.White
-            )
-        }
-    }
-}
-
-*/
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenPreview() {

@@ -2,31 +2,36 @@ package com.billage.app.ui.navigation
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
 import com.billage.app.ui.auth.MypageScreen
-import com.billage.app.ui.contract.ContractScreen
-import com.billage.app.ui.home.HomeScreen
+import com.billage.app.ui.chat.ChatRoomScreen
+import com.billage.app.ui.chat.components.cards.BaseChatCard
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
-import com.billage.app.ui.chat.components.cards.BaseChatCard
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Text
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.billage.app.ui.contract.ContractCompleteScreen
+import com.billage.app.ui.contract.ContractRole
+import com.billage.app.ui.contract.ContractScreen
+import com.billage.app.ui.contract.ContractViewModel
+import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
-import androidx.compose.ui.Alignment
-import com.billage.app.ui.chat.ChatRoomScreen
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -48,7 +53,7 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
@@ -56,10 +61,13 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(route = AppDestination.Contract.route) {
+    composable(route = AppDestination.Contract.routeWithArg) { backStackEntry ->
+        val role = backStackEntry.arguments?.getString("role")
+            ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
         ContractScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { /* TODO: 전송 완료 대기 화면으로 이동 */ }
+            onContractComplete = { appNavController.navigateToContractComplete() },
+            role = role
         )
     }
 
@@ -76,7 +84,7 @@ fun NavGraphBuilder.appNavGraph(
         val roomId = backStackEntry.arguments?.getString("roomId") ?: "100"
         val opponentName = backStackEntry.arguments?.getString("opponentName") ?: "알 수 없음"
         val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
-        
+
         LaunchedEffect(roomId) {
             viewModel.joinRoom(roomId)
         }
@@ -89,8 +97,10 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = opponentName
             ),
             onBackClick = { appNavController.popBackStack() },
+            onModeChange = {}, // 네가 추가했던 파라미터 살림
+            onAddMenuClick = {}, // 네가 추가했던 파라미터 살림
             onSendMessage = { content -> viewModel.sendMessage(content) },
-            messageListContent = { 
+            messageListContent = {
                 LazyColumn(
                     reverseLayout = true,
                     modifier = Modifier.fillMaxSize()
@@ -150,8 +160,10 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = "알 수 없음"
             ),
             onBackClick = { appNavController.popBackStack() },
+            onModeChange = {}, // 네가 추가했던 파라미터 살림
+            onAddMenuClick = {}, // 네가 추가했던 파라미터 살림
             onSendMessage = { content -> viewModel.sendMessage(content) },
-            messageListContent = { 
+            messageListContent = {
                 LazyColumn(
                     reverseLayout = true,
                     modifier = Modifier.fillMaxSize()
@@ -206,6 +218,22 @@ fun NavGraphBuilder.appNavGraph(
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) }
+        )
+    }
+
+    composable(route = AppDestination.ContractComplete.route) { entry ->
+        // Contract 화면의 ViewModel 공유 — 백스택에 남아있는 Contract 화면의 ViewModel 참조
+        val parentEntry = remember(entry) {
+            appNavController.navController.getBackStackEntry(AppDestination.Contract.routeWithArg)
+        }
+        val viewModel: ContractViewModel = viewModel(parentEntry)
+        val formState by viewModel.formState.collectAsState()
+
+        ContractCompleteScreen(
+            formState = formState,
+            onHomeClick = { appNavController.navigateToHome() },
+            onChatClick = { appNavController.navigateToChatList() }, // TODO: 생성된 채팅방으로 직접 이동
+            role = formState.role
         )
     }
 }

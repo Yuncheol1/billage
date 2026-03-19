@@ -5,172 +5,144 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
-// ─────────────────────────────────────────
-// 상환 주기 선택지
-// ─────────────────────────────────────────
+enum class ContractRole {
+    CREDITOR, // 빌려주기 (채권자)
+    DEBTOR    // 빌리기 (채무자)
+}
+
 enum class RepaymentMethod {
-    LUMP_SUM,    // 일시상환
-    MONTHLY,     // 월별
-    QUARTERLY,   // 분기별 (3개월)
-    SEMI_ANNUAL, // 반기별 (6개월)
-    ANNUAL       // 연별
+    LUMP_SUM,
+    MONTHLY,
+    QUARTERLY,
+    SEMI_ANNUAL,
+    ANNUAL
 }
 
-// ─────────────────────────────────────────
-// 상환일 유형 선택지
-// LUMP_SUM이 아닐 때만 사용
-// ─────────────────────────────────────────
-enum class RepaymentDayType {
-    FIRST,   // 매월 1일
-    LAST,    // 매월 말일
-    CUSTOM   // 직접 지정 (1~28일)
-}
-
-// ─────────────────────────────────────────
-// 8단계 입력값을 하나로 묶은 데이터 클래스
-// 각 필드가 null 이면 아직 입력 안 된 상태
-// ─────────────────────────────────────────
 data class ContractFormState(
-    val isFamily: Boolean? = null,                    // Step 1: 가족 여부
-    val amount: String = "",                           // Step 2: 금액
-    val interestRate: String = "",                     // Step 3: 이자율
-    val startDate: String = "",                        // Step 4: 시작일 (yyyy-MM-dd)
-    val endDate: String = "",                          // Step 5: 만기일 (yyyy-MM-dd)
-    val repaymentMethod: RepaymentMethod? = null,      // Step 6: 상환 주기
-    val repaymentDayType: RepaymentDayType? = null,    // Step 6: 상환일 유형
-    val repaymentCustomDay: Int? = null,               // Step 6: 직접 지정일 (1~28)
-    val debtorPhone: String = "",                      // Step 7: 채무자 연락처
+    val role: ContractRole = ContractRole.CREDITOR,
+    val debtorUserSeq: Int? = null,
+    val debtorName: String = "",
+    val debtorPhone: String = "",
+    val isFamily: Boolean? = null,
+    val amount: String = "",
+    val interestRate: String = "",
+    val startDate: String = "",
+    val endDate: String = "",
+    val repaymentMethod: RepaymentMethod? = null,
 )
 
-// ─────────────────────────────────────────
-// ViewModel
-// 8단계 입력값 + 현재 스텝 번호를 관리한다
-// ─────────────────────────────────────────
 class ContractViewModel : ViewModel() {
 
-    // 현재 스텝 (1 ~ 8)
     private val _currentStep = MutableStateFlow(1)
     val currentStep: StateFlow<Int> = _currentStep.asStateFlow()
 
-    // 전체 입력값 상태
     private val _formState = MutableStateFlow(ContractFormState())
     val formState: StateFlow<ContractFormState> = _formState.asStateFlow()
 
-    // ── 스텝 이동 ──────────────────────────
-
     fun nextStep() {
-        if (_currentStep.value < TOTAL_STEPS) {
-            _currentStep.update { it + 1 }
-        }
+        if (_currentStep.value < TOTAL_STEPS) _currentStep.update { it + 1 }
     }
 
     fun prevStep() {
-        if (_currentStep.value > 1) {
-            _currentStep.update { it - 1 }
-        }
+        if (_currentStep.value > 1) _currentStep.update { it - 1 }
     }
 
     fun goToStep(step: Int) {
-        if (step in 1..TOTAL_STEPS) {
-            _currentStep.update { step }
-        }
+        if (step in 1..TOTAL_STEPS) _currentStep.update { step }
     }
 
-    // ── 각 스텝 입력값 업데이트 ────────────
-
-    // Step 1
-    fun updateIsFamily(isFamily: Boolean) {
-        _formState.update { it.copy(isFamily = isFamily) }
+    fun updateRole(role: ContractRole) {
+        _formState.update { it.copy(role = role) }
     }
 
-    // Step 2
-    fun updateAmount(amount: String) {
-        _formState.update { it.copy(amount = amount) }
-    }
-
-    // Step 3
-    fun updateInterestRate(rate: String) {
-        _formState.update { it.copy(interestRate = rate) }
-    }
-
-    // Step 4
-    fun updateStartDate(date: String) {
-        _formState.update { it.copy(startDate = date) }
-    }
-
-    // Step 5
-    fun updateEndDate(date: String) {
-        _formState.update { it.copy(endDate = date) }
-    }
-
-    // Step 6
-    fun updateRepaymentMethod(method: RepaymentMethod) {
-        // 상환 주기가 바뀌면 상환일 유형도 초기화
+    fun updateDebtorUser(userSeq: Int, name: String, phone: String) {
         _formState.update {
             it.copy(
-                repaymentMethod = method,
-                repaymentDayType = null,
-                repaymentCustomDay = null
+                debtorUserSeq = userSeq,
+                debtorName = name,
+                debtorPhone = phone
             )
         }
     }
 
-    fun updateRepaymentDayType(dayType: RepaymentDayType) {
-        // 상환일 유형이 바뀌면 직접 지정일 초기화
-        _formState.update {
-            it.copy(
-                repaymentDayType = dayType,
-                repaymentCustomDay = null
-            )
-        }
+    fun updateDebtorName(name: String) {
+        _formState.update { it.copy(debtorName = name) }
     }
 
-    fun updateRepaymentCustomDay(day: Int) {
-        _formState.update { it.copy(repaymentCustomDay = day) }
-    }
-
-    // Step 7
     fun updateDebtorPhone(phone: String) {
         _formState.update { it.copy(debtorPhone = phone) }
     }
 
-    // ── 각 스텝 다음 버튼 활성화 여부 ──────
+    fun updateIsFamily(isFamily: Boolean) {
+        _formState.update { it.copy(isFamily = isFamily) }
+    }
+
+    fun updateAmount(amount: String) {
+        _formState.update { it.copy(amount = amount) }
+    }
+
+    fun updateInterestRate(rate: String) {
+        _formState.update { it.copy(interestRate = rate) }
+    }
+
+    // 날짜 변경 시 상환 방식 초기화 — 기간이 바뀌면 이전 선택이 유효하지 않을 수 있음
+    fun updateStartDate(date: String) {
+        _formState.update { it.copy(startDate = date, repaymentMethod = null) }
+    }
+
+    fun updateEndDate(date: String) {
+        _formState.update { it.copy(endDate = date, repaymentMethod = null) }
+    }
+
+    fun updateRepaymentMethod(method: RepaymentMethod) {
+        _formState.update { it.copy(repaymentMethod = method) }
+    }
+
+    // 총 상환 횟수 계산 — 1달 미만 잔여분은 제외 (내림 처리)
+    fun calculateTotalInstallments(): Int? {
+        val method = _formState.value.repaymentMethod ?: return null
+        if (method == RepaymentMethod.LUMP_SUM) return null
+
+        val start = runCatching { LocalDate.parse(_formState.value.startDate) }.getOrNull() ?: return null
+        val end = runCatching { LocalDate.parse(_formState.value.endDate) }.getOrNull() ?: return null
+        val months = ChronoUnit.MONTHS.between(start, end).toInt()
+
+        return when (method) {
+            RepaymentMethod.MONTHLY -> months
+            RepaymentMethod.QUARTERLY -> months / 3
+            RepaymentMethod.SEMI_ANNUAL -> months / 6
+            RepaymentMethod.ANNUAL -> months / 12
+            else -> null
+        }
+    }
+
+    // 상환일 = 시작일의 일(day)로 자동 고정
+    fun calculateRepaymentDay(): Int {
+        return runCatching {
+            LocalDate.parse(_formState.value.startDate).dayOfMonth
+        }.getOrDefault(1)
+    }
+
     fun isNextEnabled(): Boolean {
         return when (_currentStep.value) {
-            1 -> _formState.value.isFamily != null
-            2 -> _formState.value.amount.isNotBlank()
-            3 -> _formState.value.interestRate.isNotBlank()
-            4 -> _formState.value.startDate.isNotBlank()
-            5 -> _formState.value.endDate.isNotBlank()
-            6 -> isRepaymentStepComplete()
-            7 -> isValidPhoneNumber(_formState.value.debtorPhone)
-            else -> true // Step 8 미리보기는 항상 활성화
+            1 -> _formState.value.debtorUserSeq != null
+            2 -> _formState.value.isFamily != null
+            3 -> _formState.value.amount.isNotBlank()
+            4 -> _formState.value.interestRate.isNotBlank()
+            5 -> _formState.value.startDate.isNotBlank() && _formState.value.endDate.isNotBlank()
+            6 -> _formState.value.repaymentMethod != null
+            else -> true
         }
     }
 
-    // Step 6 완료 조건
-    // - 일시상환: 주기만 선택하면 완료
-    // - 그 외: 주기 + 상환일 유형 선택 필요
-    //          상환일 유형이 CUSTOM이면 날짜까지 입력 필요
-    private fun isRepaymentStepComplete(): Boolean {
-        val method = _formState.value.repaymentMethod ?: return false
-        if (method == RepaymentMethod.LUMP_SUM) return true
-
-        val dayType = _formState.value.repaymentDayType ?: return false
-        if (dayType == RepaymentDayType.CUSTOM) {
-            return _formState.value.repaymentCustomDay != null
-        }
-        return true
-    }
-
-    // Step 7 전화번호 형식 검증
-    // 010-XXXX-XXXX 또는 01012345678 형태 모두 허용
     private fun isValidPhoneNumber(phone: String): Boolean {
         return phone.replace("-", "").matches(Regex("^010\\d{8}$"))
     }
 
     companion object {
-        const val TOTAL_STEPS = 8
+        const val TOTAL_STEPS = 6
     }
 }
