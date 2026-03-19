@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python 3.10 슬림 이미지를 베이스로 사용
 FROM python:3.10-slim
 
@@ -26,3 +27,20 @@ EXPOSE 8000
 # 서버 실행 (Uvicorn)
 # --host 0.0.0.0으로 설정해야 컨테이너 외부에서 접근 가능
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+=======
+# ai/Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 의존성 먼저 복사 (캐시 활용)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 소스 복사
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+>>>>>>> 7649493b9571aa7aa394e02c5e65eee29ff0f494
