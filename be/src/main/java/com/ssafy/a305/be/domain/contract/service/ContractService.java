@@ -28,24 +28,24 @@ public class ContractService {
 
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
-    
+
     // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
     // private final AIService aiService;
 
     @Transactional
     public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
-        
+
         // 1. 도메인 유효성 및 엣지 케이스 점검
         validateBusinessRules(creditorUserSeq, requestDto);
 
         // 2. 채권자/채무자 회원 엔티티 조회
         User creditor = userRepository.findById(creditorUserSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
-        
+
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET));
 
-        if (!"ACTIVE".equals(debtor.getState())||!"ACTIVE".equals(creditor.getState())) {
+        if (!"ACTIVE".equals(debtor.getState()) || !"ACTIVE".equals(creditor.getState())) {
             throw new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET);
         }
 
@@ -54,10 +54,12 @@ public class ContractService {
 
         // 4. AI 서비스 연결 (Mock data 가정)
         // AIDraftResult aiResult = aiService.generateDraft(...);
-        /*List<String> warningFlags = new ArrayList<>();
-        if (requestDto.getInterestRate().compareTo(new BigDecimal("0.046")) < 0) {
-            warningFlags.add("LOW_INTEREST_RATE_TAX_WARNING");
-        }*/
+        /*
+         * List<String> warningFlags = new ArrayList<>();
+         * if (requestDto.getInterestRate().compareTo(new BigDecimal("0.046")) < 0) {
+         * warningFlags.add("LOW_INTEREST_RATE_TAX_WARNING");
+         * }
+         */
 
         // 5. Contract 엔티티 생성
         Contract contract = Contract.builder()
@@ -74,8 +76,6 @@ public class ContractService {
                 .status("DRAFT")
                 .createdDttm(LocalDateTime.now())
                 .build();
-
-
 
         // 7. 상환 계획 레코드 계산 및 생성
         generateRepaymentSchedules(contract, requestDto);
@@ -123,19 +123,24 @@ public class ContractService {
                     .installmentNo(1)
                     .dueDt(contract.getEndDt())
                     .principalDue(request.getPrincipalAmount())
-                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt()))
-                    .totalDue(request.getPrincipalAmount().add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt())))
+                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                            request.getStartDt(), request.getEndDt()))
+                    .totalDue(request.getPrincipalAmount()
+                            .add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                                    request.getStartDt(), request.getEndDt())))
                     .status("NONPAID")
                     .createdDttm(LocalDateTime.now())
                     .build();
             contract.addRepaymentSchedule(schedule);
 
-        } else /*if ("INSTALLMENT".equals(request.getRepaymentMethod()))*/ {
+        } else /* if ("INSTALLMENT".equals(request.getRepaymentMethod())) */ {
             int installments = request.getTotalInstallments();
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
-            
+            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2,
+                    RoundingMode.DOWN);
+
             // 단순 월 분할 이자 계산 가정
-            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt());
+            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                    request.getStartDt(), request.getEndDt());
             BigDecimal interestPerMth = totalInterest.divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
 
             BigDecimal remainingPrincipal = request.getPrincipalAmount();
@@ -145,7 +150,7 @@ public class ContractService {
                 LocalDate targetMonth = request.getStartDt().plusMonths(i);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
                 int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
-                
+
                 LocalDate dueDt = targetMonth.withDayOfMonth(actualDay);
                 if (dueDt.isAfter(request.getEndDt())) {
                     dueDt = request.getEndDt(); // 만기일 초과 금지
@@ -178,6 +183,7 @@ public class ContractService {
     }
 
     private String generateContractId() {
-        return "C-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "C-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-"
+                + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 }

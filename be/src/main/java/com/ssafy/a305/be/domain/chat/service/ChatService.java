@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.chat.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,10 @@ public class ChatService {
 
     // 더미 테스트를 위해 채팅방이 없으면 자동으로 생성해주는 메서드 포함
     public ChatMessageResponseDto saveMessage(ChatMessageRequestDto requestDto) {
+        if (requestDto.content() != null && requestDto.content().length() > 255) {
+            throw new IllegalArgumentException("메시지는 255자 이하로 입력해주세요.");
+        }
+        
         log.debug("Saving message to room {}: {}", requestDto.roomId(), requestDto.content());
         // 방 존재 확인 (없으면 생성 - 테스트용)
         ChatRoom chatRoom = chatRoomRepository.findById(requestDto.roomId())
@@ -53,8 +58,9 @@ public class ChatService {
 
         ChatMessage savedMessage = chatMessageRepository.save(message);
 
-        // 방 정보 업데이트 (마지막 메시지 등)
-        chatRoom.updateLastMessage(savedMessage.getContent());
+        // 방 정보 업데이트 (마지막 메시지 등 & 보낸 사람 읽음 처리)
+        chatRoom.updateLastMessage(savedMessage.getContent(), savedMessage.getCreatedAt());
+        chatRoom.getLastReadAt().put(String.valueOf(requestDto.senderSeq()), savedMessage.getCreatedAt());
         chatRoomRepository.save(chatRoom);
 
         String senderName = userProfileRepository.findByUserUserSeq(requestDto.senderSeq())
@@ -81,7 +87,12 @@ public class ChatService {
                     List<ParticipantDto> participantDtos = room.getParticipants().stream()
                         .map(this::apply)
                         .collect(Collectors.toList());
-                    return ChatRoomResponseDto.of(room, participantDtos);
+                    
+                    // 안읽은 메시지 수 계산 (LocalDateTime.MIN은 BSON 변환 시 long overflow 발생하므로 1970년 사용)
+                    LocalDateTime lastReadAt = room.getLastReadAt().getOrDefault(String.valueOf(userSeq), LocalDateTime.of(1970, 1, 1, 0, 0));
+                    long unreadCount = chatMessageRepository.countByRoomIdAndCreatedAtAfterAndSenderSeqNot(room.getId(), lastReadAt, userSeq);
+                    
+                    return ChatRoomResponseDto.of(room, participantDtos, unreadCount);
                 })
                 .collect(Collectors.toList());
     }
@@ -113,6 +124,9 @@ public class ChatService {
                 .id(java.util.UUID.randomUUID().toString())
                 .participants(List.of(myUserSeq, targetUserSeq))
                 .build();
+            // 초기 읽음 시각 설정
+            chatRoom.getLastReadAt().put(String.valueOf(myUserSeq), LocalDateTime.now());
+            chatRoom.getLastReadAt().put(String.valueOf(targetUserSeq), LocalDateTime.now());
             chatRoom = chatRoomRepository.save(chatRoom);
         }
 
@@ -121,7 +135,19 @@ public class ChatService {
             .map(this::apply2)
             .collect(Collectors.toList());
 
-        return ChatRoomResponseDto.of(chatRoom, participantDtos);
+        // LocalDateTime.MIN 대신 안전한 과거 시각 사용
+        LocalDateTime lastReadAt = chatRoom.getLastReadAt().getOrDefault(String.valueOf(myUserSeq), LocalDateTime.of(1970, 1, 1, 0, 0));
+        long unreadCount = chatMessageRepository.countByRoomIdAndCreatedAtAfterAndSenderSeqNot(chatRoom.getId(), lastReadAt, myUserSeq);
+
+        return ChatRoomResponseDto.of(chatRoom, participantDtos, unreadCount);
+    }
+
+    public void markAsRead(String roomId, Integer userSeq) {
+        ChatRoom room = chatRoomRepository.findById(roomId)
+            .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다: " + roomId));
+        
+        room.getLastReadAt().put(String.valueOf(userSeq), LocalDateTime.now());
+        chatRoomRepository.save(room);
     }
 
     public void leaveRoom(Integer userSeq, String roomId) {

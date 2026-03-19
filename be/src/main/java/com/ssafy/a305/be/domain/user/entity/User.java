@@ -37,6 +37,9 @@ public class User {
     @Column(name = "deleted_dttm")
     private LocalDateTime deletedDttm;
 
+    @OneToOne(mappedBy = "user")
+    private UserProfile profile;
+
     public void changeState(String state) {
         this.state = state;
         this.updatedDttm = LocalDateTime.now();
