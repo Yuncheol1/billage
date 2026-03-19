@@ -10,8 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -213,15 +211,15 @@ private fun SummaryCards(sectionStates: List<ContractSectionState>) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterChips(
     selectedFilter: ContractFilter,
     onFilterSelected: (ContractFilter) -> Unit
 ) {
-    FlowRow(
+    Row(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
         ContractFilter.entries.forEach { filter ->
             val selected = filter == selectedFilter

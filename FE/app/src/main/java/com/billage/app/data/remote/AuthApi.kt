@@ -101,6 +101,33 @@ class AuthApi(
         }
     }
 
+    suspend fun reissue(refreshToken: String): Result<TokenReissueData> = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = createConnection(
+                path = "/api/v1/auth/reissue",
+                method = "POST",
+                doOutput = true
+            )
+
+            try {
+                val requestBody = json.encodeToString(TokenReissueRequest(refreshToken = refreshToken))
+                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write(requestBody)
+                }
+
+                val responseCode = connection.responseCode
+                val responseBody = readResponseBody(connection, responseCode)
+                if (responseCode !in 200..299) {
+                    throw IOException("Token reissue failed with HTTP $responseCode: $responseBody")
+                }
+
+                json.decodeFromString<TokenReissueResponse>(responseBody).data
+            } finally {
+                connection.disconnect()
+            }
+        }
+    }
+
     private fun createConnection(
         path: String,
         method: String,
@@ -140,6 +167,11 @@ class AuthApi(
     )
 
     @Serializable
+    private data class TokenReissueRequest(
+        val refreshToken: String
+    )
+
+    @Serializable
     private data class GetConsentsResponse(
         val status: Int,
         val message: String,
@@ -156,6 +188,13 @@ class AuthApi(
         val status: Int,
         val message: String,
         val data: ConsentCompletionData
+    )
+
+    @Serializable
+    private data class TokenReissueResponse(
+        val status: Int,
+        val message: String,
+        val data: TokenReissueData
     )
 }
 
@@ -185,5 +224,14 @@ data class ConsentSubmissionItem(
 @Serializable
 data class ConsentCompletionData(
     val userSeq: Int,
+    val userState: String
+)
+
+@Serializable
+data class TokenReissueData(
+    val accessToken: String,
+    val refreshToken: String,
+    val accessTokenExpiresIn: Long,
+    val refreshTokenExpiresIn: Long,
     val userState: String
 )

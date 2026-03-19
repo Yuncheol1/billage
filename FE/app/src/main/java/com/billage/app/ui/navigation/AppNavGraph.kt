@@ -38,7 +38,14 @@ fun NavGraphBuilder.appNavGraph(
 ) {
     composable(route = AppDestination.Login.route) {
         LoginScreen(
-            onDevBypassClick = { appNavController.navigateToHome(clearBackStack = true) }
+            onDevBypassClick = { appNavController.navigateToHome(clearBackStack = true) },
+            onBiometricLoginSuccess = { userState ->
+                if (userState.equals("PENDING", ignoreCase = true)) {
+                    appNavController.navigateToConditionsOfUse(clearBackStack = true)
+                } else {
+                    appNavController.navigateToHome(clearBackStack = true)
+                }
+            }
         )
     }
 

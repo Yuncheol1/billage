@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
 import com.billage.app.data.local.AuthSessionStorage
+import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.ui.navigation.AppDestination
 import com.billage.app.ui.navigation.AppNavHost
 import com.billage.app.ui.theme.BillageTheme
@@ -18,20 +19,13 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
-private lateinit var authSessionStorage: AuthSessionStorage
+    private lateinit var authSessionStorage: AuthSessionStorage
     private var startDestination by mutableStateOf(AppDestination.Login.route)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authSessionStorage = AuthSessionStorage(applicationContext)
-        startDestination = if (authSessionStorage.hasSession()) {
-            if (authSessionStorage.getUserState().equals("PENDING", ignoreCase = true)) {
-                AppDestination.ConditionsOfUse.route
-            } else {
-                AppDestination.Home.route
-            }
-        } else {
-            AppDestination.Login.route
-        }
+        startDestination = resolveStartDestination()
         handleAuthCallback(intent)
 
         enableEdgeToEdge()
@@ -81,7 +75,35 @@ private lateinit var authSessionStorage: AuthSessionStorage
         )
 
         authSessionStorage.save(authResult)
-        startDestination = if (authResult.isNewUser || authResult.userState.equals("PENDING", ignoreCase = true)) {
+        authSessionStorage.setBiometricLoginEnabled(
+            BiometricLoginManager.isAuthenticationAvailable(applicationContext)
+        )
+        startDestination = resolveAuthenticatedDestination(
+            isNewUser = authResult.isNewUser,
+            userState = authResult.userState
+        )
+    }
+
+    private fun resolveStartDestination(): String {
+        if (authSessionStorage.shouldUseBiometricLogin()) {
+            return AppDestination.Login.route
+        }
+
+        if (!authSessionStorage.hasSession()) {
+            return AppDestination.Login.route
+        }
+
+        return resolveAuthenticatedDestination(
+            isNewUser = false,
+            userState = authSessionStorage.getUserState().orEmpty()
+        )
+    }
+
+    private fun resolveAuthenticatedDestination(
+        isNewUser: Boolean,
+        userState: String
+    ): String {
+        return if (isNewUser || userState.equals("PENDING", ignoreCase = true)) {
             AppDestination.ConditionsOfUse.route
         } else {
             AppDestination.Home.route
