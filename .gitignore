@@ -18,3 +18,6 @@ temp_untracked.txt
 
 # OS Generated Files
 .DS_Store
+
+# .idea 추가
+.idea/
