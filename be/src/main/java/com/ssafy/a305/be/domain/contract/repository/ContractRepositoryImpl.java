@@ -4,10 +4,12 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.contract.entity.QContractClause;
 import com.ssafy.a305.be.domain.user.entity.QUser;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.ssafy.a305.be.domain.contract.entity.QContract.contract;
 
@@ -34,6 +36,8 @@ public class ContractRepositoryImpl implements ContractRepositoryCustom {
                 .fetch();
     }
 
+
+
     private BooleanExpression roleEq(Integer userSeq, String role) {
         if ("CREDITOR".equalsIgnoreCase(role)) {
             return contract.creditor.userSeq.eq(userSeq);
@@ -50,5 +54,22 @@ public class ContractRepositoryImpl implements ContractRepositoryCustom {
             return null;
         }
         return contract.status.eq(status);
+    }
+
+    @Override
+    public Optional<Contract> findContractDetailById(Integer contractSeq) {
+        QUser creditorUser=new QUser("creditorUser");
+        QUser debtorUser=new QUser("debtorUser");
+        QContractClause contractClause=QContractClause.contractClause;
+        Contract result = queryFactory
+                .selectFrom(contract).distinct()
+                .join(contract.creditor, creditorUser).fetchJoin()
+                .join(contract.debtor, debtorUser).fetchJoin()
+                .leftJoin(contract.clauses, contractClause).fetchJoin()  // 특약사항 Fetch Join
+                .where(contract.contractSeq.eq(contractSeq))
+                .orderBy(contractClause.orderNo.asc())
+                .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 }

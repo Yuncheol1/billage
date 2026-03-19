@@ -1,6 +1,7 @@
 package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
@@ -276,4 +277,29 @@ public class ContractService {
         return "C-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-"
                 + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
+
+    @Transactional(readOnly = true)
+    public ContractDetailResponseDto getContractDetail(Integer contractSeq, Integer userSeq) {
+
+        // 1. Fetch Join 최적화 된 단건 조회 쿼리 호출
+        Contract contract = contractRepository.findContractDetailById(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        // 2. 보안 권한 검증: 내가 채무자이거나 채권자인지 확인
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 열람할 권한이 없습니다.");
+        }
+
+        // 3. 상대방 이름(counterpartyName) 조회
+        Integer counterpartySeq = isCreditor ? contract.getDebtor().getUserSeq() : contract.getCreditor().getUserSeq();
+        String counterpartyName = userProfileRepository.findByUserUserSeq(counterpartySeq)
+                .map(UserProfile::getRealName)
+                .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
+        // 4. 계약 엔티티와 정보들을 조립해 DTO 반환
+        return new ContractDetailResponseDto(contract, userSeq, counterpartyName);
+    }
+
 }
