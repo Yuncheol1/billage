@@ -18,4 +18,5 @@ public interface ContractRepository extends JpaRepository<Contract, Integer>, Co
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Contract c WHERE c.contractSeq = :contractSeq")
     Optional<Contract> findByIdWithPessimisticLock(@Param("contractSeq") Integer contractSeq);
+
 }

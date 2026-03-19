@@ -44,6 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (accessToken != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 jwtTokenProvider.validateAccessToken(accessToken);
                 Integer userSeq = jwtTokenProvider.extractUserSeq(accessToken);
+
                 User user = userRepository.findById(userSeq)
                         .orElseThrow(() -> new BadCredentialsException("인증 사용자를 찾을 수 없습니다."));
 

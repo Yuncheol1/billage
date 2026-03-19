@@ -59,4 +59,13 @@ public class ChatRoomController {
         chatService.leaveRoom(userSeq, roomId);
         return ResponseEntity.ok().build();
     }
+
+    // 메시지 읽음 처리
+    @org.springframework.web.bind.annotation.PatchMapping("/{roomId}/read")
+    public ResponseEntity<Void> markAsRead(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @PathVariable("roomId") String roomId) {
+        chatService.markAsRead(roomId, userSeq);
+        return ResponseEntity.ok().build();
+    }
 }

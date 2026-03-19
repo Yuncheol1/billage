@@ -1,3 +1,5 @@
+-- Spring Boot 실행 시 TermsMasterDataSeeder가 동일 데이터를 멱등 삽입하도록 함. 수동 실행 시에도 아래 NOT EXISTS로 중복 방지.
+
 INSERT INTO terms_master (terms_key, terms_type, terms_content, terms_version, created_dttm)
 SELECT 'service_terms', 'mandatory', '빌리지 서비스 이용을 위해 서비스 이용약관에 동의합니다. 본 약관에는 서비스 이용 조건, 회원의 권리와 의무, 운영 정책이 포함됩니다.', 'v1.0', NOW(6)
 WHERE NOT EXISTS (

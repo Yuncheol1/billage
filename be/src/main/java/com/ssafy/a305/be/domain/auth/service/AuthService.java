@@ -200,7 +200,7 @@ public class AuthService {
 
     private SocialLoginResult registerNewKakaoUser(String providerUserId, KakaoUserInfoResponse userInfo) {
         LocalDateTime now = LocalDateTime.now();
-        User newUser = userRepository.save(User.builder()
+        User newUser = userRepository.saveAndFlush(User.builder() // fix) save -> saveAndFlush
                 .email(resolveAvailableEmail(extractVerifiedEmail(userInfo)))
                 .phone(resolveAvailablePhone(null, userInfo))
                 .state(USER_STATE_PENDING)
