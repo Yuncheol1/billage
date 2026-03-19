@@ -1,7 +1,8 @@
 package com.billage.app.data.repository
 
-import android.os.Build
 import android.util.Log
+import com.billage.app.BuildConfig
+import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.ui.chat.models.ChatMessageReq
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ChatRepository @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val authSessionStorage: AuthSessionStorage
 ) {
     private val TAG = "ChatRepository"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -39,22 +41,36 @@ class ChatRepository @Inject constructor(
 
         scope.launch {
             try {
-                val isEmulator = Build.FINGERPRINT.contains("generic", ignoreCase = true) || 
-                                 Build.MODEL.contains("sdk", ignoreCase = true)
-                val host = if (isEmulator) "10.0.2.2:8080" else "localhost:8080"
-                val url = "ws://$host/ws-chat"
+                // Use BACKEND_BASE_URL from BuildConfig and convert to ws/wss
+                val baseUrl = BuildConfig.BACKEND_BASE_URL.removeSuffix("/")
+                val wsBase = if (baseUrl.startsWith("https")) {
+                    baseUrl.replace("https", "wss")
+                } else {
+                    baseUrl.replace("http", "ws")
+                }
+                val url = "$wsBase/ws-chat"
 
                 Log.d(TAG, "Connecting to STOMP at $url")
-                // Note: STOMP over WebSocket doesn't automatically use OkHttpClient's interceptors 
-                // for the handshake unless configured via the web socket client.
-                // Krossbow's OkHttpWebSocketClient uses the provided OkHttpClient.
+
                 val stompClient = StompClient(OkHttpWebSocketClient(okHttpClient))
-                val stompSession = stompClient.connect(url)
+
+                // Add headers for the STOMP CONNECT frame
+                val token = authSessionStorage.getAccessToken()
+                val stompHeaders = mutableMapOf<String, String>()
+                stompHeaders["userSeq"] = authSessionStorage.getUserSeq().toString()
+                if (!token.isNullOrBlank()) {
+                    stompHeaders["Authorization"] = "Bearer $token"
+                }
+
+                // Connect with customStompConnectHeaders
+                val stompSession = stompClient.connect(
+                    url = url,
+                    customStompConnectHeaders = stompHeaders
+                )
                 _session.value = stompSession
                 Log.d(TAG, "STOMP Connected")
             } catch (e: Exception) {
                 Log.e(TAG, "STOMP Connection failed", e)
-                // Retry logic could be added here
             }
         }
     }

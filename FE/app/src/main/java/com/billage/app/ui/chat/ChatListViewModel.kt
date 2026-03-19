@@ -48,6 +48,7 @@ class ChatListViewModel @Inject constructor(
                     if (query.length >= 2) {
                         try {
                             _userSearchResults.value = userApi.searchUsers(query)
+                                .filter { it.userSeq != myUserSeq }
                         } catch (e: Exception) {
                             Log.e("ChatListViewModel", "Search failed", e)
                             _userSearchResults.value = emptyList()

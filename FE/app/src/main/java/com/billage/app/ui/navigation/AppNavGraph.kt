@@ -2,29 +2,30 @@ package com.billage.app.ui.navigation
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
 import com.billage.app.ui.auth.MypageScreen
+import com.billage.app.ui.contract.ContractScreen
+import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.chat.ChatRoomScreen
 import com.billage.app.ui.chat.components.cards.BaseChatCard
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
+import com.billage.app.ui.chat.components.cards.BaseChatCard
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.billage.app.ui.contract.ContractCompleteScreen
 import com.billage.app.ui.contract.ContractRole
 import com.billage.app.ui.contract.ContractScreen
@@ -32,6 +33,9 @@ import com.billage.app.ui.contract.ContractViewModel
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
+import androidx.compose.ui.Alignment
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.billage.app.ui.chat.ChatRoomScreen
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -53,7 +57,7 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { role -> appNavController.navigateToContract(role) },
+            onAddContractClick = { appNavController.navigateToContract() },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
@@ -154,7 +158,7 @@ fun NavGraphBuilder.appNavGraph(
         LaunchedEffect(Unit) { viewModel.joinRoom("100") }
         val messages by viewModel.messages.collectAsState()
 
-        ChatRoomScreen(
+        com.billage.app.ui.chat.ChatRoomScreen(
             state = ChatRoomState(
                 roomId = "100",
                 roomName = "알 수 없음"
