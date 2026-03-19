@@ -74,7 +74,9 @@ fun NavGraphBuilder.appNavGraph(
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
         ContractScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { appNavController.navigateToSpecialTerms() },
+            onContractComplete = { contractSeq ->  // ← contractSeq 받아서 전달
+                appNavController.navigateToSpecialTerms(contractSeq)
+            },
             role = role
         )
     }

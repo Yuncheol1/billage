@@ -1,16 +1,23 @@
 package com.billage.app.ui.contract
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.billage.app.data.local.AuthSessionStorage
+import com.billage.app.data.remote.api.ContractApi
+import com.billage.app.data.remote.api.CreateContractRequest
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import javax.inject.Inject
 
 enum class ContractRole {
-    CREDITOR, // 빌려주기 (채권자)
-    DEBTOR    // 빌리기 (채무자)
+    CREDITOR,
+    DEBTOR
 }
 
 enum class RepaymentMethod {
@@ -34,13 +41,32 @@ data class ContractFormState(
     val repaymentMethod: RepaymentMethod? = null,
 )
 
-class ContractViewModel : ViewModel() {
+sealed class ContractSubmitState {
+    object Idle : ContractSubmitState()
+    object Loading : ContractSubmitState()
+    data class Success(
+        val contractSeq: Int,
+        val contractId: String
+    ) : ContractSubmitState()
+    data class Error(
+        val message: String
+    ) : ContractSubmitState()
+}
+
+@HiltViewModel
+class ContractViewModel @Inject constructor(
+    private val contractApi: ContractApi,
+    private val authSessionStorage: AuthSessionStorage  // ← import 추가됨
+) : ViewModel() {
 
     private val _currentStep = MutableStateFlow(1)
     val currentStep: StateFlow<Int> = _currentStep.asStateFlow()
 
     private val _formState = MutableStateFlow(ContractFormState())
     val formState: StateFlow<ContractFormState> = _formState.asStateFlow()
+
+    private val _submitState = MutableStateFlow<ContractSubmitState>(ContractSubmitState.Idle)
+    val submitState: StateFlow<ContractSubmitState> = _submitState.asStateFlow()
 
     fun nextStep() {
         if (_currentStep.value < TOTAL_STEPS) _currentStep.update { it + 1 }
@@ -88,7 +114,6 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(interestRate = rate) }
     }
 
-    // 날짜 변경 시 상환 방식 초기화 — 기간이 바뀌면 이전 선택이 유효하지 않을 수 있음
     fun updateStartDate(date: String) {
         _formState.update { it.copy(startDate = date, repaymentMethod = null) }
     }
@@ -101,7 +126,6 @@ class ContractViewModel : ViewModel() {
         _formState.update { it.copy(repaymentMethod = method) }
     }
 
-    // 총 상환 횟수 계산 — 1달 미만 잔여분은 제외 (내림 처리)
     fun calculateTotalInstallments(): Int? {
         val method = _formState.value.repaymentMethod ?: return null
         if (method == RepaymentMethod.LUMP_SUM) return null
@@ -119,7 +143,6 @@ class ContractViewModel : ViewModel() {
         }
     }
 
-    // 상환일 = 시작일의 일(day)로 자동 고정
     fun calculateRepaymentDay(): Int {
         return runCatching {
             LocalDate.parse(_formState.value.startDate).dayOfMonth
@@ -136,6 +159,78 @@ class ContractViewModel : ViewModel() {
             6 -> _formState.value.repaymentMethod != null
             else -> true
         }
+    }
+
+    // 파라미터 제거 — authSessionStorage에서 직접 userSeq 가져옴
+    fun submitContractDraft() {
+        // 로그인한 사용자 seq 가져오기
+        val creditorUserSeq = authSessionStorage.getUserSeq()
+        if (creditorUserSeq == -1) {
+            _submitState.value = ContractSubmitState.Error(
+                "로그인 정보를 찾을 수 없어요. 다시 로그인해 주세요."
+            )
+            return
+        }
+
+        val form = _formState.value
+
+        val debtorSeq = form.debtorUserSeq ?: run {
+            _submitState.value = ContractSubmitState.Error("상대방 정보가 없어요.")
+            return
+        }
+        val isFamily = form.isFamily ?: run {
+            _submitState.value = ContractSubmitState.Error("가족 여부를 선택해 주세요.")
+            return
+        }
+        val principalAmount = form.amount.toLongOrNull() ?: run {
+            _submitState.value = ContractSubmitState.Error("금액을 확인해 주세요.")
+            return
+        }
+        val interestRate = form.interestRate.toDoubleOrNull()?.div(100) ?: run {
+            _submitState.value = ContractSubmitState.Error("이자율을 확인해 주세요.")
+            return
+        }
+        val repaymentMethod = form.repaymentMethod ?: run {
+            _submitState.value = ContractSubmitState.Error("상환 방식을 선택해 주세요.")
+            return
+        }
+
+        val request = CreateContractRequest(
+            family = if (isFamily) "FAMILY" else "NOT_FAMILY",
+            creditorUserSeq = creditorUserSeq,
+            debtorUserSeq = debtorSeq,
+            principalAmount = principalAmount,
+            interestRate = interestRate,
+            repaymentMethod = repaymentMethod.name,
+            totalInstallments = calculateTotalInstallments(),
+            repaymentDay = calculateRepaymentDay(),
+            startDt = form.startDate,
+            endDt = form.endDate
+        )
+
+        viewModelScope.launch {
+            _submitState.value = ContractSubmitState.Loading
+            try {
+                val response = contractApi.createContractDraft(request)
+                val data = response.data
+                if (response.status == 201 && data != null) {
+                    _submitState.value = ContractSubmitState.Success(
+                        contractSeq = data.contractSeq,
+                        contractId = data.contractId
+                    )
+                } else {
+                    _submitState.value = ContractSubmitState.Error(response.message)
+                }
+            } catch (e: Exception) {
+                _submitState.value = ContractSubmitState.Error(
+                    "계약 생성에 실패했어요. 다시 시도해 주세요."
+                )
+            }
+        }
+    }
+
+    fun resetSubmitState() {
+        _submitState.value = ContractSubmitState.Idle
     }
 
     private fun isValidPhoneNumber(phone: String): Boolean {
