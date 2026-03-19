@@ -46,9 +46,14 @@ sealed interface AppDestination {
 class AppNavController(
     val navController: NavHostController
 ) {
-    fun navigateToLogin() {
+    fun navigateToLogin(clearBackStack: Boolean = false) {
         navController.navigate(AppDestination.Login.route) {
             launchSingleTop = true
+            if (clearBackStack) {
+                popUpTo(AppDestination.Home.route) {
+                    inclusive = true
+                }
+            }
         }
     }
 
@@ -61,10 +66,16 @@ class AppNavController(
         }
     }
 
-    fun navigateToHome() {
+    fun navigateToHome(clearBackStack: Boolean = false) {
         navController.navigate(AppDestination.Home.route) {
-            popUpTo(AppDestination.Home.route) {
-                saveState = true
+            if (clearBackStack) {
+                popUpTo(AppDestination.Login.route) {
+                    inclusive = true
+                }
+            } else {
+                popUpTo(AppDestination.Home.route) {
+                    saveState = true
+                }
             }
             launchSingleTop = true
             restoreState = true
@@ -89,8 +100,17 @@ class AppNavController(
         }
     }
 
-    fun navigateToChatRoom(roomId: String? = null) {
-        navController.navigate(AppDestination.ChatRoom.route) {
+    fun navigateToChatRoom(roomId: String? = null, opponentName: String? = null) {
+        val route = buildString {
+            append(AppDestination.ChatRoom.route)
+            if (roomId != null) {
+                append("/$roomId")
+                if (opponentName != null) {
+                    append("/$opponentName")
+                }
+            }
+        }
+        navController.navigate(route) {
             launchSingleTop = true
         }
     }

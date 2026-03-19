@@ -13,6 +13,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.LaunchedEffect
+import com.billage.app.ui.chat.security.SecurityTestBed
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -21,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.theme.*
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import kotlin.collections.isNotEmpty
 
 data class ChatPreviewItem(
     val id: String,
@@ -32,20 +47,101 @@ data class ChatPreviewItem(
     val hasContract: Boolean
 )
 
-val dummyChatList = listOf(
-    ChatPreviewItem("1", "김철수", "👨", "네 알겠습니다!", "방금", 0, true),
-    ChatPreviewItem("2", "이영희", "👩", "고마워요~", "10분 전", 0, true),
-    ChatPreviewItem("3", "박민수", "👨‍💼", "오늘 저녁에 통화 가능해?", "1시간 전", 2, false)
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    onChatRoomClick: (String) -> Unit,
+    viewModel: ChatListViewModel = hiltViewModel(),
+    onChatRoomClick: (String, String) -> Unit,
     onHomeClick: () -> Unit,
     onAddContractClick: () -> Unit,
     onContractClick: () -> Unit = {}
 ) {
+    val rooms by viewModel.rooms.collectAsState()
+    val userSearchResults by viewModel.userSearchResults.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val myUserSeq = viewModel.myUserSeq
+    
+    // 화면 진입 시마다 목록 새로고침
+    LaunchedEffect(Unit) {
+        viewModel.fetchRooms()
+    }
+
+    var showCreateRoomDialog by remember { mutableStateOf(false) }
+    var isCreating by remember { mutableStateOf(false) }
+
+    if (showCreateRoomDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateRoomDialog = false },
+            title = { Text("새 채팅방 만들기", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.onSearchQueryChange(it) },
+                        label = { Text("상대방 이메일") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    if (userSearchResults.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                            colors = CardDefaults.cardColors(containerColor = BillageBackground),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            LazyColumn {
+                                items(userSearchResults) { user ->
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.onSearchQueryChange(user.email) }
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(user.realName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(user.email, fontSize = 12.sp, color = BillageTextSecondary)
+                                    }
+                                    HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { 
+                        if (searchQuery.isNotBlank()) {
+                            isCreating = true
+                            viewModel.createRoomByEmail(
+                                targetEmail = searchQuery,
+                                onSuccess = { id, opponent -> 
+                                    isCreating = false
+                                    viewModel.onSearchQueryChange("")
+                                    onChatRoomClick(id, opponent)
+                                },
+                                onError = {
+                                    isCreating = false
+                                }
+                            )
+                        }
+                    },
+                    enabled = !isCreating && searchQuery.isNotBlank()
+                ) {
+                    Text(if (isCreating) "생성 중..." else "만들기", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateRoomDialog = false }) {
+                    Text("취소", color = BillageTextSecondary)
+                }
+            },
+            containerColor = BillageSurface,
+            titleContentColor = BillageTextPrimary,
+            textContentColor = BillageTextPrimary
+        )
+    }
+
     Scaffold(
         containerColor = BillageBackground,
         topBar = {
@@ -56,12 +152,26 @@ fun ChatListScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
-                Text(
-                    text = "메시지",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = BillageTextPrimary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "메시지",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = BillageTextPrimary
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewModel.fetchRooms() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
+                        }
+                        IconButton(onClick = { showCreateRoomDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "채팅방 추가", tint = BillageTextPrimary)
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "대화 상대와 안전하게 거래하세요",
@@ -80,18 +190,121 @@ fun ChatListScreen(
             )
         }
     ) { paddingValues ->
+        val context = LocalContext.current
+        var testResult by remember { mutableStateOf(SecurityTestBed.getDeviceSecuritySpec(context)) }
+        var showEnrollDialog by remember { mutableStateOf(false) }
+
+        if (showEnrollDialog) {
+            AlertDialog(
+                onDismissRequest = { showEnrollDialog = false },
+                title = { Text("화면 잠금 설정 필요", fontWeight = FontWeight.Bold) },
+                text = { 
+                    Text("전자서명(TEE/StrongBox)을 안전하게 저장하기 위해 기기에 화면 잠금(PIN, 패턴, 지문 등)이 필수로 설정되어 있어야 합니다.\n\n설정 앱에서 화면 잠금을 등록한 후 다시 시도해주세요.") 
+                },
+                confirmButton = {
+                    TextButton(onClick = { showEnrollDialog = false }) {
+                        Text("확인", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                    }
+                },
+                containerColor = BillageSurface,
+                titleContentColor = BillageTextPrimary,
+                textContentColor = BillageTextPrimary
+            )
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            items(dummyChatList) { chat ->
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0F5))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🛠️ 전자서명(TEE) 저장 및 지문 테스트 (임시) 🛠️", fontWeight = FontWeight.Bold, color = BillagePrimary)
+                        Spacer(Modifier.height(8.dp))
+                        Text(testResult, fontSize = 13.sp)
+                        Spacer(Modifier.height(16.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { 
+                                    val result = SecurityTestBed.testKeyGenerationAndHwStatus(context)
+                                    if (result.startsWith("NEEDS_ENROLLMENT")) {
+                                        showEnrollDialog = true
+                                    } else {
+                                        testResult = result
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("1. TEE 저장상태 확인", fontSize=12.sp) }
+                            Button(
+                                onClick = { 
+                                    val activity = context as? FragmentActivity
+                                    if (activity != null) {
+                                        SecurityTestBed.startBiometricSignature(activity) { res -> 
+                                            if (res.startsWith("NEEDS_ENROLLMENT")) {
+                                                showEnrollDialog = true
+                                            } else {
+                                                testResult = res 
+                                            }
+                                        }
+                                    } else {
+                                        testResult = "에러: MainActivity가 FragmentActivity를 상속받아야 합니다! (현재 변경완료됨)"
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("2. 지문 서명 실행", fontSize=12.sp) }
+                        }
+                    }
+                }
+            }
+            items(rooms) { room ->
+                // Map ChatRoomRes to ChatPreviewItem for UI
+                // 내 UserSeq가 아닌 참여자의 이름을 찾아서 표시 (없으면 알 수 없음)
+                val opponentName = room.participants.firstOrNull { it.userSeq != myUserSeq }?.name ?: "알 수 없음"
+                val chat = ChatPreviewItem(
+                    id = room.id,
+                    name = opponentName,
+                    avatar = "👤",
+                    lastMessage = room.lastMessage ?: "",
+                    timestamp = room.lastModifiedAt ?: "",
+                    unread = room.unreadCount.toInt(),
+                    hasContract = false
+                )
+                var showLeaveDialog by remember { mutableStateOf(false) }
+                if (showLeaveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showLeaveDialog = false },
+                        title = { Text("채팅방 나가기", fontWeight = FontWeight.Bold) },
+                        text = { Text("정말 채팅방을 나가시겠습니까?") },
+                        confirmButton = {
+                            TextButton(onClick = { 
+                                showLeaveDialog = false
+                                viewModel.leaveRoom(room.id)
+                            }) {
+                                Text("나가기", color = Color.Red, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showLeaveDialog = false }) {
+                                Text("취소", color = BillageTextSecondary)
+                            }
+                        },
+                        containerColor = BillageSurface,
+                        titleContentColor = BillageTextPrimary,
+                        textContentColor = BillageTextPrimary
+                    )
+                }
+
                 ChatListItem(
                     chat = chat,
-                    onClick = { onChatRoomClick(chat.id) }
+                    onClick = { onChatRoomClick(chat.id, opponentName) },
+                    onLeaveClick = { showLeaveDialog = true }
                 )
             }
-            if (dummyChatList.isEmpty()) {
+            if (rooms.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier
@@ -123,7 +336,8 @@ fun ChatListScreen(
 @Composable
 fun ChatListItem(
     chat: ChatPreviewItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLeaveClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -216,6 +430,10 @@ fun ChatListItem(
                 }
             }
         }
+        Spacer(modifier = Modifier.width(8.dp))
+        IconButton(onClick = onLeaveClick, modifier = Modifier.size(24.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "나가기", tint = BillageTextSecondary)
+        }
     }
     HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
 }
@@ -225,7 +443,7 @@ fun ChatListItem(
 fun ChatListScreenPreview() {
     BillageTheme(dynamicColor = false) {
         ChatListScreen(
-            onChatRoomClick = {},
+            onChatRoomClick = { _, _ -> },
             onHomeClick = {},
             onAddContractClick = {}
         )
