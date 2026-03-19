@@ -2,17 +2,25 @@ package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
+import com.ssafy.a305.be.domain.user.entity.UserProfile;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
+import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,6 +36,7 @@ public class ContractService {
 
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository;
 
     // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
     // private final AIService aiService;
@@ -88,6 +97,87 @@ public class ContractService {
                 .contractSeq(savedContract.getContractSeq())
                 .contractId(savedContract.getContractId())
                 .build();
+    }
+
+    @Transactional
+    public void addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
+
+        // 2. 상태 검증
+        if (!"DRAFT".equals(contract.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS);
+        }
+
+        // 3. 권한 검증
+        if (!contract.getCreditor().getUserSeq().equals(userSeq)
+                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // 4. AI 서비스 호출 (Mock 처리)
+        String refinedContent = "[AI 변환] " + clauseContent;
+
+        // 5. ContractClause 엔티티 생성 및 추가
+        int nextOrderNo = contract.getClauses().size() + 1;
+
+        ContractClause clause = ContractClause.builder()
+                .contract(contract)
+                .clauseId("SPECIAL_" + nextOrderNo)
+                .title("특약사항 " + nextOrderNo)
+                .content(refinedContent)
+                .orderNo(nextOrderNo)
+                .createdDttm(LocalDateTime.now())
+                .build();
+
+        contract.addClause(clause);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContractListResponseDto> getContracts(Integer userSeq, String role, String status) {
+        List<Contract> contracts = contractRepository.searchContracts(userSeq, role, status);
+
+        // N+1 문제 해결: 조회된 모든 파트너의 userSeq 추출 후 한 번에 프로필 조회
+        List<Integer> counterpartySeqs = contracts.stream()
+                .map(c -> c.getCreditor().getUserSeq().equals(userSeq) ? c.getDebtor().getUserSeq() : c.getCreditor().getUserSeq())
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Integer, String> realNameMap = userProfileRepository.findByUserUserSeqIn(counterpartySeqs)
+                .stream()
+                .collect(Collectors.toMap(
+                        up -> up.getUser().getUserSeq(),
+                        UserProfile::getRealName,
+                        (v1, v2) -> v1
+                ));
+
+        return contracts.stream().map(contract -> {
+            boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+            String mappedRole = isCreditor ? "CREDITOR" : "DEBTOR";
+
+            User counterparty = isCreditor ? contract.getDebtor() : contract.getCreditor();
+
+            // N+1 해결된 메모리 맵에서 상대 실명 매핑
+            String realName = realNameMap.getOrDefault(counterparty.getUserSeq(), counterparty.getEmail());
+
+            int totalSchedules = contract.getRepaymentSchedules().size();
+            int paidSchedules = (int) contract.getRepaymentSchedules().stream()
+                    .filter(s -> "PAID".equals(s.getStatus()))
+                    .count();
+
+            return new ContractListResponseDto(
+                    contract.getContractSeq(),
+                    contract.getContractId(),
+                    mappedRole,
+                    realName,
+                    contract.getPrincipalAmount(),
+                    contract.getRepaymentMethod(),
+                    contract.getStatus(),
+                    contract.getStartDt(),
+                    contract.getEndDt()
+                    );
+        }).collect(Collectors.toList());
     }
 
     private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {

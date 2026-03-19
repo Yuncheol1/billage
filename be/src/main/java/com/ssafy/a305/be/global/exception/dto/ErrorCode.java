@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
+    CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "계약을 찾을 수 없습니다."),
+    INVALID_CONTRACT_STATUS(HttpStatus.BAD_REQUEST, "현재 계약 상태에서는 해당 작업을 수행할 수 없습니다."),
     INVALID_DATE(HttpStatus.BAD_REQUEST, "종료일은 시작일보다 미래여야 합니다."),
     EXCEED_LEGAL_INTEREST_RATE(HttpStatus.BAD_REQUEST, "법정 최고 이자율(연 20%)을 초과할 수 없습니다."),
     SELF_CONTRACT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "본인과의 계약은 불가능합니다."),
