@@ -2,18 +2,25 @@ package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
+import com.ssafy.a305.be.domain.user.entity.UserProfile;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
+import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,24 +36,25 @@ public class ContractService {
 
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
-    
+    private final UserProfileRepository userProfileRepository;
+
     // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
     // private final AIService aiService;
 
     @Transactional
     public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
-        
+
         // 1. 도메인 유효성 및 엣지 케이스 점검
         validateBusinessRules(creditorUserSeq, requestDto);
 
         // 2. 채권자/채무자 회원 엔티티 조회
         User creditor = userRepository.findById(creditorUserSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
-        
+
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET));
 
-        if (!"ACTIVE".equals(debtor.getState())||!"ACTIVE".equals(creditor.getState())) {
+        if (!"ACTIVE".equals(debtor.getState()) || !"ACTIVE".equals(creditor.getState())) {
             throw new CustomBusinessException(ErrorCode.INACTIVE_USER_TARGET);
         }
 
@@ -55,10 +63,12 @@ public class ContractService {
 
         // 4. AI 서비스 연결 (Mock data 가정)
         // AIDraftResult aiResult = aiService.generateDraft(...);
-        /*List<String> warningFlags = new ArrayList<>();
-        if (requestDto.getInterestRate().compareTo(new BigDecimal("0.046")) < 0) {
-            warningFlags.add("LOW_INTEREST_RATE_TAX_WARNING");
-        }*/
+        /*
+         * List<String> warningFlags = new ArrayList<>();
+         * if (requestDto.getInterestRate().compareTo(new BigDecimal("0.046")) < 0) {
+         * warningFlags.add("LOW_INTEREST_RATE_TAX_WARNING");
+         * }
+         */
 
         // 5. Contract 엔티티 생성
         Contract contract = Contract.builder()
@@ -76,8 +86,6 @@ public class ContractService {
                 .createdDttm(LocalDateTime.now())
                 .build();
 
-
-
         // 7. 상환 계획 레코드 계산 및 생성
         generateRepaymentSchedules(contract, requestDto);
 
@@ -93,8 +101,8 @@ public class ContractService {
 
     @Transactional
     public void addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
-        // 1. 계약 조회
-        Contract contract = contractRepository.findById(contractSeq)
+        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
 
         // 2. 상태 검증
@@ -124,6 +132,52 @@ public class ContractService {
                 .build();
 
         contract.addClause(clause);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContractListResponseDto> getContracts(Integer userSeq, String role, String status) {
+        List<Contract> contracts = contractRepository.searchContracts(userSeq, role, status);
+
+        // N+1 문제 해결: 조회된 모든 파트너의 userSeq 추출 후 한 번에 프로필 조회
+        List<Integer> counterpartySeqs = contracts.stream()
+                .map(c -> c.getCreditor().getUserSeq().equals(userSeq) ? c.getDebtor().getUserSeq() : c.getCreditor().getUserSeq())
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Integer, String> realNameMap = userProfileRepository.findByUserUserSeqIn(counterpartySeqs)
+                .stream()
+                .collect(Collectors.toMap(
+                        up -> up.getUser().getUserSeq(),
+                        UserProfile::getRealName,
+                        (v1, v2) -> v1
+                ));
+
+        return contracts.stream().map(contract -> {
+            boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+            String mappedRole = isCreditor ? "CREDITOR" : "DEBTOR";
+
+            User counterparty = isCreditor ? contract.getDebtor() : contract.getCreditor();
+
+            // N+1 해결된 메모리 맵에서 상대 실명 매핑
+            String realName = realNameMap.getOrDefault(counterparty.getUserSeq(), counterparty.getEmail());
+
+            int totalSchedules = contract.getRepaymentSchedules().size();
+            int paidSchedules = (int) contract.getRepaymentSchedules().stream()
+                    .filter(s -> "PAID".equals(s.getStatus()))
+                    .count();
+
+            return new ContractListResponseDto(
+                    contract.getContractSeq(),
+                    contract.getContractId(),
+                    mappedRole,
+                    realName,
+                    contract.getPrincipalAmount(),
+                    contract.getRepaymentMethod(),
+                    contract.getStatus(),
+                    contract.getStartDt(),
+                    contract.getEndDt()
+                    );
+        }).collect(Collectors.toList());
     }
 
     private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
@@ -159,19 +213,24 @@ public class ContractService {
                     .installmentNo(1)
                     .dueDt(contract.getEndDt())
                     .principalDue(request.getPrincipalAmount())
-                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt()))
-                    .totalDue(request.getPrincipalAmount().add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt())))
+                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                            request.getStartDt(), request.getEndDt()))
+                    .totalDue(request.getPrincipalAmount()
+                            .add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                                    request.getStartDt(), request.getEndDt())))
                     .status("NONPAID")
                     .createdDttm(LocalDateTime.now())
                     .build();
             contract.addRepaymentSchedule(schedule);
 
-        } else /*if ("INSTALLMENT".equals(request.getRepaymentMethod()))*/ {
+        } else /* if ("INSTALLMENT".equals(request.getRepaymentMethod())) */ {
             int installments = request.getTotalInstallments();
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
-            
+            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2,
+                    RoundingMode.DOWN);
+
             // 단순 월 분할 이자 계산 가정
-            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt());
+            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                    request.getStartDt(), request.getEndDt());
             BigDecimal interestPerMth = totalInterest.divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
 
             BigDecimal remainingPrincipal = request.getPrincipalAmount();
@@ -181,7 +240,7 @@ public class ContractService {
                 LocalDate targetMonth = request.getStartDt().plusMonths(i);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
                 int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
-                
+
                 LocalDate dueDt = targetMonth.withDayOfMonth(actualDay);
                 if (dueDt.isAfter(request.getEndDt())) {
                     dueDt = request.getEndDt(); // 만기일 초과 금지
@@ -214,6 +273,7 @@ public class ContractService {
     }
 
     private String generateContractId() {
-        return "C-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "C-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-"
+                + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 }
