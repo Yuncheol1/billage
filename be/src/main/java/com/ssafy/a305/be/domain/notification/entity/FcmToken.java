@@ -42,4 +42,11 @@ public class FcmToken {
         this.isActive = false;
         this.invalidatedDttm = LocalDateTime.now();
     }
+
+    public void updateToken(String newToken) {
+        this.token = newToken;
+        this.isActive = true;
+        this.lastUsedDttm = LocalDateTime.now();
+        this.invalidatedDttm = null;
+    }
 }

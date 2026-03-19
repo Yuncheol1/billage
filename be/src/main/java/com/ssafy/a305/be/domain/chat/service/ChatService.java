@@ -7,7 +7,10 @@ import java.util.stream.Collectors;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
 import org.springframework.stereotype.Service;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto;
+import com.ssafy.a305.be.domain.notification.dto.ChatNotificationEvent;
 import com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto;
 import com.ssafy.a305.be.domain.chat.dto.ChatRoomResponseDto;
 import com.ssafy.a305.be.domain.chat.dto.ParticipantDto;
@@ -28,6 +31,7 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final com.ssafy.a305.be.domain.user.repository.UserRepository userRepository;
     private final com.ssafy.a305.be.domain.user.repository.UserProfileRepository userProfileRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 더미 테스트를 위해 채팅방이 없으면 자동으로 생성해주는 메서드 포함
     public ChatMessageResponseDto saveMessage(ChatMessageRequestDto requestDto) {
@@ -66,6 +70,19 @@ public class ChatService {
         String senderName = userProfileRepository.findByUserUserSeq(requestDto.senderSeq())
             .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
             .orElse("알 수 없음");
+
+        // 푸시 알림 이벤트를 발행 (수신자들에게 전송)
+        chatRoom.getParticipants().stream()
+            .filter(participantSeq -> !participantSeq.equals(requestDto.senderSeq()))
+            .forEach(recipientSeq -> {
+                eventPublisher.publishEvent(new ChatNotificationEvent(
+                    chatRoom.getId(),
+                    requestDto.senderSeq(),
+                    recipientSeq,
+                    senderName,
+                    requestDto.content()
+                ));
+            });
 
         return ChatMessageResponseDto.of(savedMessage, senderName);
     }

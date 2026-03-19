@@ -51,3 +51,6 @@ application-prod.yml
 Thumbs.db
 schema.sql
 GEMINI.md
+
+### Firebase Admin SDK Key ###
+billage-firebase-adminsdk.json
