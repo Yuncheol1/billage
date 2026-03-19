@@ -10,6 +10,4 @@ import java.util.List;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Integer> {
-
-
 }
