@@ -17,6 +17,12 @@ class AuthSessionStorage(context: Context) {
 
     fun getUserState(): String? = preferences.getString(KEY_USER_STATE, null)
 
+    fun isBiometricLoginEnabled(): Boolean = preferences.getBoolean(KEY_BIOMETRIC_LOGIN_ENABLED, false)
+
+    fun shouldUseBiometricLogin(): Boolean {
+        return isBiometricLoginEnabled() && !getRefreshToken().isNullOrBlank()
+    }
+
     fun save(authResult: AuthResult) {
         preferences.edit {
             putString(KEY_ACCESS_TOKEN, authResult.accessToken)
@@ -29,8 +35,31 @@ class AuthSessionStorage(context: Context) {
         }
     }
 
+    fun saveReissuedSession(
+        accessToken: String,
+        refreshToken: String,
+        accessTokenExpiresIn: Long,
+        refreshTokenExpiresIn: Long,
+        userState: String
+    ) {
+        preferences.edit {
+            putString(KEY_ACCESS_TOKEN, accessToken)
+                .putString(KEY_REFRESH_TOKEN, refreshToken)
+                .putLong(KEY_ACCESS_TOKEN_EXPIRES_IN, accessTokenExpiresIn)
+                .putLong(KEY_REFRESH_TOKEN_EXPIRES_IN, refreshTokenExpiresIn)
+                .putString(KEY_USER_STATE, userState)
+                .putBoolean(KEY_IS_NEW_USER, false)
+        }
+    }
+
     fun clear() {
         preferences.edit { clear() }
+    }
+
+    fun setBiometricLoginEnabled(enabled: Boolean) {
+        preferences.edit {
+            putBoolean(KEY_BIOMETRIC_LOGIN_ENABLED, enabled)
+        }
     }
 
     fun updateUserState(userState: String) {
@@ -61,5 +90,6 @@ class AuthSessionStorage(context: Context) {
         private const val KEY_IS_NEW_USER = "is_new_user"
         private const val KEY_USER_SEQ = "user_seq"
         private const val KEY_USER_STATE = "user_state"
+        private const val KEY_BIOMETRIC_LOGIN_ENABLED = "biometric_login_enabled"
     }
 }
