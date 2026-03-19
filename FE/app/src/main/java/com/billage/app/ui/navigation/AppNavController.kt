@@ -41,6 +41,11 @@ sealed interface AppDestination {
     data object ContractComplete : AppDestination {
         override val route: String = "contract_complete"
     }
+
+    data object ContractSpecialTerms : AppDestination {
+        override val route: String = "contract_special_terms"
+        const val routeWithArg = "contract_special_terms/{contractSeq}"
+    }
 }
 
 class AppNavController(
@@ -131,6 +136,12 @@ class AppNavController(
 
     fun navigateToContractComplete() {
         navController.navigate(AppDestination.ContractComplete.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToSpecialTerms(contractSeq: Int = -1) {
+        navController.navigate("${AppDestination.ContractSpecialTerms.route}/$contractSeq") {
             launchSingleTop = true
         }
     }
