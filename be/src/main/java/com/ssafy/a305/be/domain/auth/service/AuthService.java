@@ -26,6 +26,7 @@ import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
+import com.ssafy.a305.be.global.util.PhoneNumberNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -265,7 +266,7 @@ public class AuthService {
     }
 
     private String resolveAvailablePhone(User user, KakaoUserInfoResponse userInfo) {
-        String normalizedPhoneNumber = normalizePhoneNumber(extractPhoneNumber(userInfo));
+        String normalizedPhoneNumber = PhoneNumberNormalizer.normalize(extractPhoneNumber(userInfo));
         if (normalizedPhoneNumber == null || normalizedPhoneNumber.isBlank()) {
             return user == null ? null : user.getPhone();
         }
@@ -325,23 +326,6 @@ public class AuthService {
             return Boolean.FALSE;
         }
         return Boolean.TRUE.equals(userInfo.kakaoAccount().phoneNumberVerified());
-    }
-
-    private String normalizePhoneNumber(String phoneNumber) {
-        if (phoneNumber == null || phoneNumber.isBlank()) {
-            return null;
-        }
-
-        String digitsOnly = phoneNumber.replaceAll("[^0-9]", "");
-        if (digitsOnly.isBlank()) {
-            return null;
-        }
-
-        if (phoneNumber.trim().startsWith("+82") && digitsOnly.startsWith("82")) {
-            return "0" + digitsOnly.substring(2);
-        }
-
-        return digitsOnly;
     }
 
     private void validateMandatoryConsents(Map<Integer, Boolean> requestAgreementMap) {

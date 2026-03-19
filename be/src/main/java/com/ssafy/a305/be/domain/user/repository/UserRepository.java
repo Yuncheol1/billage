@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     boolean existsByEmail(String email);
     boolean existsByPhoneAndUserSeqNot(String phone, Integer userSeq);
+    boolean existsByPhoneAndState(String phone, String state);
     Optional<User> findByEmail(String email);
 
     java.util.List<User> findByEmailContaining(String email);
