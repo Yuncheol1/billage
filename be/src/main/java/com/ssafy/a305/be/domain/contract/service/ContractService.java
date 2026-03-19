@@ -281,11 +281,9 @@ public class ContractService {
     @Transactional(readOnly = true)
     public ContractDetailResponseDto getContractDetail(Integer contractSeq, Integer userSeq) {
 
-        // 1. Fetch Join 최적화 된 단건 조회 쿼리 호출
         Contract contract = contractRepository.findContractDetailById(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
-        // 2. 보안 권한 검증: 내가 채무자이거나 채권자인지 확인
         boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
         boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
 
@@ -293,13 +291,32 @@ public class ContractService {
             throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 열람할 권한이 없습니다.");
         }
 
-        // 3. 상대방 이름(counterpartyName) 조회
+
         Integer counterpartySeq = isCreditor ? contract.getDebtor().getUserSeq() : contract.getCreditor().getUserSeq();
         String counterpartyName = userProfileRepository.findByUserUserSeq(counterpartySeq)
                 .map(UserProfile::getRealName)
                 .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
-        // 4. 계약 엔티티와 정보들을 조립해 DTO 반환
+
         return new ContractDetailResponseDto(contract, userSeq, counterpartyName);
     }
+    @Transactional
+    public void deleteContract(Integer contractSeq, Integer userSeq) {
+        // 계약 조회 (동시 삭제/서명 등의 충돌 방지를 위한 비관적 락 사용)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 삭제할 권한이 없습니다.");
+        }
+
+        String status = contract.getStatus();
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "이미 서명이 완료되었거나 활성화된 계약은 파기할 수 없습니다.");
+        }
+
+        contractRepository.delete(contract);
+    }
 }
