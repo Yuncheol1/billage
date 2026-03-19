@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/internal/v1"
     
     # 보안 (Server to Server Auth)
-    INTERNAL_API_KEY: str = "super-secret-key-change-me-in-production"
+    INTERNAL_API_KEY: str = ""
     
     # AI 환경변수 (SSAFY GMS Gateway 전용)
     GMS_KEY: str = ""
