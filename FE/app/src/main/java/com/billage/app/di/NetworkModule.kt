@@ -1,56 +1,70 @@
 package com.billage.app.di
 
-import android.os.Build
+import android.content.Context
+import com.billage.app.BuildConfig
+import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.data.remote.api.ChatApi
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.billage.app.data.remote.api.UserApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
+    @Provides
+    @Singleton
+    fun provideAuthSessionStorage(@ApplicationContext context: Context): AuthSessionStorage {
+        return AuthSessionStorage(context)
     }
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        // 에뮬레이터/실기기 판별하여 베이스 URL 설정
-        val isEmulator = Build.FINGERPRINT.contains("generic", ignoreCase = true) || 
-                         Build.MODEL.contains("sdk", ignoreCase = true) || 
-                         Build.MODEL.contains("Emulator", ignoreCase = true) || 
-                         Build.PRODUCT.contains("sdk", ignoreCase = true) ||
-                         Build.HARDWARE.contains("goldfish", ignoreCase = true) ||
-                         Build.HARDWARE.contains("ranchu", ignoreCase = true)
-        
-        val baseUrl = if (isEmulator) "http://10.0.2.2:8080/" else "http://localhost:8080/"
-        
-        return Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(okHttpClient)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        return OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor(authInterceptor)
             .build()
     }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
-        return OkHttpClient.Builder().build()
+    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        val contentType = "application/json".toMediaType()
+        val json = Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+        }
+
+        return Retrofit.Builder()
+            .baseUrl(BuildConfig.BACKEND_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
     }
 
     @Provides
     @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi {
         return retrofit.create(ChatApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserApi(retrofit: Retrofit): UserApi {
+        return retrofit.create(UserApi::class.java)
     }
 }

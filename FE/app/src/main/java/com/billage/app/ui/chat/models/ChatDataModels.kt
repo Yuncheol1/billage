@@ -13,7 +13,8 @@ data class ChatRoomRes(
     val id: String,
     val participants: List<ChatParticipant>,
     val lastMessage: String? = null,
-    val lastModifiedAt: String? = null
+    val lastModifiedAt: String? = null,
+    val unreadCount: Long = 0
 )
 
 @Serializable
@@ -33,4 +34,10 @@ data class ChatMessageRes(
     val content: String,
     val isContractMsg: Boolean,
     val createdAt: String
+)
+@Serializable
+data class UserSearchResponse(
+    val userSeq: Int,
+    val email: String,
+    val realName: String
 )

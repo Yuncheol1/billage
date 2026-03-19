@@ -23,8 +23,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.LaunchedEffect
 import com.billage.app.ui.chat.security.SecurityTestBed
-import com.billage.app.ui.chat.models.TestSessionManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,7 +34,8 @@ import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.theme.*
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import kotlin.collections.isNotEmpty
 
 data class ChatPreviewItem(
     val id: String,
@@ -45,8 +47,6 @@ data class ChatPreviewItem(
     val hasContract: Boolean
 )
 
-// dummyChatList removed in favor of ViewModel
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
@@ -57,81 +57,76 @@ fun ChatListScreen(
     onContractClick: () -> Unit = {}
 ) {
     val rooms by viewModel.rooms.collectAsState()
-    val myUserSeq by TestSessionManager.myUserSeq.collectAsState()
-    // 채팅 목록 진입 시 팝업이 바로 뜨도록 기본값을 true로 설정
-    var showUserSelectDialog by remember { mutableStateOf(true) }
-    var showCreateRoomDialog by remember { mutableStateOf(false) }
-    var newRoomEmail by remember { mutableStateOf("") }
-    var isCreating by remember { mutableStateOf(false) }
-
-    if (showUserSelectDialog) {
-        AlertDialog(
-            onDismissRequest = { showUserSelectDialog = false },
-            title = { Text("테스트 계정 선택", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Button(
-                        onClick = { TestSessionManager.setUserSeq(100); showUserSelectDialog = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (myUserSeq == 100) BillagePrimary else BillageDivider)
-                    ) {
-                        Text("test1 (100)", color = if (myUserSeq == 100) Color.White else BillageTextPrimary)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { TestSessionManager.setUserSeq(101); showUserSelectDialog = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (myUserSeq == 101) BillagePrimary else BillageDivider)
-                    ) {
-                        Text("test2 (101)", color = if (myUserSeq == 101) Color.White else BillageTextPrimary)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showUserSelectDialog = false }) {
-                    Text("닫기", color = BillagePrimary, fontWeight = FontWeight.Bold)
-                }
-            },
-            containerColor = BillageSurface,
-            titleContentColor = BillageTextPrimary,
-            textContentColor = BillageTextPrimary
-        )
+    val userSearchResults by viewModel.userSearchResults.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val myUserSeq = viewModel.myUserSeq
+    
+    // 화면 진입 시마다 목록 새로고침
+    LaunchedEffect(Unit) {
+        viewModel.fetchRooms()
     }
+
+    var showCreateRoomDialog by remember { mutableStateOf(false) }
+    var isCreating by remember { mutableStateOf(false) }
 
     if (showCreateRoomDialog) {
         AlertDialog(
             onDismissRequest = { showCreateRoomDialog = false },
             title = { Text("새 채팅방 만들기", fontWeight = FontWeight.Bold) },
             text = {
-                OutlinedTextField(
-                    value = newRoomEmail,
-                    onValueChange = { newRoomEmail = it },
-                    label = { Text("상대방 이메일") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.onSearchQueryChange(it) },
+                        label = { Text("상대방 이메일") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    if (userSearchResults.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                            colors = CardDefaults.cardColors(containerColor = BillageBackground),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            LazyColumn {
+                                items(userSearchResults) { user ->
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.onSearchQueryChange(user.email) }
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(user.realName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(user.email, fontSize = 12.sp, color = BillageTextSecondary)
+                                    }
+                                    HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
+                                }
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = { 
-                        if (newRoomEmail.isNotBlank()) {
+                        if (searchQuery.isNotBlank()) {
                             isCreating = true
                             viewModel.createRoomByEmail(
-                                targetEmail = newRoomEmail,
+                                targetEmail = searchQuery,
                                 onSuccess = { id, opponent -> 
                                     isCreating = false
-                                    showCreateRoomDialog = false
-                                    newRoomEmail = ""
+                                    viewModel.onSearchQueryChange("")
                                     onChatRoomClick(id, opponent)
                                 },
                                 onError = {
                                     isCreating = false
-                                    // Error handling (toast would be better)
                                 }
                             )
                         }
                     },
-                    enabled = !isCreating && newRoomEmail.isNotBlank()
+                    enabled = !isCreating && searchQuery.isNotBlank()
                 ) {
                     Text(if (isCreating) "생성 중..." else "만들기", color = BillagePrimary, fontWeight = FontWeight.Bold)
                 }
@@ -169,19 +164,9 @@ fun ChatListScreen(
                         color = BillageTextPrimary
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
-                            onClick = { showUserSelectDialog = true },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = if (myUserSeq == 100) "test1(100)" else "test2(101)",
-                                fontSize = 12.sp,
-                                color = BillagePrimary,
-                                fontWeight = FontWeight.Bold
-                            )
+                        IconButton(onClick = { viewModel.fetchRooms() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(onClick = { showCreateRoomDialog = true }) {
                             Icon(Icons.Default.Add, contentDescription = "채팅방 추가", tint = BillageTextPrimary)
                         }
@@ -285,7 +270,7 @@ fun ChatListScreen(
                     avatar = "👤",
                     lastMessage = room.lastMessage ?: "",
                     timestamp = room.lastModifiedAt ?: "",
-                    unread = 0,
+                    unread = room.unreadCount.toInt(),
                     hasContract = false
                 )
                 var showLeaveDialog by remember { mutableStateOf(false) }

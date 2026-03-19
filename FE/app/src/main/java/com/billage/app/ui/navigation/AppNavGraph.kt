@@ -9,13 +9,12 @@ import com.billage.app.ui.auth.LoginScreen
 import com.billage.app.ui.auth.MypageScreen
 import com.billage.app.ui.contract.ContractScreen
 import com.billage.app.ui.home.HomeScreen
-import com.billage.app.ui.chat.ChatRoomScreen
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
 import com.billage.app.ui.chat.components.cards.BaseChatCard
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
+import com.billage.app.ui.chat.ChatRoomScreen
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -83,7 +83,7 @@ fun NavGraphBuilder.appNavGraph(
 
         val messages by viewModel.messages.collectAsState()
 
-        com.billage.app.ui.chat.ChatRoomScreen(
+        ChatRoomScreen(
             state = ChatRoomState(
                 roomId = roomId,
                 roomName = opponentName
@@ -144,7 +144,7 @@ fun NavGraphBuilder.appNavGraph(
         LaunchedEffect(Unit) { viewModel.joinRoom("100") }
         val messages by viewModel.messages.collectAsState()
 
-        com.billage.app.ui.chat.ChatRoomScreen(
+        ChatRoomScreen(
             state = ChatRoomState(
                 roomId = "100",
                 roomName = "알 수 없음"

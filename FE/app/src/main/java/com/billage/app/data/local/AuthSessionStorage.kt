@@ -1,6 +1,7 @@
 package com.billage.app.data.local
 
 import android.content.Context
+import androidx.core.content.edit
 
 class AuthSessionStorage(context: Context) {
 
@@ -17,26 +18,26 @@ class AuthSessionStorage(context: Context) {
     fun getUserState(): String? = preferences.getString(KEY_USER_STATE, null)
 
     fun save(authResult: AuthResult) {
-        preferences.edit()
-            .putString(KEY_ACCESS_TOKEN, authResult.accessToken)
-            .putString(KEY_REFRESH_TOKEN, authResult.refreshToken)
-            .putLong(KEY_ACCESS_TOKEN_EXPIRES_IN, authResult.accessTokenExpiresIn)
-            .putLong(KEY_REFRESH_TOKEN_EXPIRES_IN, authResult.refreshTokenExpiresIn)
-            .putBoolean(KEY_IS_NEW_USER, authResult.isNewUser)
-            .putInt(KEY_USER_SEQ, authResult.userSeq ?: -1)
-            .putString(KEY_USER_STATE, authResult.userState)
-            .apply()
+        preferences.edit {
+            putString(KEY_ACCESS_TOKEN, authResult.accessToken)
+                .putString(KEY_REFRESH_TOKEN, authResult.refreshToken)
+                .putLong(KEY_ACCESS_TOKEN_EXPIRES_IN, authResult.accessTokenExpiresIn)
+                .putLong(KEY_REFRESH_TOKEN_EXPIRES_IN, authResult.refreshTokenExpiresIn)
+                .putBoolean(KEY_IS_NEW_USER, authResult.isNewUser)
+                .putInt(KEY_USER_SEQ, authResult.userSeq ?: -1)
+                .putString(KEY_USER_STATE, authResult.userState)
+        }
     }
 
     fun clear() {
-        preferences.edit().clear().apply()
+        preferences.edit { clear() }
     }
 
     fun updateUserState(userState: String) {
-        preferences.edit()
-            .putString(KEY_USER_STATE, userState)
-            .putBoolean(KEY_IS_NEW_USER, false)
-            .apply()
+        preferences.edit {
+            putString(KEY_USER_STATE, userState)
+                .putBoolean(KEY_IS_NEW_USER, false)
+        }
     }
 
     data class AuthResult(
@@ -48,6 +49,8 @@ class AuthSessionStorage(context: Context) {
         val userSeq: Int?,
         val userState: String
     )
+
+    fun getUserSeq(): Int = preferences.getInt(KEY_USER_SEQ, -1)
 
     companion object {
         private const val PREFS_NAME = "auth_session"

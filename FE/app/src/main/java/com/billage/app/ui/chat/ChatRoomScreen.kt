@@ -35,9 +35,13 @@ fun ChatRoomScreen(
             ChatBottomInputBar(
                 mode = state.mode,
                 inputText = inputText,
-                onValueChange = { inputText = it },
+                onValueChange = { 
+                    if (it.length <= 255) {
+                        inputText = it 
+                    }
+                },
                 onSendClick = {
-                    if (inputText.isNotBlank()) {
+                    if (inputText.isNotBlank() && inputText.length <= 255) {
                         onSendMessage(inputText)
                         inputText = ""
                     }
