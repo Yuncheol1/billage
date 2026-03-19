@@ -33,4 +33,10 @@ interface ChatApi {
         @retrofit2.http.Header("userSeq") userSeq: Int,
         @Path("roomId") roomId: String
     )
+
+    @retrofit2.http.PATCH("api/v1/chats/{roomId}/read")
+    suspend fun markAsRead(
+        @retrofit2.http.Header("userSeq") userSeq: Int,
+        @Path("roomId") roomId: String
+    )
 }
