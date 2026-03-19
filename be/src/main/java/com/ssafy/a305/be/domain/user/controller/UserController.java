@@ -23,7 +23,7 @@ public class UserController {
     public ResponseEntity<Integer> searchByEmail(@RequestParam String email) {
         Integer userSeq = userService.searchByEmail(email);
         return ResponseEntity.ok(userSeq);
-
+    }
     public ResponseEntity<List<UserSearchResponseDto>> searchUsers(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam("email") String email) {
