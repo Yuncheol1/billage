@@ -47,8 +47,8 @@ class GMSGeminiClient:
             except (KeyError, IndexError):
                 return "AI 응답을 파싱할 수 없습니다."
 
-    async def generate_chat(self, history: List[Dict[str, Any]], current_message: str) -> str:
-        """멀티 턴 챗봇용"""
+    async def generate_chat(self, history: List[Dict[str, Any]], current_message: str, system_instruction: str = None) -> str:
+        """멀티 턴 챗봇용. system_instruction을 외부에서 주입 가능."""
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": settings.GMS_KEY
@@ -69,13 +69,17 @@ class GMSGeminiClient:
             "parts": [{"text": current_message}]
         })
         
+        # 시스템 지시문: 외부 주입이 없으면 기본값 사용
+        if system_instruction is None:
+            system_instruction = "당신은 차용증 작성 및 세금(증여세, 이자소득세 등) 관련 전문 법률/세무 챗봇입니다. 정확하고 친절하게 답변하세요."
+        
         payload = {
             "system_instruction": {
-                "parts": [{"text": "당신은 차용증 작성 및 세금(증여세, 이자소득세 등) 관련 전문 법률/세무 챗봇입니다. 정확하고 친절하게 답변하세요."}]
+                "parts": [{"text": system_instruction}]
             },
             "contents": contents,
             "generationConfig": {
-                "temperature": 0.3,
+                "temperature": 0.1,  # 법률 도메인이므로 환각 방지를 위해 낮게 설정
             }
         }
         
