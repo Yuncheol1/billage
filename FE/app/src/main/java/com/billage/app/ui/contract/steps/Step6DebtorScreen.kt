@@ -273,6 +273,28 @@ fun Step6DebtorScreen(
                             color = Color.White
                         )
                     }
+
+                    // TODO: 개발용 임시 버튼 — API 연동 후 제거
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = BillageTextSecondary,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                onUserSelect(9999, "개발테스트", "01000000000")
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "[개발용] 임시로 다음 단계 진행",
+                            fontSize = 13.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 

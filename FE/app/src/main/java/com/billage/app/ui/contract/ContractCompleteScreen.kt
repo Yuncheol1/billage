@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,8 +34,6 @@ import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageSurface
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
-import com.billage.app.ui.theme.KakaoTextBrown
-import com.billage.app.ui.theme.KakaoYellow
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -74,8 +71,7 @@ private fun formatRepaymentMethod(method: RepaymentMethod?): String = when (meth
 fun ContractCompleteScreen(
     formState: ContractFormState,
     onHomeClick: () -> Unit,
-    onKakaoClick: () -> Unit,
-    onSmsClick: () -> Unit,
+    onChatClick: () -> Unit,
     role: ContractRole = ContractRole.CREDITOR
 ) {
     Column(
@@ -103,7 +99,7 @@ fun ContractCompleteScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         Text(
-            text = "계약 내용이 준비됐어요!",
+            text = "계약 초안이 만들어졌어요!",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = BillageTextPrimary
@@ -112,10 +108,7 @@ fun ContractCompleteScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = if (role == ContractRole.CREDITOR)
-                "${formState.debtorName}님에게 알림을 보내\n수락을 요청해보세요"
-            else
-                "${formState.debtorName}님께 차용 요청을 보내보세요",
+            text = "${formState.debtorName}님과의 채팅방이 열렸어요\n초안을 확인하고 계약을 완성해보세요",
             fontSize = 14.sp,
             color = BillageTextSecondary,
             textAlign = TextAlign.Center,
@@ -161,98 +154,57 @@ fun ContractCompleteScreen(
                 label = "상환",
                 value = formatRepaymentMethod(formState.repaymentMethod)
             )
-            // 특약은 채팅방에서 추가 — 초안 단계에서는 표시 안 함
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 카카오톡 / 문자 버튼
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // 채팅방으로 이동 버튼
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = BillagePrimary,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable {
+                    // TODO: 생성된 계약 채팅방으로 이동
+                    onChatClick()
+                }
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // 카카오톡 버튼
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        color = KakaoYellow,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .clickable {
-                        // TODO: 카카오톡 공유 SDK 연동
-                        onKakaoClick()
-                    }
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(text = "💬", fontSize = 16.sp)
-                    Text(
-                        text = "카카오톡",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = KakaoTextBrown
-                    )
-                }
-            }
-
-            // 문자 버튼
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        color = BillageSurface,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = BillageCardBorder,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .clickable {
-                        // TODO: 문자 공유 연동
-                        onSmsClick()
-                    }
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(text = "📱", fontSize = 16.sp)
-                    Text(
-                        text = "문자",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BillageTextPrimary
-                    )
-                }
+                Text(text = "💬", fontSize = 16.sp)
+                Text(
+                    text = "채팅방으로 이동",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.White
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 보내면 이런 순서로 진행돼요
+        // 이제 이런 순서로 진행돼요
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "보내면 이런 순서로 진행돼요",
+                text = "이제 이런 순서로 진행돼요",
                 fontSize = 13.sp,
                 color = BillageTextSecondary
             )
 
             listOf(
-                Triple("📱", "초대를 수락해요", "링크를 누르면 빌리지에 가입할 수 있어요"),
-                Triple("💬", "채팅방에서 조건을 확인해요", "계약 내용에 대해 자유롭게 대화할 수 있어요"),
-                Triple("✍️", "전자서명으로 계약을 완성해요", "양쪽 모두 서명하면 법적 효력이 생겨요"),
-                Triple("🔄", "자동이체로 상환이 시작돼요", "정해진 날짜에 맞춰 자동으로 이체돼요")
+                Triple("💬", "채팅방에서 초안을 확인해요", "상대방과 계약 내용을 자유롭게 조율할 수 있어요"),
+                Triple("✏️", "특약을 추가할 수 있어요", "필요한 조건이 있으면 특약으로 추가해요"),
+                Triple("✍️", "전자서명으로 계약을 확정해요", "양쪽 모두 서명하면 법적 효력이 생겨요"),
+                Triple("🔄", "상환 관리는 자동으로 해드려요", "정해진 날짜에 자동이체와 알림이 작동해요")
             ).forEach { (emoji, title, description) ->
                 Row(
                     verticalAlignment = Alignment.Top,

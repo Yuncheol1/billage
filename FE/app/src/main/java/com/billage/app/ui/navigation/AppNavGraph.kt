@@ -95,8 +95,7 @@ fun NavGraphBuilder.appNavGraph(
         ContractCompleteScreen(
             formState = formState,
             onHomeClick = { appNavController.navigateToHome() },
-            onKakaoClick = { /* TODO */ },
-            onSmsClick = { /* TODO */ },
+            onChatClick = { appNavController.navigateToChatList() }, // TODO: 생성된 채팅방으로 직접 이동
             role = formState.role
         )
     }
