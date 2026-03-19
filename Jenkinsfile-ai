@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Pull') {
+            steps {
+                git branch: 'develop-ai',
+                    credentialsId: 'gitlab-git-credentials',
+                    url: 'https://lab.ssafy.com/s14-fintech-finance-sub1/S14P21A305.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('ai_service') {
+                    sh 'docker build -t billage-ai .'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'gms-key', variable: 'GMS_KEY'),
+                    string(credentialsId: 'internal-api-key', variable: 'INTERNAL_API_KEY')
+                ]) {
+                    sh '''
+                        docker stop billage-ai || true
+                        docker rm billage-ai || true
+                        mkdir -p /data/chroma_db
+                        docker run -d \
+                            --name billage-ai \
+                            --restart unless-stopped \
+                            -p 8000:8000 \
+                            --memory="8g" \
+                            -e GMS_KEY=$GMS_KEY \
+                            -e INTERNAL_API_KEY=$INTERNAL_API_KEY \
+                            -e API_V1_STR=/internal/v1 \
+                            -e CHROMA_DB_DIR=/app/chroma_db \
+                            -v /data/chroma_db:/app/chroma_db \
+                            billage-ai
+
+                        echo "AI 서버 헬스체크 시작..."
+                        for i in $(seq 1 12); do
+                            curl -f http://localhost:8000/health && break
+                            echo "웜업 대기 중... ($i/12)"
+                            sleep 10
+                        done
+
+                        docker image prune -f
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            mattermostSend color: 'good',
+                message: "💰 빌리지에 새로운 기능이 입금되었습니다! (Job: ${env.JOB_NAME} #${env.BUILD_NUMBER})"
+        }
+        failure {
+            mattermostSend color: 'danger',
+                message: "🚨 빌리지 금고에 문제가 생겼습니다! 범인은... 로그를 확인해 주세요. (Build: #${env.BUILD_NUMBER})\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
+        }
+    }
+
+}
