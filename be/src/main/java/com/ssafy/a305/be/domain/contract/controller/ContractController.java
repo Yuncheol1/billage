@@ -64,6 +64,7 @@ public class ContractController {
                 "message", "조회 성공",
                 "data", result));
     }
+
     @GetMapping("/{contractSeq}")
     public ResponseEntity<Map<String, Object>> getContractDetail(
             @PathVariable Integer contractSeq) {
@@ -74,4 +75,14 @@ public class ContractController {
                 "message", "계약 상세 조회 성공",
                 "data", result));
     }
+
+    @DeleteMapping("/{contractSeq}")
+    public ResponseEntity<Map<String,Object>>deleteContract(@PathVariable Integer contractSeq){
+        Integer userSeq=tempUserSeq;
+        contractService.deleteContract(contractSeq,userSeq);
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "계약이 성공적으로 삭제되었습니다."));
+    }
+
 }
