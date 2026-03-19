@@ -58,4 +58,15 @@ pipeline {
             }
         }
     }
+
+    post {
+        success {
+            mattermostSend color: 'good',
+                message: "💰 빌리지에 새로운 기능이 입금되었습니다! (Job: ${env.JOB_NAME} #${env.BUILD_NUMBER})"
+        }
+        failure {
+            mattermostSend color: 'danger',
+                message: "🚨 빌리지 금고에 문제가 생겼습니다! 범인은... 아니, 로그를 확인해 주세요. (Build: #${env.BUILD_NUMBER})\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
+        }
+    }
 }

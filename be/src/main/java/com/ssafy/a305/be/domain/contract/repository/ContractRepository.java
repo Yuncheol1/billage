@@ -8,6 +8,15 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
+
 @Repository
-public interface ContractRepository extends JpaRepository<Contract, Integer> {
+public interface ContractRepository extends JpaRepository<Contract, Integer>, ContractRepositoryCustom {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Contract c WHERE c.contractSeq = :contractSeq")
+    Optional<Contract> findByIdWithPessimisticLock(@Param("contractSeq") Integer contractSeq);
+
 }
