@@ -42,4 +42,9 @@ public class ContractClause {
 
     @Column(name = "updated_dttm")
     private LocalDateTime updatedDttm;
+
+    public void updateContent(String newContent) {
+        this.content = newContent;
+        this.updatedDttm = LocalDateTime.now();
+    }
 }
