@@ -42,7 +42,9 @@ public class UserController {
             @Valid @RequestBody UserPhoneLookupRequestDto requestDto) {
         requireAuthenticatedUser(authenticatedUser);
 
-        UserPhoneLookupResponseDto responseDto = userService.lookupRegisteredPhone(requestDto.phone());
+        UserPhoneLookupResponseDto responseDto = userService.lookupRegisteredPhone(
+                requestDto.phone(),
+                requestDto.realName());
         return ResponseEntity.ok(successResponse("전화번호 가입 여부 확인 성공", responseDto));
     }
 

@@ -17,6 +17,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
@@ -75,28 +76,77 @@ class UserServiceTest {
 
     @Test
     void lookupRegisteredPhoneNormalizesAndChecksActiveUser() {
-        when(userRepository.existsByPhoneAndState(eq("01040140142"), eq("ACTIVE"))).thenReturn(true);
+        User user = User.builder()
+                .userSeq(7)
+                .phone("01040140142")
+                .state("ACTIVE")
+                .build();
+        UserProfile profile = UserProfile.builder()
+                .user(user)
+                .realName("Hong Gil Dong")
+                .rrn("")
+                .build();
+        user = User.builder()
+                .userSeq(user.getUserSeq())
+                .phone(user.getPhone())
+                .state(user.getState())
+                .profile(profile)
+                .build();
 
-        UserPhoneLookupResponseDto result = userService.lookupRegisteredPhone("010-4014-0142");
+        when(userRepository.findByPhoneAndState(eq("01040140142"), eq("ACTIVE")))
+                .thenReturn(Optional.of(user));
+
+        UserPhoneLookupResponseDto result = userService.lookupRegisteredPhone("010-4014-0142", " Hong Gil Dong ");
 
         assertTrue(result.isRegistered());
-        verify(userRepository).existsByPhoneAndState("01040140142", "ACTIVE");
+        assertEquals(7, result.getUserSeq());
+        verify(userRepository).findByPhoneAndState("01040140142", "ACTIVE");
     }
 
     @Test
     void lookupRegisteredPhoneRejectsInvalidPhoneNumber() {
         CustomBusinessException exception = assertThrows(CustomBusinessException.class,
-                () -> userService.lookupRegisteredPhone("abc"));
+                () -> userService.lookupRegisteredPhone("abc", "Hong Gil Dong"));
 
         assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
     }
 
     @Test
     void lookupRegisteredPhoneReturnsFalseForUnavailableUser() {
-        when(userRepository.existsByPhoneAndState(eq("01040140142"), eq("ACTIVE"))).thenReturn(false);
+        when(userRepository.findByPhoneAndState(eq("01040140142"), eq("ACTIVE")))
+                .thenReturn(Optional.empty());
 
-        UserPhoneLookupResponseDto result = userService.lookupRegisteredPhone("+82 10-4014-0142");
+        UserPhoneLookupResponseDto result = userService.lookupRegisteredPhone("+82 10-4014-0142", "Hong Gil Dong");
 
         assertFalse(result.isRegistered());
+        assertNull(result.getUserSeq());
+    }
+
+    @Test
+    void lookupRegisteredPhoneReturnsFalseWhenRealNameDoesNotMatch() {
+        User user = User.builder()
+                .userSeq(7)
+                .phone("01040140142")
+                .state("ACTIVE")
+                .build();
+        UserProfile profile = UserProfile.builder()
+                .user(user)
+                .realName("Kim Cheolsu")
+                .rrn("")
+                .build();
+        user = User.builder()
+                .userSeq(user.getUserSeq())
+                .phone(user.getPhone())
+                .state(user.getState())
+                .profile(profile)
+                .build();
+
+        when(userRepository.findByPhoneAndState(eq("01040140142"), eq("ACTIVE")))
+                .thenReturn(Optional.of(user));
+
+        UserPhoneLookupResponseDto result = userService.lookupRegisteredPhone("010-4014-0142", "Hong Gil Dong");
+
+        assertFalse(result.isRegistered());
+        assertNull(result.getUserSeq());
     }
 }
