@@ -71,8 +71,13 @@ class ChatRepository @Inject constructor(
                 Log.d(TAG, "STOMP Connected")
             } catch (e: Exception) {
                 Log.e(TAG, "STOMP Connection failed", e)
+                _session.value = null
             }
         }
+    }
+
+    fun clearSession() {
+        _session.value = null
     }
 
     fun sendMessage(roomId: String, senderSeq: Int, content: String) {
@@ -96,6 +101,8 @@ class ChatRepository @Inject constructor(
                 Log.d(TAG, "Message sent to $roomId: $content")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
+                clearSession()
+                connect()
             }
         }
     }
