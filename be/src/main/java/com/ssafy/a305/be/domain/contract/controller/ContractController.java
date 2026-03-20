@@ -50,6 +50,19 @@ public class ContractController {
                 "message", "특약사항이 성공적으로 저장되었습니다."));
     }
 
+    @PatchMapping("/{contractSeq}/clauses/{clauseSeq}")
+    public ResponseEntity<Map<String, Object>> updateClause(
+            @PathVariable Integer contractSeq,
+            @PathVariable Integer clauseSeq,
+            @Valid @RequestBody ClauseRequestDto requestDto) {
+
+        contractService.updateClause(contractSeq, clauseSeq, requestDto, tempUserSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "특약이 성공적으로 수정되었습니다."));
+    }
+
     @GetMapping
     public ResponseEntity<Map<String, Object>> getContracts(
             @RequestParam(required = false, defaultValue = "ALL") String role,

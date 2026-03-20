@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.contract.service;
 
+import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
@@ -133,6 +134,37 @@ public class ContractService {
                 .build();
 
         contract.addClause(clause);
+    }
+
+    @Transactional
+    public void updateClause(Integer contractSeq, Integer clauseSeq, ClauseRequestDto requestDto, Integer userSeq) {
+        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용 권장)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        // 2. 권한 검증
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 특약을 수정할 권한이 없습니다.");
+        }
+
+        // 3. 상태 검증
+        String status = contract.getStatus();
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약의 특약만 수정할 수 있습니다.");
+        }
+
+        // 4. AI 서비스 호출 (Mock 처리)
+        String refinedContent = "[AI 변환] " + requestDto.getClauseContent();
+
+        // 5. 특약 조회 및 수정
+        ContractClause targetClause = contract.getClauses().stream()
+                .filter(c -> c.getClauseSeq().equals(clauseSeq))
+                .findFirst()
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "해당 특약을 찾을 수 없습니다."));
+
+        targetClause.updateContent(refinedContent);
     }
 
     @Transactional(readOnly = true)
