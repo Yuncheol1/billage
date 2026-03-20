@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +36,26 @@ public class UserController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         UserMeResponseDto responseDto = userService.getMyInfo(requireAuthenticatedUser(authenticatedUser).userSeq());
         return ResponseEntity.ok(successResponse("사용자 정보 조회 성공", responseDto));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, Object>> withdraw(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        try {
+            userService.withdraw(requireAuthenticatedUser(authenticatedUser).userSeq());
+            return ResponseEntity.ok(Map.of(
+                    "status", HttpStatus.OK.value(),
+                    "message", "회원 탈퇴가 완료되었습니다."
+            ));
+        } catch (CustomBusinessException e) {
+            if (e.getErrorCode() == ErrorCode.ACTIVE_CONTRACT_EXISTS) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "status_code", HttpStatus.CONFLICT.value(),
+                        "message", e.getMessage()
+                ));
+            }
+            throw e;
+        }
     }
 
     @PostMapping("/lookup/phone")
@@ -64,7 +85,6 @@ public class UserController {
         }
         Integer excludedUserSeq = (authenticatedUser != null) ? authenticatedUser.userSeq() : null;
         return ResponseEntity.ok(userService.searchByEmail(email, excludedUserSeq));
-
     }
 
     private AuthenticatedUser requireAuthenticatedUser(AuthenticatedUser authenticatedUser) {
