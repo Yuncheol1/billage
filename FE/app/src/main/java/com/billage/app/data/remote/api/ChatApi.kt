@@ -7,6 +7,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Body
 import kotlinx.serialization.Serializable
+import retrofit2.http.PATCH
 
 @Serializable
 data class ChatRoomCreateReq(val targetEmail: String)
@@ -34,7 +35,7 @@ interface ChatApi {
         @Path("roomId") roomId: String
     )
 
-    @retrofit2.http.PATCH("api/v1/chats/{roomId}/read")
+    @PATCH("api/v1/chats/{roomId}/read")
     suspend fun markAsRead(
         @retrofit2.http.Header("userSeq") userSeq: Int,
         @Path("roomId") roomId: String

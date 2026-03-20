@@ -5,7 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface UserApi {
-    @GET("api/v1/users/search")
+    @GET("api/v1/users/contain")
     suspend fun searchUsers(
         @Query("email") email: String
     ): List<UserSearchResponse>
