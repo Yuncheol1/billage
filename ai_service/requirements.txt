@@ -9,3 +9,5 @@ langchain-community>=0.0.20
 langchain-google-genai>=0.0.9
 chromadb>=0.4.22
 sentence-transformers>=2.5.0
+redis>=5.0.0
+redisvl>=0.1.0
