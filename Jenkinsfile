@@ -66,11 +66,11 @@ pipeline {
     post {
         success {
             mattermostSend color: 'good',
-                message: "💰 BE 빌리지 금고에 ${env.GIT_AUTHOR}님이 새로운 기능을 입금하셨습니다!\n\n(${env.JOB_NAME} #${env.BUILD_NUMBER})"
+                message: "💰 BE 빌리지 금고에 ${env.GIT_AUTHOR}님이 새로운 기능을 입금하셨습니다! 💰\n(${env.JOB_NAME} #${env.BUILD_NUMBER})"
         }
         failure {
             mattermostSend color: 'danger',
-                message: "🚨 BE 빌리지 금고에 문제가 생겼습니다! 범인은...\n${env.GIT_AUTHOR}! 로그를 확인해 주세요.\n(Build: #${env.BUILD_NUMBER})\n\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
+                message: "🚨 BE 빌리지 금고에 문제가 생겼습니다! 범인은...${env.GIT_AUTHOR}! 🚨\n로그를 확인해 주세요.\n(Build: #${env.BUILD_NUMBER})\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
         }
     }
 }
