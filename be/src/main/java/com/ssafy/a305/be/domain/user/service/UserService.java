@@ -36,12 +36,18 @@ public class UserService {
                 .build();
     }
 
-    public UserPhoneLookupResponseDto lookupRegisteredPhone(String phone) {
+    public UserPhoneLookupResponseDto lookupRegisteredPhone(String phone, String realName) {
         String normalizedPhone = PhoneNumberNormalizer.normalize(phone);
+        String normalizedRealName = normalizeRealName(realName);
         validatePhoneNumber(normalizedPhone);
+        validateRealName(normalizedRealName);
 
-        boolean registered = userRepository.existsByPhoneAndState(normalizedPhone, USER_STATE_ACTIVE);
-        return new UserPhoneLookupResponseDto(registered);
+        return userRepository.findByPhoneAndState(normalizedPhone, USER_STATE_ACTIVE)
+                .filter(user -> normalizedRealName.equals(extractRealName(user)))
+                .map(user -> new UserPhoneLookupResponseDto(
+                        true,
+                        user.getUserSeq()))
+                .orElseGet(() -> new UserPhoneLookupResponseDto(false, null));
     }
 
     @Transactional(readOnly = true)
@@ -76,5 +82,24 @@ public class UserService {
                 || !normalizedPhone.startsWith("0")) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "유효한 전화번호를 입력해주세요.");
         }
+    }
+    private String normalizeRealName(String realName) {
+        if (realName == null) {
+            return "";
+        }
+        return realName.trim();
+    }
+
+    private void validateRealName(String normalizedRealName) {
+        if (normalizedRealName.isBlank()) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "real_name is required.");
+        }
+    }
+
+    private String extractRealName(User user) {
+        if (user.getProfile() == null || user.getProfile().getRealName() == null) {
+            return "";
+        }
+        return user.getProfile().getRealName().trim();
     }
 }
