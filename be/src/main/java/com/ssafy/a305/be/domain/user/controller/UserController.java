@@ -1,5 +1,4 @@
 package com.ssafy.a305.be.domain.user.controller;
-
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
 import com.ssafy.a305.be.domain.user.dto.request.UserPhoneLookupRequestDto;
 import com.ssafy.a305.be.domain.user.dto.response.UserMeResponseDto;
@@ -48,6 +47,10 @@ public class UserController {
     }
 
     @GetMapping("/search")
+    public ResponseEntity<Integer> searchByEmail(@RequestParam String email) {
+        Integer userSeq = userService.searchByEmail(email);
+        return ResponseEntity.ok(userSeq);
+    }
     public ResponseEntity<List<UserSearchResponseDto>> searchUsers(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam("email") String email) {
@@ -56,6 +59,7 @@ public class UserController {
         }
         Integer excludedUserSeq = (authenticatedUser != null) ? authenticatedUser.userSeq() : null;
         return ResponseEntity.ok(userService.searchByEmail(email, excludedUserSeq));
+
     }
 
     private AuthenticatedUser requireAuthenticatedUser(AuthenticatedUser authenticatedUser) {

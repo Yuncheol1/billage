@@ -32,12 +32,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/kakao/authorize").permitAll()
-                        .requestMatchers("/api/v1/auth/kakao/login").permitAll()
-                        .requestMatchers("/api/v1/auth/kakao/callback").permitAll()
-                        .requestMatchers("/api/v1/auth/reissue").permitAll()
-                        .requestMatchers("/api/v1/auth/logout").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/api/v1/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

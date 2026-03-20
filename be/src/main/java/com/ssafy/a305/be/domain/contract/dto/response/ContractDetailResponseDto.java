@@ -1,0 +1,64 @@
+package com.ssafy.a305.be.domain.contract.dto.response;
+
+import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.contract.entity.ContractClause;
+import lombok.Getter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Getter
+public class ContractDetailResponseDto {
+    private final Integer contractSeq;
+    private final String contractId;
+    private final Boolean family;
+    private final String myRole;
+    private final String counterpartyName;
+    private final BigDecimal principalAmount;
+    private final BigDecimal interestRate;
+    private final String repaymentMethod;
+    private final Integer totalInstallments;
+    private final String status;
+    private final LocalDate startDt;
+    private final LocalDate endDt;
+    private final String aiDraftContent;
+    private final LocalDateTime signedDttm;
+    private final List<ClauseDetailDto> clauses;
+
+    public ContractDetailResponseDto(Contract contract, Integer myUserSeq, String counterpartyName){
+        this.contractSeq=contract.getContractSeq();
+        this.contractId=contract.getContractId();
+        this.family=contract.getFamily();
+        this.myRole=contract.getCreditor().getUserSeq().equals(myUserSeq)?"CREDITOR":"DEBTOR";
+        this.counterpartyName=counterpartyName;
+        this.principalAmount = contract.getPrincipalAmount();
+        this.interestRate = contract.getInterestRate();
+        this.repaymentMethod = contract.getRepaymentMethod();
+        this.totalInstallments = contract.getTotalInstallments();
+        this.status = contract.getStatus();
+        this.startDt = contract.getStartDt();
+        this.endDt = contract.getEndDt();
+        this.aiDraftContent = contract.getAiDraftContent();
+        this.signedDttm = contract.getSignedDttm();
+
+        this.clauses=contract.getClauses().stream()
+                .map(ClauseDetailDto::new)
+                .collect(Collectors.toList());
+    }
+    @Getter
+    public static class ClauseDetailDto{
+        private final Integer clauseSeq;
+        private final String title;
+        private final String content;
+        private final Integer orderNo;
+        public ClauseDetailDto(ContractClause clause) {
+            this.clauseSeq = clause.getClauseSeq();
+            this.title = clause.getTitle();
+            this.content = clause.getContent();
+            this.orderNo = clause.getOrderNo();
+        }
+    }
+}
