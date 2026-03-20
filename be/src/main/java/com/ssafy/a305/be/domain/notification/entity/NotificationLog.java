@@ -54,4 +54,8 @@ public class NotificationLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)
     private Contract contract;
+
+    public void markAsRead() {
+        this.isRead = true;
+    }
 }
