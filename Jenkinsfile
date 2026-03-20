@@ -16,6 +16,10 @@ pipeline {
 
         stage('Build') {
             steps {
+                withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY')]) {
+                    sh 'cp $FIREBASE_KEY be/src/main/resources/billage-firebase-adminsdk.json'
+                }
+
                 dir('be') {
                     sh 'docker build -t billage-be .'
                 }
