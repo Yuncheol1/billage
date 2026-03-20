@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     
     CHROMA_DB_DIR: str = "./chroma_db"
     
+    # Redis 설정 (Semantic Cache 전용)
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 1
+    SEMANTIC_CACHE_THRESHOLD: float = 0.95  # 유사도 임계값
+    
     # .env 파일의 위치를 config.py 기준으로 절대 경로 설정 (어디서 실행해도 로드 가능)
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),

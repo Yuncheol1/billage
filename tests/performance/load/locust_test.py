@@ -18,20 +18,34 @@ class AIServiceUser(HttpUser):
     # 기본 호스트 설정 (tests/.env 또는 기본값)
     host = os.getenv("TEST_BASE_URL", "http://3.35.206.231:8000")
     
-    # GMS API 할당량을 고려하여 요청 간격을 5~10초로 완화
-    wait_time = between(5, 10)
+    # GMS API 할당량이 매우 작으므로 초극보수적으로 10~20초 간격 설정
+    wait_time = between(10, 20)
+    
+    # 자동 종료를 위한 설정 (환경 변수 또는 기본값)
+    max_requests = int(os.getenv("TEST_MAX_REQUESTS", "50"))
+    request_count = 0
 
     def on_start(self):
         """
-        테스트 시작 시 필요한 Header 설정 (API Key 인증 포함)
+        테스트 시작 시 인증 토큰 및 초기 설정
         """
+        self.internal_api_key = os.getenv("INTERNAL_API_KEY", "billage-ai-key-1234")
+        self.request_count = 0
+        print(f"🚀 성능 테스트 시작: 대상 호스트 - {self.host} (최대 {self.max_requests}회 요청 후 자동 종료)")
         self.headers = {
-            "X-Internal-API-Key": INTERNAL_API_KEY,
+            "X-Internal-API-Key": self.internal_api_key,
             "Content-Type": "application/json"
         }
 
-    @task(5)
-    def ask_ai_chatbot(self):
+    @task
+    def chat_performance_test(self):
+        # 지정된 요청 횟수에 도달하면 테스트 자동 종료
+        if self.request_count >= self.max_requests:
+            print(f"🏁 목표 요청 횟수({self.max_requests}회)에 도달하여 테스트를 자동 종료합니다.")
+            self.environment.runner.quit()
+            return
+
+        self.request_count += 1
         """
         핵심 기능: RAG 기반 챗봇 질의 테스트
         """

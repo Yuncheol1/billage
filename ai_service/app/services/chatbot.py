@@ -1,10 +1,12 @@
+import logging
 from app.services.gms_engine import GMSGeminiClient
 from app.services.rag_engine import get_rag_engine
+from app.services.cache_engine import cache_manager
+
+logger = logging.getLogger(__name__)
 
 # ══════════════════════════════════════════════════════════════════════════
 #  특수관계인 판정 및 증여세 계산 특화 시스템 프롬프트
-#  - 4.6% 적정이자율, 1000만원 임계값, 사돈 특수관계인 포함 등
-#  - 서면-2018-상속증여-2137, 서면-2016-상속증여-4496, 재산세과-230 기반
 # ══════════════════════════════════════════════════════════════════════════
 LEGAL_SYSTEM_PROMPT = """당신은 대한민국 국세청의 상속증여세 전문 세무 조사관이자, 차용증 작성 및 가족 간 금전거래 전문 AI 법률 자문관입니다.
 사용자가 자금 차용이나 증여에 대해 질문하면, 아래의 [판정 기준]과 [분석 프로세스]에 따라 답변하세요.
@@ -43,7 +45,6 @@ LEGAL_SYSTEM_PROMPT = """당신은 대한민국 국세청의 상속증여세 전
 - 답변은 한국어로 작성하세요.
 - 계산이 필요한 경우 반드시 숫자와 공식을 명시하세요."""
 
-
 class ChatbotService:
     def __init__(self):
         self.llm_client = GMSGeminiClient()
@@ -51,24 +52,40 @@ class ChatbotService:
         
     async def get_chat_response(self, history: list, message: str) -> str:
         """
-        [기능 3] 세법 및 법률 상담 챗봇 파이프라인
-        RAG 컨텍스트 + 특화 시스템 프롬프트로 정확한 법률 답변 생성
+        [기능 3] 세법 및 법률 상담 챗봇 파이프라인 (시맨틱 캐시 통합)
         """
-        
-        # 1. 사용자의 질문을 기반으로 RAG 검색 (k=4로 확장하여 법령+사례 모두 포착)
+        query_vector = None
+        try:
+            # RAG 엔진의 임베딩 모델을 사용하여 질문 벡터화
+            query_vector = self.rag_engine.embedding_model.embed_query(message)
+            cached_reply = await cache_manager.get_cache(query_vector)
+            
+            if cached_reply:
+                return cached_reply
+        except Exception as e:
+            logger.warning(f"⚠️ 시맨틱 캐시 조회 중 오류 (무시하고 진행): {str(e)}")
+
+        # 1. RAG 검색 (k=4)
         rag_context = self.rag_engine.search_similar_documents(message, k=4)
         
-        # 2. 검색 내용을 프롬프트 컨텍스트로 보강하여 주입
+        # 2. 메시지 보강
         enhanced_message = (
             f"[사용자 질의]\n{message}\n\n"
             f"[RAG 검색된 관련 법률/판례 근거]\n{rag_context}"
         )
         
-        # 3. 특화 시스템 프롬프트 + RAG 보강 메시지로 LLM 호출
+        # 3. LLM 호출
         ai_reply = await self.llm_client.generate_chat(
             history, 
             enhanced_message, 
             system_instruction=LEGAL_SYSTEM_PROMPT
         )
+        
+        # 4. 결과 캐시에 저장
+        if query_vector:
+            try:
+                await cache_manager.set_cache(query_vector, message, ai_reply)
+            except Exception as e:
+                logger.warning(f"⚠️ 시맨틱 캐시 저장 중 오류: {str(e)}")
+            
         return ai_reply
-
