@@ -23,6 +23,8 @@ pipeline {
                 dir('be') {
                     sh 'docker build -t billage-be .'
                 }
+
+                sh 'rm -f be/src/main/resources/billage-firebase-adminsdk.json'
             }
         }
 
