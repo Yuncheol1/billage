@@ -1,10 +1,15 @@
 package com.billage.app.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
+import com.billage.app.ui.common.MenuProfileState
 import com.billage.app.ui.common.TopBar
 import com.billage.app.ui.contract.ContractRole
 import com.billage.app.ui.common.rememberLogoutUiState
@@ -45,133 +51,189 @@ fun HomeScreen(
     onChatClick: () -> Unit = {},
     onMypageClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showContractTypeSheet by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
+    val dismissInteraction = remember { MutableInteractionSource() }
 
-    Scaffold(
-        containerColor = BillageBackground,
-        topBar = {
-            TopBar(
-                userName = uiState.userName,
-                hasNotification = uiState.hasNotification,
-                onNotificationClick = onNotificationClick,
-                onLogoutClick = logoutUiState.onLogoutClick,
-                isLogoutInProgress = logoutUiState.isLoggingOut
-            )
-        },
-        bottomBar = {
-            BottomBar(
-                selectedTab = BottomBarTab.Home,
-                onChatClick = onChatClick,
-                onHomeClick = {},
-                onAddContractClick = { showContractTypeSheet = true },
-                onContractClick = onMypageClick
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = BillageBackground,
+            topBar = {
+                TopBar(
+                    userName = uiState.userName,
+                    hasNotification = uiState.hasNotification,
+                    onNotificationClick = onNotificationClick,
+                    onMenuClick = { showMenu = true }
+                )
+            },
+            bottomBar = {
+                BottomBar(
+                    selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.Home,
+                    onChatClick = onChatClick,
+                    onHomeClick = {},
+                    onAddContractClick = { showContractTypeSheet = true },
+                    onContractClick = onMypageClick,
+                    onMenuClick = { showMenu = true }
+                )
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AnimatedVisibility(
+                    visible = uiState.hasNotification,
+                    enter = slideInVertically(initialOffsetY = { -it }),
+                    exit = slideOutVertically(targetOffsetY = { -it })
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        NotificationBanner(
+                            message = uiState.notificationMessage,
+                            onDismiss = { viewModel.dismissNotification() }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                SectionTitle(title = "나의 계약 현황")
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ContractSummaryCard(
+                        modifier = Modifier.weight(1f),
+                        label = "받을 돈",
+                        count = uiState.lentCount,
+                        amount = uiState.lentAmount,
+                        onClick = { onContractClick("lent") }
+                    )
+                    ContractSummaryCard(
+                        modifier = Modifier.weight(1f),
+                        label = "갚을 돈",
+                        count = uiState.borrowedCount,
+                        amount = uiState.borrowedAmount,
+                        onClick = { onContractClick("borrowed") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+                SectionTitleWithAction(
+                    title = "다가오는 일정",
+                    actionLabel = "전체보기 >",
+                    onActionClick = onScheduleAllClick
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = BillageSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
+                        ScheduleTimeline(schedules = uiState.upcomingSchedules)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+                AiBannerCard()
+
+                Spacer(modifier = Modifier.height(28.dp))
+                SectionTitle(title = "최근 거래활동")
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = BillageSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        uiState.recentActivities.forEach { activity ->
+                            ActivityItemRow(activity = activity)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = onActivityClick,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "전체 내역 보기",
+                                color = BillagePrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable(
+                        interactionSource = dismissInteraction,
+                        indication = null
+                    ) { showMenu = false }
             )
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            AnimatedVisibility(
-                visible = uiState.hasNotification,
-                enter = slideInVertically(initialOffsetY = { -it }),
-                exit = slideOutVertically(targetOffsetY = { -it })
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    NotificationBanner(
-                        message = uiState.notificationMessage,
-                        onDismiss = { viewModel.dismissNotification() }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-            SectionTitle(title = "나의 계약 현황")
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ContractSummaryCard(
-                    modifier = Modifier.weight(1f),
-                    label = "받을 돈",
-                    count = uiState.lentCount,
-                    amount = uiState.lentAmount,
-                    onClick = { onContractClick("lent") }
-                )
-                ContractSummaryCard(
-                    modifier = Modifier.weight(1f),
-                    label = "갚을 돈",
-                    count = uiState.borrowedCount,
-                    amount = uiState.borrowedAmount,
-                    onClick = { onContractClick("borrowed") }
+                HomeSideMenu(
+                    userName = menuProfileState.realName.ifBlank { uiState.userName },
+                    email = menuProfileState.email,
+                    isLoggingOut = logoutUiState.isLoggingOut,
+                    onClose = { showMenu = false },
+                    onProfileClick = { showMenu = false },
+                    onContractMenuClick = {
+                        showMenu = false
+                        onMypageClick()
+                    },
+                    onReportMenuClick = {
+                        showMenu = false
+                        onMypageClick()
+                    },
+                    onSettingsClick = { showMenu = false },
+                    onSupportClick = { showMenu = false },
+                    onTermsClick = { showMenu = false },
+                    onPrivacyClick = { showMenu = false },
+                    onLogoutClick = {
+                        showMenu = false
+                        logoutUiState.onLogoutClick()
+                    }
                 )
             }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            SectionTitleWithAction(
-                title = "다가오는 일정",
-                actionLabel = "전체보기 >",
-                onActionClick = onScheduleAllClick
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = BillageSurface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
-                    ScheduleTimeline(schedules = uiState.upcomingSchedules)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            AiBannerCard()
-
-            Spacer(modifier = Modifier.height(28.dp))
-            SectionTitle(title = "최근 거래활동")
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = BillageSurface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    uiState.recentActivities.forEach { activity ->
-                        ActivityItemRow(activity = activity)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(
-                        onClick = onActivityClick,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "전체 내역 보기",
-                            color = BillagePrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 

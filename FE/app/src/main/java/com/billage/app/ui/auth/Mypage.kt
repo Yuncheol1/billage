@@ -4,9 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
+import com.billage.app.ui.common.MenuProfileState
 import com.billage.app.ui.common.TopBar
 import com.billage.app.ui.common.rememberLogoutUiState
+import com.billage.app.ui.home.HomeSideMenu
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageDivider
 import com.billage.app.ui.theme.BillagePrimary
@@ -70,11 +75,14 @@ fun MypageScreen(
     onNotificationClick: () -> Unit = {},
     onAddContractClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
-    onLogoutClick: () -> Unit = {}
+    onLogoutClick: () -> Unit = {},
+    menuProfileState: MenuProfileState = MenuProfileState()
 ) {
     val contracts = remember { sampleContracts() }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
+    var showMenu by remember { mutableStateOf(false) }
     var selectedFilter by rememberSaveable { mutableStateOf(ContractFilter.All) }
+    val dismissInteraction = remember { MutableInteractionSource() }
     val expandedSections = remember {
         mutableStateMapOf(
             ContractSectionType.InProgress to false,
@@ -92,71 +100,118 @@ fun MypageScreen(
         }
     }
 
-    Scaffold(
-        containerColor = BillageBackground,
-        topBar = {
-            TopBar(
-                userName = "빌리지",
-                hasNotification = true,
-                onNotificationClick = onNotificationClick,
-                onLogoutClick = logoutUiState.onLogoutClick,
-                isLogoutInProgress = logoutUiState.isLoggingOut
-            )
-        },
-        bottomBar = {
-            BottomBar(
-                selectedTab = BottomBarTab.Contract,
-                onAddContractClick = onAddContractClick,
-                onHomeClick = onNavigateHome,
-                onChatClick = onChatClick,
-                onContractClick = {}
-            )
-        }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
-                ) {
-                    Text(
-                        text = "내 계약 전체보기",
-                        color = BillageTextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
-                    SummaryCards(sectionStates = sectionStates)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FilterChips(
-                        selectedFilter = selectedFilter,
-                        onFilterSelected = { selectedFilter = it }
-                    )
-                }
-            }
-
-            items(sectionStates, key = { it.type.name }) { section ->
-                val visibleContracts = section.contracts.filter { contract ->
-                    selectedFilter == ContractFilter.All || contract.filter == selectedFilter
-                }
-                ContractSectionCard(
-                    state = section,
-                    visibleContracts = visibleContracts,
-                    expanded = expandedSections[section.type] == true,
-                    onToggle = {
-                        expandedSections[section.type] = !(expandedSections[section.type] ?: false)
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = BillageBackground,
+            topBar = {
+                TopBar(
+                    userName = "빌리지",
+                    hasNotification = true,
+                    onNotificationClick = onNotificationClick,
+                    onMenuClick = { showMenu = true }
+                )
+            },
+            bottomBar = {
+                BottomBar(
+                    selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.Contract,
+                    onAddContractClick = onAddContractClick,
+                    onHomeClick = onNavigateHome,
+                    onChatClick = onChatClick,
+                    onContractClick = {},
+                    onMenuClick = { showMenu = true }
                 )
             }
+        ) { paddingValues ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+                    ) {
+                        Text(
+                            text = "내 계약 전체보기",
+                            color = BillageTextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
 
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
+                        SummaryCards(sectionStates = sectionStates)
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        FilterChips(
+                            selectedFilter = selectedFilter,
+                            onFilterSelected = { selectedFilter = it }
+                        )
+                    }
+                }
+
+                items(sectionStates, key = { it.type.name }) { section ->
+                    val visibleContracts = section.contracts.filter { contract ->
+                        selectedFilter == ContractFilter.All || contract.filter == selectedFilter
+                    }
+                    ContractSectionCard(
+                        state = section,
+                        visibleContracts = visibleContracts,
+                        expanded = expandedSections[section.type] == true,
+                        onToggle = {
+                            expandedSections[section.type] = !(expandedSections[section.type] ?: false)
+                        }
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable(
+                        interactionSource = dismissInteraction,
+                        indication = null
+                    ) { showMenu = false }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                HomeSideMenu(
+                    userName = menuProfileState.realName.ifBlank { "빌리지" },
+                    email = menuProfileState.email,
+                    isLoggingOut = logoutUiState.isLoggingOut,
+                    onClose = { showMenu = false },
+                    onProfileClick = { showMenu = false },
+                    onContractMenuClick = { showMenu = false },
+                    onReportMenuClick = { showMenu = false },
+                    onSettingsClick = { showMenu = false },
+                    onSupportClick = { showMenu = false },
+                    onTermsClick = { showMenu = false },
+                    onPrivacyClick = { showMenu = false },
+                    onLogoutClick = {
+                        showMenu = false
+                        logoutUiState.onLogoutClick()
+                    }
+                )
             }
         }
     }
