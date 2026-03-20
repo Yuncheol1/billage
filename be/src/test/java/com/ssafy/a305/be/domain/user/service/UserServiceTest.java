@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.user.service;
 
+import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.dto.response.UserMeResponseDto;
 import com.ssafy.a305.be.domain.user.dto.response.UserPhoneLookupResponseDto;
 import com.ssafy.a305.be.domain.user.entity.User;
@@ -14,9 +15,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,8 +30,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
+    private static final Set<String> BLOCKING_CONTRACT_STATUSES = Set.of("ACTIVE");
+
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ContractRepository contractRepository;
 
     @InjectMocks
     private UserService userService;
@@ -72,6 +80,44 @@ class UserServiceTest {
                 () -> userService.getMyInfo(99));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void withdrawMarksUserDeletedWhenNoBlockingContractExists() {
+        User user = User.builder()
+                .userSeq(1)
+                .email("example@example.com")
+                .phone("01012345678")
+                .state("ACTIVE")
+                .build();
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(user));
+        when(contractRepository.existsByUserSeqAndStatuses(1, BLOCKING_CONTRACT_STATUSES)).thenReturn(false);
+
+        userService.withdraw(1);
+
+        assertEquals("DELETED", user.getState());
+        assertNotNull(user.getDeletedDttm());
+        verify(contractRepository).existsByUserSeqAndStatuses(1, BLOCKING_CONTRACT_STATUSES);
+    }
+
+    @Test
+    void withdrawThrowsConflictWhenBlockingContractExists() {
+        User user = User.builder()
+                .userSeq(1)
+                .email("example@example.com")
+                .phone("01012345678")
+                .state("ACTIVE")
+                .build();
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(user));
+        when(contractRepository.existsByUserSeqAndStatuses(1, BLOCKING_CONTRACT_STATUSES)).thenReturn(true);
+
+        CustomBusinessException exception = assertThrows(CustomBusinessException.class,
+                () -> userService.withdraw(1));
+
+        assertEquals(ErrorCode.ACTIVE_CONTRACT_EXISTS, exception.getErrorCode());
+        assertEquals("ACTIVE", user.getState());
     }
 
     @Test
