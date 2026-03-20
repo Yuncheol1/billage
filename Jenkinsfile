@@ -76,7 +76,7 @@ pipeline {
         }
         failure {
             mattermostSend color: 'danger',
-                message: "🚨 BE 빌리지 금고에 문제가 생겼습니다! 범인은...${env.GIT_AUTHOR}! 🚨\n로그를 확인해 주세요.\n(Build: #${env.BUILD_NUMBER})\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
+                message: "🚨 BE 빌리지 금고에 문제가 생겼습니다! 범인은...${env.GIT_AUTHOR}! 🚨\n로그를 확인해 주세요.\n(${env.JOB_NAME} #${env.BUILD_NUMBER})\n🔗 http://3.35.206.231:9090/job/${env.JOB_NAME}/${env.BUILD_NUMBER}/console"
         }
     }
 }
