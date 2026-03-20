@@ -7,6 +7,10 @@ pipeline {
                 git branch: 'develop-ai',
                     credentialsId: 'gitlab-git-credentials',
                     url: 'https://lab.ssafy.com/s14-fintech-finance-sub1/S14P21A305.git'
+                
+                script {
+                    env.GIT_AUTHOR = sh(script: "git log -1 --pretty=format:'%an'", returnStdout: true).trim()
+                }
             }
         }
 
