@@ -89,6 +89,8 @@ class ChatRoomViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Subscription error", e)
+                chatRepository.clearSession()
+                chatRepository.connect()
             }
         }
     }
