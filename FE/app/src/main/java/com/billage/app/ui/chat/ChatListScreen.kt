@@ -1,7 +1,13 @@
 package com.billage.app.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.LaunchedEffect
 import com.billage.app.ui.chat.security.SecurityTestBed
@@ -33,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
+import com.billage.app.ui.common.MenuProfileState
+import com.billage.app.ui.home.HomeSideMenu
 import com.billage.app.ui.theme.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlin.collections.isNotEmpty
@@ -54,12 +63,17 @@ fun ChatListScreen(
     onChatRoomClick: (String, String) -> Unit,
     onHomeClick: () -> Unit,
     onAddContractClick: () -> Unit,
-    onContractClick: () -> Unit = {}
+    onContractClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    menuProfileState: MenuProfileState = MenuProfileState()
 ) {
     val rooms by viewModel.rooms.collectAsState()
     val userSearchResults by viewModel.userSearchResults.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val myUserSeq = viewModel.myUserSeq
+    var showMenu by remember { mutableStateOf(false) }
+    val logoutUiState = com.billage.app.ui.common.rememberLogoutUiState(onLoggedOut = onLogoutClick)
+    val dismissInteraction = remember { MutableInteractionSource() }
     
     // 화면 진입 시마다 목록 새로고침
     LaunchedEffect(Unit) {
@@ -142,125 +156,130 @@ fun ChatListScreen(
         )
     }
 
-    Scaffold(
-        containerColor = BillageBackground,
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BillageSurface)
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = BillageBackground,
+            topBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BillageSurface)
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
-                    Text(
-                        text = "메시지",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BillageTextPrimary
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { viewModel.fetchRooms() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
-                        }
-                        IconButton(onClick = { showCreateRoomDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "채팅방 추가", tint = BillageTextPrimary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "메시지",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BillageTextPrimary
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { viewModel.fetchRooms() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
+                            }
+                            IconButton(onClick = { showCreateRoomDialog = true }) {
+                                Icon(Icons.Default.Add, contentDescription = "채팅방 추가", tint = BillageTextPrimary)
+                            }
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = BillageTextPrimary)
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "대화 상대와 안전하게 거래하세요",
+                        fontSize = 13.sp,
+                        color = BillageTextSecondary
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "대화 상대와 안전하게 거래하세요",
-                    fontSize = 13.sp,
-                    color = BillageTextSecondary
+            },
+            bottomBar = {
+                BottomBar(
+                    selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.ChatList,
+                    onAddContractClick = onAddContractClick,
+                    onHomeClick = onHomeClick,
+                    onChatClick = {}, // We are already here
+                    onContractClick = onContractClick,
+                    onMenuClick = { showMenu = true }
                 )
             }
-        },
-        bottomBar = {
-            BottomBar(
-                selectedTab = BottomBarTab.ChatList,
-                onAddContractClick = onAddContractClick,
-                onHomeClick = onHomeClick,
-                onChatClick = {}, // We are already here
-                onContractClick = onContractClick
-            )
-        }
-    ) { paddingValues ->
-        val context = LocalContext.current
-        var testResult by remember { mutableStateOf(SecurityTestBed.getDeviceSecuritySpec(context)) }
-        var showEnrollDialog by remember { mutableStateOf(false) }
+        ) { paddingValues ->
+            val context = LocalContext.current
+            var testResult by remember { mutableStateOf(SecurityTestBed.getDeviceSecuritySpec(context)) }
+            var showEnrollDialog by remember { mutableStateOf(false) }
 
-        if (showEnrollDialog) {
-            AlertDialog(
-                onDismissRequest = { showEnrollDialog = false },
-                title = { Text("화면 잠금 설정 필요", fontWeight = FontWeight.Bold) },
-                text = { 
-                    Text("전자서명(TEE/StrongBox)을 안전하게 저장하기 위해 기기에 화면 잠금(PIN, 패턴, 지문 등)이 필수로 설정되어 있어야 합니다.\n\n설정 앱에서 화면 잠금을 등록한 후 다시 시도해주세요.") 
-                },
-                confirmButton = {
-                    TextButton(onClick = { showEnrollDialog = false }) {
-                        Text("확인", color = BillagePrimary, fontWeight = FontWeight.Bold)
-                    }
-                },
-                containerColor = BillageSurface,
-                titleContentColor = BillageTextPrimary,
-                textContentColor = BillageTextPrimary
-            )
-        }
+            if (showEnrollDialog) {
+                AlertDialog(
+                    onDismissRequest = { showEnrollDialog = false },
+                    title = { Text("화면 잠금 설정 필요", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text("전자서명(TEE/StrongBox)을 안전하게 저장하기 위해 기기에 화면 잠금(PIN, 패턴, 지문 등)이 필수로 설정되어 있어야 합니다.\n\n설정 앱에서 화면 잠금을 등록한 후 다시 시도해주세요.")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showEnrollDialog = false }) {
+                            Text("확인", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    containerColor = BillageSurface,
+                    titleContentColor = BillageTextPrimary,
+                    textContentColor = BillageTextPrimary
+                )
+            }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0F5))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("🛠️ 전자서명(TEE) 저장 및 지문 테스트 (임시) 🛠️", fontWeight = FontWeight.Bold, color = BillagePrimary)
-                        Spacer(Modifier.height(8.dp))
-                        Text(testResult, fontSize = 13.sp)
-                        Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { 
-                                    val result = SecurityTestBed.testKeyGenerationAndHwStatus(context)
-                                    if (result.startsWith("NEEDS_ENROLLMENT")) {
-                                        showEnrollDialog = true
-                                    } else {
-                                        testResult = result
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("1. TEE 저장상태 확인", fontSize=12.sp) }
-                            Button(
-                                onClick = { 
-                                    val activity = context as? FragmentActivity
-                                    if (activity != null) {
-                                        SecurityTestBed.startBiometricSignature(activity) { res -> 
-                                            if (res.startsWith("NEEDS_ENROLLMENT")) {
-                                                showEnrollDialog = true
-                                            } else {
-                                                testResult = res 
-                                            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0F5))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("🛠️ 전자서명(TEE) 저장 및 지문 테스트 (임시) 🛠️", fontWeight = FontWeight.Bold, color = BillagePrimary)
+                            Spacer(Modifier.height(8.dp))
+                            Text(testResult, fontSize = 13.sp)
+                            Spacer(Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        val result = SecurityTestBed.testKeyGenerationAndHwStatus(context)
+                                        if (result.startsWith("NEEDS_ENROLLMENT")) {
+                                            showEnrollDialog = true
+                                        } else {
+                                            testResult = result
                                         }
-                                    } else {
-                                        testResult = "에러: MainActivity가 FragmentActivity를 상속받아야 합니다! (현재 변경완료됨)"
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("2. 지문 서명 실행", fontSize=12.sp) }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("1. TEE 저장상태 확인", fontSize=12.sp) }
+                                Button(
+                                    onClick = {
+                                        val activity = context as? FragmentActivity
+                                        if (activity != null) {
+                                            SecurityTestBed.startBiometricSignature(activity) { res ->
+                                                if (res.startsWith("NEEDS_ENROLLMENT")) {
+                                                    showEnrollDialog = true
+                                                } else {
+                                                    testResult = res
+                                                }
+                                            }
+                                        } else {
+                                            testResult = "에러: MainActivity가 FragmentActivity를 상속받아야 합니다! (현재 변경완료됨)"
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("2. 지문 서명 실행", fontSize=12.sp) }
+                            }
                         }
                     }
                 }
-            }
-            items(rooms) { room ->
+                items(rooms) { room ->
                 // Map ChatRoomRes to ChatPreviewItem for UI
                 // 내 UserSeq가 아닌 참여자의 이름을 찾아서 표시 (없으면 알 수 없음)
                 val opponentName = room.participants.firstOrNull { it.userSeq != myUserSeq }?.name ?: "알 수 없음"
@@ -298,36 +317,85 @@ fun ChatListScreen(
                     )
                 }
 
-                ChatListItem(
-                    chat = chat,
-                    onClick = { onChatRoomClick(chat.id, opponentName) },
-                    onLeaveClick = { showLeaveDialog = true }
-                )
-            }
-            if (rooms.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 80.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "💬", fontSize = 60.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "아직 대화가 없어요",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = BillageTextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "거래하고 싶은 친구에게 메시지를 보내보세요",
-                            fontSize = 14.sp,
-                            color = BillageTextSecondary
-                        )
+                    ChatListItem(
+                        chat = chat,
+                        onClick = { onChatRoomClick(chat.id, opponentName) },
+                        onLeaveClick = { showLeaveDialog = true }
+                    )
+                }
+                if (rooms.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 80.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(text = "💬", fontSize = 60.sp)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "아직 대화가 없어요",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BillageTextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "거래하고 싶은 친구에게 메시지를 보내보세요",
+                                fontSize = 14.sp,
+                                color = BillageTextSecondary
+                            )
+                        }
                     }
                 }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable(
+                        interactionSource = dismissInteraction,
+                        indication = null
+                    ) { showMenu = false }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                HomeSideMenu(
+                    userName = menuProfileState.realName.ifBlank { "빌리지" },
+                    email = menuProfileState.email,
+                    isLoggingOut = logoutUiState.isLoggingOut,
+                    onClose = { showMenu = false },
+                    onProfileClick = { showMenu = false },
+                    onContractMenuClick = {
+                        showMenu = false
+                        onContractClick()
+                    },
+                    onReportMenuClick = { showMenu = false },
+                    onSettingsClick = { showMenu = false },
+                    onSupportClick = { showMenu = false },
+                    onTermsClick = { showMenu = false },
+                    onPrivacyClick = { showMenu = false },
+                    onLogoutClick = {
+                        showMenu = false
+                        logoutUiState.onLogoutClick()
+                    }
+                )
             }
         }
     }
