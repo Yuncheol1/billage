@@ -13,7 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
 
 import java.util.Map;
 
@@ -22,15 +24,15 @@ import java.util.Map;
 @RequestMapping("/api/v1/contracts")
 @RequiredArgsConstructor
 public class ContractController {
-    private final Integer tempUserSeq = 100;// 임시 하드코딩
     private final ContractService contractService;
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> createContractDraft(
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @AuthenticationPrincipal AuthenticatedUser authUser,
             @Valid @RequestBody ContractDraftRequestDto requestDto) {
 
-        ContractDraftResponseDto responseDto = contractService.createDraft(tempUserSeq, requestDto);
+        Integer userSeq = authUser.userSeq();
+        ContractDraftResponseDto responseDto = contractService.createDraft(userSeq, requestDto);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", HttpStatus.CREATED.value(),
@@ -40,10 +42,12 @@ public class ContractController {
 
     @PostMapping("/{contractSeq}/clauses")
     public ResponseEntity<Map<String, Object>> addAiClauses(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
             @PathVariable Integer contractSeq,
             @Valid @RequestBody ClauseRequestDto requestDto) {
 
-        contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), tempUserSeq);
+        Integer userSeq = authUser.userSeq();
+        contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), userSeq);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", HttpStatus.CREATED.value(),
@@ -52,10 +56,11 @@ public class ContractController {
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getContracts(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
             @RequestParam(required = false, defaultValue = "ALL") String role,
             @RequestParam(required = false) String status) {
 
-        Integer userSeq = tempUserSeq;
+        Integer userSeq = authUser.userSeq();
 
         List<ContractListResponseDto> result = contractService.getContracts(userSeq, role, status);
 
@@ -67,8 +72,9 @@ public class ContractController {
 
     @GetMapping("/{contractSeq}")
     public ResponseEntity<Map<String, Object>> getContractDetail(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
             @PathVariable Integer contractSeq) {
-        Integer userSeq = tempUserSeq; // Controller 상단에 이미 선언된 임시 유저 사용
+        Integer userSeq = authUser.userSeq();
         ContractDetailResponseDto result = contractService.getContractDetail(contractSeq, userSeq);
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),
@@ -77,8 +83,10 @@ public class ContractController {
     }
 
     @DeleteMapping("/{contractSeq}")
-    public ResponseEntity<Map<String,Object>>deleteContract(@PathVariable Integer contractSeq){
-        Integer userSeq=tempUserSeq;
+    public ResponseEntity<Map<String,Object>>deleteContract(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq){
+        Integer userSeq = authUser.userSeq();
         contractService.deleteContract(contractSeq,userSeq);
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),

@@ -40,9 +40,9 @@ public class TestDataInit {
                 log.info("   - 기존 테스트 계정 삭제 완료");
 
                 // 3. User & Profile 삽입
-                insertUser(100, "test1@test.com", "010-0000-0100", "test1", "900101-1234567");
-                insertUser(101, "test2@test.com", "010-0000-0101", "test2", "900101-2345678");
-                insertUser(102, "test3@test.com", "010-0000-0102", "test3", "900101-3456789");
+                insertUser(100, "test1@test.com", "01000000100", "test1", "900101-1234567");
+                insertUser(101, "test2@test.com", "01000000101", "test2", "900101-2345678");
+                insertUser(102, "test3@test.com", "01000000102", "test3", "900101-3456789");
 
                 // 4. 외래키 체크 복구
                 em.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();

@@ -3,11 +3,7 @@ package com.ssafy.a305.be.domain.chat.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto;
 import com.ssafy.a305.be.domain.chat.dto.ChatRoomCreateRequestDto;
@@ -42,7 +38,7 @@ public class ChatRoomController {
     }
 
     // 이메일로 새로운 채팅방 생성 (혹은 기존 방 오픈)
-    @org.springframework.web.bind.annotation.PostMapping("/rooms")
+    @PostMapping("/rooms")
     public ResponseEntity<ChatRoomResponseDto> createRoomByEmail(
             @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
             @org.springframework.web.bind.annotation.RequestBody ChatRoomCreateRequestDto request) {
@@ -52,7 +48,7 @@ public class ChatRoomController {
     }
 
     // 채팅방 나가기
-    @org.springframework.web.bind.annotation.PostMapping("/{roomId}/leave")
+    @PostMapping("/{roomId}/leave")
     public ResponseEntity<Void> leaveRoom(
             @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
             @PathVariable("roomId") String roomId) {
@@ -61,7 +57,7 @@ public class ChatRoomController {
     }
 
     // 메시지 읽음 처리
-    @org.springframework.web.bind.annotation.PatchMapping("/{roomId}/read")
+    @PatchMapping("/{roomId}/read")
     public ResponseEntity<Void> markAsRead(
             @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
             @PathVariable("roomId") String roomId) {
