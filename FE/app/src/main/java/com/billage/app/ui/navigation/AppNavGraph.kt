@@ -101,6 +101,7 @@ fun NavGraphBuilder.appNavGraph(
         }
 
         val messages by viewModel.messages.collectAsState()
+        val contracts by viewModel.contracts.collectAsState()
 
         ChatRoomScreen(
             state = ChatRoomState(
@@ -108,6 +109,8 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = opponentName
             ),
             onBackClick = { appNavController.popBackStack() },
+            contracts = contracts,
+            onFetchContracts = { viewModel.fetchContracts() },
             onModeChange = {}, // 네가 추가했던 파라미터 살림
             onAddMenuClick = {}, // 네가 추가했던 파라미터 살림
             onSendMessage = { content -> viewModel.sendMessage(content) },
@@ -164,6 +167,7 @@ fun NavGraphBuilder.appNavGraph(
         val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
         LaunchedEffect(Unit) { viewModel.joinRoom("100") }
         val messages by viewModel.messages.collectAsState()
+        val contracts by viewModel.contracts.collectAsState()
 
         com.billage.app.ui.chat.ChatRoomScreen(
             state = ChatRoomState(
@@ -171,6 +175,8 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = "알 수 없음"
             ),
             onBackClick = { appNavController.popBackStack() },
+            contracts = contracts,
+            onFetchContracts = { viewModel.fetchContracts() },
             onModeChange = {}, // 네가 추가했던 파라미터 살림
             onAddMenuClick = {}, // 네가 추가했던 파라미터 살림
             onSendMessage = { content -> viewModel.sendMessage(content) },
