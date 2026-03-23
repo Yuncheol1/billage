@@ -6,7 +6,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
-import com.billage.app.ui.auth.MypageScreen
+import com.billage.app.ui.contract.ContractListScreen
 import com.billage.app.ui.contract.ContractScreen
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.common.MenuProfileViewModel
@@ -306,13 +306,14 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Mypage.route) {
         val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
-        MypageScreen(
+        ContractListScreen(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            onContractDetailClick = { contractId -> appNavController.navigateToContractDetail(contractId.toString()) },
             menuProfileState = menuProfileState
         )
     }
