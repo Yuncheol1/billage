@@ -58,6 +58,7 @@ public class ChatService {
             .senderSeq(requestDto.senderSeq())
             .content(requestDto.content())
             .isContractMsg(requestDto.isContractMsg())
+            .msgType(requestDto.msgType())
             .build();
 
         ChatMessage savedMessage = chatMessageRepository.save(message);

@@ -99,4 +99,18 @@ public class Contract {
         this.signedDttm = signedAt;
         this.updatedDttm = signedAt;
     }
+
+    public void updateContractTerms(BigDecimal principalAmount, BigDecimal interestRate) {
+        if (principalAmount != null) {
+            this.principalAmount = principalAmount;
+        }
+        if (interestRate != null) {
+            this.interestRate = interestRate;
+        }
+        this.updatedDttm = LocalDateTime.now();
+    }
+
+    public void setAiDraftContent(String aiDraftContent) {
+        this.aiDraftContent = aiDraftContent;
+    }
 }

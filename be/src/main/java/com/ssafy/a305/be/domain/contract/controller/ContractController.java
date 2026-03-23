@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.contract.controller;
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractSignatureRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
@@ -73,6 +74,20 @@ public class ContractController {
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),
                 "message", "특약이 성공적으로 수정되었습니다."));
+    }
+
+    @PutMapping("/{contractSeq}")
+    public ResponseEntity<Map<String, Object>> updateContract(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq,
+            @Valid @RequestBody ContractUpdateRequestDto requestDto) {
+
+        Integer userSeq = authUser.userSeq();
+        contractService.updateContract(contractSeq, requestDto, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "계약이 성공적으로 수정되었습니다."));
     }
 
     @DeleteMapping("/{contractSeq}/clauses/{clauseSeq}")
@@ -164,4 +179,16 @@ public class ContractController {
         return request.getRemoteAddr();
     }
 
+    @PostMapping("/{contractSeq}/ai-propose-mock")
+    public ResponseEntity<Map<String, Object>> createAiProposalMock(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq) {
+
+        Integer userSeq = authUser.userSeq();
+        contractService.createAiProposalMock(contractSeq, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "AI 제안서(Mock)가 성공적으로 생성되었습니다."));
+    }
 }

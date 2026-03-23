@@ -23,13 +23,15 @@ public class ChatMessage {
     
     // contract 여부 등 추가 데이터
     private Boolean isContractMsg;
+    private String msgType; // TEXT, SYSTEM, AI_PROPOSAL
     
     @Builder
-    public ChatMessage(String roomId, Integer senderSeq, String content, Boolean isContractMsg) {
+    public ChatMessage(String roomId, Integer senderSeq, String content, Boolean isContractMsg, String msgType) {
         this.roomId = roomId;
         this.senderSeq = senderSeq;
         this.content = content;
         this.createdAt = LocalDateTime.now();
         this.isContractMsg = isContractMsg != null ? isContractMsg : false;
+        this.msgType = msgType != null ? msgType : "TEXT";
     }
 }
