@@ -156,6 +156,12 @@ class ContractViewModel @Inject constructor(
                 )
                 val data = response.data
                 if (data != null && data.registered && data.userSeq != null) {
+                    // 자기 자신과 계약 시도 차단
+                    if (data.userSeq == authSessionStorage.getUserSeq()) {
+                        _formState.update { it.copy(debtorUserSeq = null) }
+                        _searchState.value = UserSearchState.Error("자기 자신과는 계약할 수 없어요")
+                        return@launch
+                    }
                     // 등록된 사용자 → 자동으로 선택 처리
                     updateDebtorUser(data.userSeq, name, phone)
                     _searchState.value = UserSearchState.Found(

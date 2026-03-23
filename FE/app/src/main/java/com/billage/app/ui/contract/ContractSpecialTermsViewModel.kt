@@ -16,7 +16,8 @@ import javax.inject.Inject
 data class SpecialTerm(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
-    val isRecommended: Boolean = false
+    val isRecommended: Boolean = false,
+    val clauseSeq: Int = -1  // 서버 PK — 삭제 API 호출 시 필요
 )
 
 data class RecommendedTermItem(
@@ -84,9 +85,41 @@ class ContractSpecialTermsViewModel @Inject constructor(
     }
 
     fun removeTerm(termId: String) {
-        _uiState.value = _uiState.value.copy(
-            addedTerms = _uiState.value.addedTerms.filter { it.id != termId }
-        )
+        val term = _uiState.value.addedTerms.find { it.id == termId } ?: return
+
+        // clauseSeq가 없으면 로컈에서만 제거 (서버에 저장 안 된 항목)
+        if (contractSeq == -1 || term.clauseSeq == -1) {
+            _uiState.value = _uiState.value.copy(
+                addedTerms = _uiState.value.addedTerms.filter { it.id != termId }
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            try {
+                val response = contractApi.deleteClause(
+                    contractSeq = contractSeq,
+                    clauseSeq = term.clauseSeq
+                )
+                if (response.status == 200) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        addedTerms = _uiState.value.addedTerms.filter { it.id != termId }
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = response.message
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "특약 삭제에 실패했어요. 다시 시도해 주세요."
+                )
+            }
+        }
     }
 
     private fun callAddClauseApi(
@@ -114,9 +147,11 @@ class ContractSpecialTermsViewModel @Inject constructor(
                 )
 
                 if (response.status == 201) {
+                    val clauseSeq = response.data?.clauseSeq ?: -1
                     val newTerm = SpecialTerm(
                         title = displayTitle,
-                        isRecommended = isRecommended
+                        isRecommended = isRecommended,
+                        clauseSeq = clauseSeq
                     )
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

@@ -3,6 +3,7 @@ package com.billage.app.data.remote.api
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.POST
@@ -22,6 +23,13 @@ interface ContractApi {
         @Path("contractSeq") contractSeq: Int,
         @Body request: AddClauseRequest
     ): AddClauseResponse
+
+    // 특약 삭제
+    @DELETE("api/v1/contracts/{contractSeq}/clauses/{clauseSeq}")
+    suspend fun deleteClause(
+        @Path("contractSeq") contractSeq: Int,
+        @Path("clauseSeq") clauseSeq: Int
+    ): DeleteClauseResponse
 
     // 계약 목록 조회
     @GET("/api/v1/contracts")
@@ -76,6 +84,18 @@ data class AddClauseRequest(
 
 @Serializable
 data class AddClauseResponse(
+    val status: Int,
+    val message: String,
+    val data: AddClauseData? = null
+)
+
+@Serializable
+data class AddClauseData(
+    val clauseSeq: Int   // 삭제 API 호출 시 필요한 특약 PK
+)
+
+@Serializable
+data class DeleteClauseResponse(
     val status: Int,
     val message: String
 )
