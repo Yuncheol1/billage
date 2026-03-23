@@ -8,8 +8,8 @@ import com.billage.app.ui.chat.models.ContractSummary
  */
 object ChatPreviewData {
     val dummyContracts = listOf(
-        ContractSummary("c1", "100만원 소액 대출 건", "김철수"),
-        ContractSummary("c2", "원룸 보증금 500만원", "이영희")
+        ContractSummary(1, "100만원 소액 대출 건", "김철수"),
+        ContractSummary(2, "원룸 보증금 500만원", "이영희")
     )
     
     val dummyContractDetails = """

@@ -110,3 +110,16 @@ data class ContractCompleteMessage(
     val contractId: String,
     val contractTitle: String
 ) : BaseChatMessage
+
+/**
+ * AI 수정 제안 카드 - 종료 버튼 누른 사람이 채팅방에 발송
+ */
+data class AiProposalMessage(
+    override val id: String,
+    override val sender: MessageSender,
+    override val timestamp: LocalDateTime,
+    val contractTitle: String,
+    val originalInterestRate: Double?,
+    val proposedInterestRate: Double?,
+    val modifications: List<String> = emptyList()
+) : BaseChatMessage

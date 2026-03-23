@@ -183,9 +183,10 @@ fun ContractFlowPreview() {
         // 차용증 전문 보기 전체 화면 연동
         if (isDocumentSheetVisible) {
             ContractDocumentFullScreen(
-                title = "100만원 소액 대출 건",
-                details = ChatPreviewData.dummyContractDetails,
-                onDismissRequest = { isDocumentSheetVisible = false }
+                contractTitle = "100만원 소액 대출 건",
+                contractDetail = null,
+                onDismissRequest = { isDocumentSheetVisible = false },
+                onAccept = { isDocumentSheetVisible = false }
             )
         }
     }

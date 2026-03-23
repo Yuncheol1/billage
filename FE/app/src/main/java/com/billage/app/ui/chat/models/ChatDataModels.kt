@@ -22,7 +22,8 @@ data class ChatMessageReq(
     val roomId: String,
     val senderSeq: Int,
     val content: String,
-    val isContractMsg: Boolean = false
+    val isContractMsg: Boolean = false,
+    val msgType: String = "TEXT"
 )
 
 @Serializable
@@ -33,6 +34,7 @@ data class ChatMessageRes(
     val senderName: String,
     val content: String,
     val isContractMsg: Boolean,
+    val msgType: String? = "TEXT",
     val createdAt: String
 )
 @Serializable
