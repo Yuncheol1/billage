@@ -2,6 +2,7 @@ package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
@@ -23,8 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -167,6 +169,88 @@ public class ContractService {
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "해당 특약을 찾을 수 없습니다."));
 
         targetClause.updateContent(refinedContent);
+    }
+
+    @Transactional
+    public void updateContract(Integer contractSeq, ContractUpdateRequestDto requestDto, Integer userSeq) {
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 수정할 권한이 없습니다.");
+        }
+
+        String status = contract.getStatus();
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약만 수정할 수 있습니다.");
+        }
+
+        contract.updateContractTerms(requestDto.getPrincipalAmount(), requestDto.getInterestRate());
+
+        if (requestDto.getClauses() != null) {
+            for (ContractUpdateRequestDto.ClauseUpdateDto reqClause : requestDto.getClauses()) {
+                contract.getClauses().stream()
+                        .filter(c -> c.getClauseSeq().equals(reqClause.getClauseSeq()))
+                        .findFirst()
+                        .ifPresent(clause -> clause.updateContent(reqClause.getContent()));
+            }
+        }
+    }
+
+    @Transactional
+    public void createAiProposalMock(Integer contractSeq, Integer userSeq) {
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약에 접근할 권한이 없습니다.");
+        }
+
+        String status = contract.getStatus();
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약만 제안서를 만들 수 있습니다.");
+        }
+
+        // Mock AI 제안 생성 로직: 이자율 2% 삭감
+        BigDecimal proposedInterestRate = contract.getInterestRate() != null
+            ? contract.getInterestRate().subtract(new BigDecimal("2.0000"))
+            : new BigDecimal("5.0000");
+
+        if (proposedInterestRate.compareTo(BigDecimal.ZERO) < 0) {
+            proposedInterestRate = BigDecimal.ZERO;
+        }
+
+        List<ContractUpdateRequestDto.ClauseUpdateDto> clauseDtos = contract.getClauses().stream()
+                .map(c -> {
+                    ContractUpdateRequestDto.ClauseUpdateDto dto = new ContractUpdateRequestDto.ClauseUpdateDto();
+                    dto.setClauseSeq(c.getClauseSeq());
+                    dto.setContent(c.getContent());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        // 첫 번째 특약에 AI 코멘트 추가
+        if (!clauseDtos.isEmpty()) {
+            ContractUpdateRequestDto.ClauseUpdateDto firstClause = clauseDtos.get(0);
+            firstClause.setContent(firstClause.getContent() + " (AI 권장: 이자율 인하 및 원만한 상환 협의 권장)");
+        }
+
+        ContractUpdateRequestDto proposalDto = new ContractUpdateRequestDto();
+        proposalDto.setPrincipalAmount(contract.getPrincipalAmount());
+        proposalDto.setInterestRate(proposedInterestRate);
+        proposalDto.setClauses(clauseDtos);
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String jsonStr = mapper.writeValueAsString(proposalDto);
+            contract.setAiDraftContent(jsonStr); // AI 초안 내용으로 저장
+        } catch (Exception e) {
+            throw new RuntimeException("AI 제안 생성 실패", e);
+        }
     }
 
     @Transactional

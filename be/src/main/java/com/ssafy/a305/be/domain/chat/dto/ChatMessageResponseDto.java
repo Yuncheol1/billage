@@ -10,6 +10,7 @@ public record ChatMessageResponseDto(
     String senderName,
     String content,
     Boolean isContractMsg,
+    String msgType,
     LocalDateTime createdAt
 ) {
     public static ChatMessageResponseDto of(ChatMessage message, String senderName) {
@@ -20,6 +21,7 @@ public record ChatMessageResponseDto(
                 senderName,
                 message.getContent(),
                 message.getIsContractMsg(),
+                message.getMsgType(),
                 message.getCreatedAt()
         );
     }
