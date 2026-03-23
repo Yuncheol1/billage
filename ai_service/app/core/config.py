@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     CHROMA_DB_DIR: str = "./chroma_db"
     
     # Redis 설정 (Semantic Cache 전용)
-    REDIS_HOST: str = "172.26.2.14" # EC2의 Private IP (eth0)
+    REDIS_HOST: str = "redis-cache" # Docker Network 내부 DNS (컨테이너 이름)
     REDIS_PORT: int = 6379
     REDIS_DB: int = 1
     SEMANTIC_CACHE_THRESHOLD: float = 0.95  # 유사도 임계값
