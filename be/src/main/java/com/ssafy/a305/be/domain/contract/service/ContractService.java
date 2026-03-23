@@ -167,6 +167,35 @@ public class ContractService {
         targetClause.updateContent(refinedContent);
     }
 
+    @Transactional
+    public void deleteClause(Integer contractSeq, Integer clauseSeq, Integer userSeq) {
+        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용 권장)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        // 2. 권한 검증
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 특약을 삭제할 권한이 없습니다.");
+        }
+
+        // 3. 상태 검증
+        String status = contract.getStatus();
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약의 특약만 삭제할 수 있습니다.");
+        }
+
+
+
+        // 5. 특약 조회 및 수정
+        ContractClause targetClause = contract.getClauses().stream()
+                .filter(c -> c.getClauseSeq().equals(clauseSeq))
+                .findFirst()
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "해당 특약을 찾을 수 없습니다."));
+
+        contract.removeClause(targetClause);
+    }
     @Transactional(readOnly = true)
     public List<ContractListResponseDto> getContracts(Integer userSeq, String role, String status) {
         List<Contract> contracts = contractRepository.searchContracts(userSeq, role, status);
