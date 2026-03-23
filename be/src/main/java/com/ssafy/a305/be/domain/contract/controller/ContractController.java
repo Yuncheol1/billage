@@ -69,6 +69,20 @@ public class ContractController {
                 "message", "특약이 성공적으로 수정되었습니다."));
     }
 
+    @DeleteMapping("/{contractSeq}/clauses/{clauseSeq}")
+    public ResponseEntity<Map<String, Object>> deleteClause(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq,
+            @PathVariable Integer clauseSeq
+          ) {
+
+        Integer userSeq = authUser.userSeq();
+        contractService.deleteClause(contractSeq, clauseSeq,userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "특약이 성공적으로 삭제되었습니다."));
+    }
     @GetMapping
     public ResponseEntity<Map<String, Object>> getContracts(
             @AuthenticationPrincipal AuthenticatedUser authUser,

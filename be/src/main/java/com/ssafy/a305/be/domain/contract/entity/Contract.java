@@ -87,7 +87,9 @@ public class Contract {
         this.clauses.add(clause);
         // clause.setContract(this); -> if ContractClause doesn't have setter, maybe we don't need it if we used Builder nicely
     }
-
+    public void removeClause(ContractClause clause) {
+        this.clauses.remove(clause);
+    }
     public void addRepaymentSchedule(RepaymentSchedule schedule) {
         this.repaymentSchedules.add(schedule);
     }
