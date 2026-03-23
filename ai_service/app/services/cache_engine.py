@@ -48,10 +48,12 @@ class SemanticCacheManager:
                 redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
                 self.index = SearchIndex(self.schema, redis_url=redis_url)
                 
-                # 인덱스가 없으면 생성
-                if not self.index.exists():
-                    self.index.create(overwrite=False)
+                # 인덱스 무조건 덮어쓰기 (No such index 오류 방지)
+                try:
+                    self.index.create(overwrite=True)
                     logger.info("🆕 Redis 시맨틱 캐시 인덱스가 생성되었습니다.")
+                except Exception as e:
+                    pass
                 return True
             except Exception as e:
                 logger.error(f"❌ 캐시 엔진 초기화 실패: {str(e)}")
@@ -101,7 +103,7 @@ class SemanticCacheManager:
             data = [{
                 "original_query": original_query,
                 "answer": answer,
-                "query_vector": np.array(query_vector, dtype=np.float32).tolist()
+                "query_vector": np.array(query_vector, dtype=np.float32).tobytes()
             }]
             self.index.load(data)
             logger.info("💾 새로운 응답이 시맨틱 캐시에 저장되었습니다.")
