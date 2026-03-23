@@ -17,3 +17,6 @@ local.properties
 
 # 로컬 환경 설정
 gradle/gradle-daemon-jvm.properties
+
+# Firebase
+google-services.json

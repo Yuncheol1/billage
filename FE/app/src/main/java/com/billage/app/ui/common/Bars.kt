@@ -57,6 +57,7 @@ fun TopBar(
     userName: String,
     hasNotification: Boolean,
     onNotificationClick: () -> Unit,
+    onMenuClick: (() -> Unit)? = null,
     onLogoutClick: (() -> Unit)? = null,
     isLogoutInProgress: Boolean = false
 ) {
@@ -88,7 +89,7 @@ fun TopBar(
             }
         },
         actions = {
-            if (onLogoutClick != null) {
+            if (onLogoutClick != null && onMenuClick == null) {
                 TextButton(
                     onClick = onLogoutClick,
                     enabled = !isLogoutInProgress

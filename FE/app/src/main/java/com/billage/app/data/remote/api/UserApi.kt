@@ -3,6 +3,7 @@ package com.billage.app.data.remote.api
 import com.billage.app.data.remote.dto.UserLookupRequest
 import com.billage.app.data.remote.dto.UserLookupResponse
 import com.billage.app.ui.chat.models.UserSearchResponse
+import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -17,10 +18,28 @@ interface UserApi {
         @Body request: UserLookupRequest
     ): UserLookupResponse
 
-    // 채팅방 생성용 — 이메일로 사용자 검색
-    // GET /api/v1/users/contain?email={query}
+    // 내 정보 조회
+    @GET("api/v1/users/me")
+    suspend fun getMyInfo(): UserMeApiResponse
+
+    // 사용자 검색 (이메일)
     @GET("api/v1/users/contain")
     suspend fun searchUsersByEmail(
         @Query("email") email: String
     ): List<UserSearchResponse>
 }
+
+@Serializable
+data class UserMeApiResponse(
+    val status: Int,
+    val message: String,
+    val data: UserMeResponse
+)
+
+@Serializable
+data class UserMeResponse(
+    val userSeq: Int,
+    val realName: String? = null,
+    val email: String? = null,
+    val phone: String? = null
+)

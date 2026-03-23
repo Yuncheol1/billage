@@ -43,3 +43,4 @@ app-example
 /android
 
 .agents/
+FE/.gradle-user-home/

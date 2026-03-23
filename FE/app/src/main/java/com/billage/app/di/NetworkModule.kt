@@ -6,6 +6,7 @@ import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.data.remote.api.ChatApi
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.UserApi
+import com.billage.app.data.remote.api.NotificationApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -67,6 +68,12 @@ object NetworkModule {
     @Singleton
     fun provideUserApi(retrofit: Retrofit): UserApi {
         return retrofit.create(UserApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNotificationApi(retrofit: Retrofit): NotificationApi {
+        return retrofit.create(NotificationApi::class.java)
     }
 
     @Provides

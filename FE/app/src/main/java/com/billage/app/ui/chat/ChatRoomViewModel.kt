@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.remote.api.ChatApi
+import com.billage.app.data.remote.api.ContractApi
+import com.billage.app.data.remote.api.ContractListResponse
 import com.billage.app.data.repository.ChatRepository
 import com.billage.app.ui.chat.models.ChatMessageRes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatRoomViewModel @Inject constructor(
     private val chatApi: ChatApi,
+    private val contractApi: ContractApi,
     private val chatRepository: ChatRepository,
     private val authSessionStorage: AuthSessionStorage
 ) : ViewModel() {
@@ -30,6 +33,9 @@ class ChatRoomViewModel @Inject constructor(
 
     private val _messages = MutableStateFlow<List<ChatMessageRes>>(emptyList())
     val messages: StateFlow<List<ChatMessageRes>> = _messages.asStateFlow()
+
+    private val _contracts = MutableStateFlow<List<ContractListResponse>>(emptyList())
+    val contracts: StateFlow<List<ContractListResponse>> = _contracts.asStateFlow()
 
     private var currentRoomId: String = ""
 
@@ -89,6 +95,8 @@ class ChatRoomViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Subscription error", e)
+                chatRepository.clearSession()
+                chatRepository.connect()
             }
         }
     }
@@ -96,5 +104,18 @@ class ChatRoomViewModel @Inject constructor(
     fun sendMessage(content: String) {
         if (currentRoomId.isEmpty() || content.isBlank()) return
         chatRepository.sendMessage(currentRoomId, myUserSeq, content)
+    }
+
+    fun fetchContracts() {
+        viewModelScope.launch {
+            try {
+                val res = contractApi.getContracts()
+                if (res.status == 200) {
+                    _contracts.value = res.data
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load contracts", e)
+            }
+        }
     }
 }

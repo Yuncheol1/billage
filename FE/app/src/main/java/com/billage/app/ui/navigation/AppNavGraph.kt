@@ -9,6 +9,7 @@ import com.billage.app.ui.auth.LoginScreen
 import com.billage.app.ui.auth.MypageScreen
 import com.billage.app.ui.contract.ContractScreen
 import com.billage.app.ui.home.HomeScreen
+import com.billage.app.ui.common.MenuProfileViewModel
 import com.billage.app.ui.chat.ChatRoomScreen
 import com.billage.app.ui.chat.components.cards.BaseChatCard
 import com.billage.app.ui.chat.models.ChatRoomState
@@ -58,6 +59,8 @@ fun NavGraphBuilder.appNavGraph(
     }
 
     composable(route = AppDestination.Home.route) {
+        val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
+        val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
@@ -65,7 +68,8 @@ fun NavGraphBuilder.appNavGraph(
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
-            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) }
+            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            menuProfileState = menuProfileState
         )
     }
 
@@ -82,11 +86,15 @@ fun NavGraphBuilder.appNavGraph(
     }
 
     composable(route = AppDestination.ChatList.route) {
+        val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
+        val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         com.billage.app.ui.chat.ChatListScreen(
             onChatRoomClick = { roomId, opponentName -> appNavController.navigateToChatRoom(roomId, opponentName) },
             onHomeClick = { appNavController.navigateToHome() },
             onAddContractClick = { appNavController.navigateToContract() },
-            onContractClick = { appNavController.navigateToMypage() }
+            onContractClick = { appNavController.navigateToMypage() },
+            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            menuProfileState = menuProfileState
         )
     }
 
@@ -100,6 +108,7 @@ fun NavGraphBuilder.appNavGraph(
         }
 
         val messages by viewModel.messages.collectAsState()
+        val contracts by viewModel.contracts.collectAsState()
 
         ChatRoomScreen(
             state = ChatRoomState(
@@ -107,6 +116,8 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = opponentName
             ),
             onBackClick = { appNavController.popBackStack() },
+            contracts = contracts,
+            onFetchContracts = { viewModel.fetchContracts() },
             onModeChange = {},
             onAddMenuClick = {},
             onSendMessage = { content -> viewModel.sendMessage(content) },
@@ -163,6 +174,7 @@ fun NavGraphBuilder.appNavGraph(
         val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
         LaunchedEffect(Unit) { viewModel.joinRoom("100") }
         val messages by viewModel.messages.collectAsState()
+        val contracts by viewModel.contracts.collectAsState()
 
         com.billage.app.ui.chat.ChatRoomScreen(
             state = ChatRoomState(
@@ -170,6 +182,8 @@ fun NavGraphBuilder.appNavGraph(
                 roomName = "알 수 없음"
             ),
             onBackClick = { appNavController.popBackStack() },
+            contracts = contracts,
+            onFetchContracts = { viewModel.fetchContracts() },
             onModeChange = {},
             onAddMenuClick = {},
             onSendMessage = { content -> viewModel.sendMessage(content) },
@@ -222,12 +236,15 @@ fun NavGraphBuilder.appNavGraph(
     }
 
     composable(route = AppDestination.Mypage.route) {
+        val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
+        val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         MypageScreen(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
-            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) }
+            onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            menuProfileState = menuProfileState
         )
     }
 
