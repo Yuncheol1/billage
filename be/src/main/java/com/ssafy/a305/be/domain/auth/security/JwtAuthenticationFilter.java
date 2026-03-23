@@ -16,6 +16,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -25,14 +26,34 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("removal")
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
+    /**
+     * Bearer 검증 없이 통과할 공개 API (헬스, 로그인·토큰 교환 등).
+     * {@code /api/v1/auth/consents} 등 인증 필요 엔드포인트는 포함하지 않음.
+     */
+    private static final List<AntPathRequestMatcher> JWT_FILTER_WHITELIST = List.of(
+            new AntPathRequestMatcher("/api/v1/health"),
+            new AntPathRequestMatcher("/api/v1/auth/kakao/authorize"),
+            new AntPathRequestMatcher("/api/v1/auth/kakao/callback"),
+            new AntPathRequestMatcher("/api/v1/auth/kakao/login"),
+            new AntPathRequestMatcher("/api/v1/auth/reissue"),
+            new AntPathRequestMatcher("/api/v1/auth/logout")
+    );
+
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return JWT_FILTER_WHITELIST.stream()
+                .anyMatch(matcher -> matcher.matches(request));
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
