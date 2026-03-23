@@ -52,11 +52,12 @@ public class ContractController {
             @Valid @RequestBody ClauseRequestDto requestDto) {
 
         Integer userSeq = authUser.userSeq();
-        contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), userSeq);
+        Integer clauseSeq = contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), userSeq);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", HttpStatus.CREATED.value(),
-                "message", "특약사항이 성공적으로 저장되었습니다."));
+                "message", "특약사항이 성공적으로 저장되었습니다.",
+                "data", Map.of("clauseSeq", clauseSeq)));
     }
 
     @PatchMapping("/{contractSeq}/clauses/{clauseSeq}")

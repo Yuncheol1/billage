@@ -102,7 +102,7 @@ public class ContractService {
     }
 
     @Transactional
-    public void addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+    public Integer addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
@@ -134,6 +134,8 @@ public class ContractService {
                 .build();
 
         contract.addClause(clause);
+        contractRepository.flush();
+        return clause.getClauseSeq();
     }
 
     @Transactional
