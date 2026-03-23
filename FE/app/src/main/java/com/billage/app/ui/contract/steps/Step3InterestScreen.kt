@@ -270,7 +270,7 @@ fun Step3InterestScreen(
                     ) {
                         Text(text = "⚠️", fontSize = 12.sp)
                         Text(
-                            text = "설정한 이자율이 낮아 이자 차액이 연 1천만 원 이상이에요. 그 차액만큼 증여로 볼 수 있어요",
+                            text = "설정한 이자율이 낮아 이자 차액이 연 1천만 원 이상이에요.\n그 차액만큼 증여로 볼 수 있어요",
                             fontSize = 12.sp,
                             color = BillageDanger,
                             lineHeight = 18.sp

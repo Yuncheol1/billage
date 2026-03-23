@@ -1,18 +1,22 @@
 package com.billage.app.ui.home
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.billage.app.data.remote.api.ContractApi
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 // 홈 화면에 표시할 데이터 묶음
 // 현재는 더미 데이터, 추후 API 연동 시 실제 데이터로 교체 예정
 data class HomeUiState(
     val userName: String = "",                          // 사용자 이름
-    val lentCount: Int = 0,                             // 빌려준 건수
-    val lentAmount: String = "",                        // 빌려준 총액
-    val borrowedCount: Int = 0,                         // 빌려온 건수
-    val borrowedAmount: String = "",                    // 빌려온 총액
+    val lentCount: Int = 0,                             // 받을 계약 건수 (채권자)
+    val borrowedCount: Int = 0,                         // 갚을 계약 건수 (채무자)
     val upcomingSchedules: List<ScheduleItem> = emptyList(), // 다가오는 일정
     val recentActivities: List<ActivityItem> = emptyList(),  // 최근 거래활동
     val hasNotification: Boolean = false,               // 중요 알림 여부
@@ -36,7 +40,10 @@ data class ActivityItem(
     val type: String        // "transfer" | "chat"
 )
 
-class HomeViewModel : ViewModel() {
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val contractApi: ContractApi
+) : ViewModel() {
     // StateFlow — 데이터가 바뀌면 Compose UI가 자동으로 다시 그려지게 해주는 객체
     // _uiState는 내부에서만 수정 가능 (private)
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -44,19 +51,37 @@ class HomeViewModel : ViewModel() {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
-        // ViewModel이 처음 생성될 때 더미 데이터를 넣어요.
-        // TODO: API 연동 후 실제 데이터로 교체
         loadDummyData()
+        fetchContracts()
+    }
+
+    fun fetchContracts() {
+        viewModelScope.launch {
+            try {
+                // 서명이 모두 완료되어 진행 중인(ACTIVE) 계약만 전체 조회
+                val response = contractApi.getContracts(role = "ALL", status = "ACTIVE")
+                if (response.status == 200) {
+                    val contracts = response.data
+                    val lent = contracts.count { it.role == "CREDITOR" }
+                    val borrowed = contracts.count { it.role == "DEBTOR" }
+                    
+                    _uiState.update { it.copy(
+                        lentCount = lent,
+                        borrowedCount = borrowed
+                    ) }
+                }
+            } catch (e: Exception) {
+                // 에러 발생 시 처리 (현재는 로그나 토스트 등 생략)
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun loadDummyData() {
-        _uiState.value = HomeUiState(
-            userName = "빌리지",
-            lentCount = 1,
-            lentAmount = "300만원",
-            borrowedCount = 1,
-            borrowedAmount = "5000만원",
-            hasNotification = true,
+        _uiState.update {
+            it.copy(
+                userName = "빌리지",
+                hasNotification = true,
             notificationMessage = "김철수님의 상환 예정일이 내일입니다",
             upcomingSchedules = listOf(
                 ScheduleItem("2026.6.23", "김철수", "받을", "30만원"),
@@ -67,7 +92,8 @@ class HomeViewModel : ViewModel() {
                 ActivityItem("김철수님이 돈을 보냈어요", "10분 전", "transfer"),
                 ActivityItem("이영희님과 조율 중이에요", "1시간 전", "chat")
             )
-        )
+            )
+        }
     }
 
     // 알림 배너 닫기
