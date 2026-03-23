@@ -30,14 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.billage.app.ui.contract.ContractCompleteScreen
 import com.billage.app.ui.contract.ContractRole
-import com.billage.app.ui.contract.ContractScreen
+import com.billage.app.ui.contract.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.ContractViewModel
-import com.billage.app.ui.home.HomeScreen
+import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.billage.app.ui.chat.ChatRoomScreen
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -68,10 +67,11 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
@@ -82,7 +82,9 @@ fun NavGraphBuilder.appNavGraph(
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
         ContractScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { appNavController.navigateToContractComplete() },
+            onContractComplete = { contractSeq ->  // ← contractSeq 받아서 전달
+                appNavController.navigateToSpecialTerms(contractSeq)
+            },
             role = role
         )
     }
@@ -93,8 +95,9 @@ fun NavGraphBuilder.appNavGraph(
         com.billage.app.ui.chat.ChatListScreen(
             onChatRoomClick = { roomId, opponentName -> appNavController.navigateToChatRoom(roomId, opponentName) },
             onHomeClick = { appNavController.navigateToHome() },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onContractClick = { appNavController.navigateToMypage() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
@@ -134,11 +137,11 @@ fun NavGraphBuilder.appNavGraph(
             onBackClick = { appNavController.popBackStack() },
             contracts = contracts,
             onFetchContracts = { viewModel.fetchContracts() },
-            onModeChange = { mode -> 
+            onModeChange = { mode ->
                 if (mode == com.billage.app.ui.chat.models.ChatRoomMode.NORMAL) {
                     viewModel.exitModificationMode()
                 }
-            }, 
+            },
             onAddMenuClick = {},
             onRequestAiProposal = { viewModel.requestAiProposal() },
             onContractSelectForModify = { viewModel.setModificationMode(it) },
@@ -248,8 +251,8 @@ fun NavGraphBuilder.appNavGraph(
             onBackClick = { appNavController.popBackStack() },
             contracts = contracts,
             onFetchContracts = { viewModel.fetchContracts() },
-            onModeChange = {}, // 네가 추가했던 파라미터 살림
-            onAddMenuClick = {}, // 네가 추가했던 파라미터 살림
+            onModeChange = {},
+            onAddMenuClick = {},
             onSendMessage = { content -> viewModel.sendMessage(content) },
             onDirectEditClick = { contractId -> appNavController.navigateToContractEdit(contractId) },
             messageListContent = {
@@ -274,7 +277,7 @@ fun NavGraphBuilder.appNavGraph(
                                 Column {
                                     if (!isMe) {
                                         Text(
-                                            text = msg.senderName, // 백엔드에서 내려온 진짜 상대방 이름 표시
+                                            text = msg.senderName,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = BillageTextSecondary,
                                             modifier = Modifier.padding(bottom = 4.dp)
@@ -308,23 +311,47 @@ fun NavGraphBuilder.appNavGraph(
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
     }
 
+    // ← 특약 추가 화면 (ContractComplete 바로 위에 위치)
+    composable(route = AppDestination.Settings.route) {
+        WithdrawalSettingsScreen(
+            onBackClick = { appNavController.popBackStack() },
+            onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) }
+        )
+    }
+
+    composable(route = AppDestination.ContractSpecialTerms.routeWithArg) { backStackEntry ->
+        val contractSeq = backStackEntry.arguments?.getString("contractSeq")
+            ?.toIntOrNull() ?: -1
+
+        ContractSpecialTermsScreen(
+            onSkip = { appNavController.navigateToContractComplete() },
+            onComplete = { appNavController.navigateToContractComplete() },
+            viewModel = hiltViewModel()  // ← hiltViewModel()로 교체
+        )
+    }
+
     composable(route = AppDestination.ContractComplete.route) { entry ->
-        // Contract 화면의 ViewModel 공유 — 백스택에 남아있는 Contract 화면의 ViewModel 참조
         val parentEntry = remember(entry) {
-            appNavController.navController.getBackStackEntry(AppDestination.Contract.routeWithArg)
+            try {
+                appNavController.navController
+                    .getBackStackEntry(AppDestination.Contract.routeWithArg)
+            } catch (e: IllegalArgumentException) {
+                entry
+            }
         }
         val viewModel: ContractViewModel = viewModel(parentEntry)
         val formState by viewModel.formState.collectAsState()
 
         ContractCompleteScreen(
             formState = formState,
-            onHomeClick = { appNavController.navigateToHome() },
-            onChatClick = { appNavController.navigateToChatList() }, // TODO: 생성된 채팅방으로 직접 이동
+            onHomeClick = { appNavController.popToHome() },
+            onChatClick = { appNavController.navigateToChatListFromContract() },
             role = formState.role
         )
     }
@@ -332,7 +359,7 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.ContractEdit.routeWithArg) { backStackEntry ->
         val contractId = backStackEntry.arguments?.getString("contractId") ?: ""
         val viewModel: com.billage.app.ui.contract.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-        
+
         androidx.compose.runtime.LaunchedEffect(contractId) {
             contractId.toIntOrNull()?.let { viewModel.fetchContractDetail(it) }
         }
@@ -348,7 +375,7 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.ContractDetail.routeWithArg) { backStackEntry ->
         val contractId = backStackEntry.arguments?.getString("contractId") ?: ""
         val viewModel: com.billage.app.ui.contract.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-        
+
         androidx.compose.runtime.LaunchedEffect(contractId) {
             contractId.toIntOrNull()?.let { viewModel.fetchContractDetail(it) }
         }

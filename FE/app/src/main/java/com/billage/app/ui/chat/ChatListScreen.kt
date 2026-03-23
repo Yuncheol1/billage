@@ -62,8 +62,9 @@ fun ChatListScreen(
     viewModel: ChatListViewModel = hiltViewModel(),
     onChatRoomClick: (String, String) -> Unit,
     onHomeClick: () -> Unit,
-    onAddContractClick: () -> Unit,
+    onAddContractClick: (com.billage.app.ui.contract.ContractRole) -> Unit,
     onContractClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState()
 ) {
@@ -201,7 +202,7 @@ fun ChatListScreen(
             bottomBar = {
                 BottomBar(
                     selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.ChatList,
-                    onAddContractClick = onAddContractClick,
+                    onAddContractClick = { onAddContractClick(com.billage.app.ui.contract.ContractRole.CREDITOR) }, // BottomBar는 role을 전달하지 않으므로 기본값(또는 바텀시트 동작) 처리
                     onHomeClick = onHomeClick,
                     onChatClick = {}, // We are already here
                     onContractClick = onContractClick,
@@ -387,7 +388,10 @@ fun ChatListScreen(
                         onContractClick()
                     },
                     onReportMenuClick = { showMenu = false },
-                    onSettingsClick = { showMenu = false },
+                    onSettingsClick = {
+                        showMenu = false
+                        onSettingsClick()
+                    },
                     onSupportClick = { showMenu = false },
                     onTermsClick = { showMenu = false },
                     onPrivacyClick = { showMenu = false },
