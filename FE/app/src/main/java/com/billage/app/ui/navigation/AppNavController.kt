@@ -50,6 +50,16 @@ sealed interface AppDestination {
         override val route: String = "contract_special_terms"
         const val routeWithArg = "contract_special_terms/{contractSeq}"
     }
+
+    data object ContractEdit : AppDestination {
+        override val route: String = "contract_edit"
+        const val routeWithArg = "contract_edit/{contractId}"
+    }
+
+    data object ContractDetail : AppDestination {
+        override val route: String = "contract_detail"
+        const val routeWithArg = "contract_detail/{contractId}"
+    }
 }
 
 class AppNavController(
@@ -184,6 +194,18 @@ class AppNavController(
 
     fun navigateToContractComplete() {
         navController.navigate(AppDestination.ContractComplete.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToContractEdit(contractId: String) {
+        navController.navigate("${AppDestination.ContractEdit.route}/$contractId") {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToContractDetail(contractId: String) {
+        navController.navigate("${AppDestination.ContractDetail.route}/$contractId") {
             launchSingleTop = true
         }
     }

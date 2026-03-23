@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.billage.app.ui.chat.models.ActionStatus
+import com.billage.app.ui.chat.models.AiProposalMessage
 import com.billage.app.ui.chat.models.ConditionProposalMessage
 import com.billage.app.ui.chat.models.ContractCompleteMessage
 import com.billage.app.ui.chat.models.DraftRequestMessage
@@ -531,10 +533,134 @@ fun ProposalRequestCard(
     }
 }
 
+@Composable
+fun AiProposalCard(
+    message: AiProposalMessage,
+    onViewDetailsClick: () -> Unit
+) {
+    BaseChatCard(sender = message.sender) {
+        Column(modifier = androidx.compose.ui.Modifier.width(260.dp)) {
+            // 헤더
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = androidx.compose.ui.Modifier.padding(vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = BillagePrimary,
+                    modifier = androidx.compose.ui.Modifier.size(18.dp)
+                )
+                Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                Text(
+                    text = "\uD83E\uDD16 AI 수정 제안 도착",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BillageTextPrimary
+                )
+            }
+            
+            Spacer(modifier = androidx.compose.ui.Modifier.height(8.dp))
+            
+            // 요약 정보 (미리보기 영역 강화)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = BillageSurface),
+                shape = RoundedCornerShape(12.dp),
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = androidx.compose.ui.Modifier.padding(16.dp)) {
+                    Text(
+                        text = message.contractTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BillageTextPrimary
+                    )
+                    
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = androidx.compose.ui.Modifier.padding(vertical = 12.dp),
+                        color = BillageDivider.copy(alpha = 0.5f)
+                    )
+                    
+                    if (message.originalInterestRate != null && message.proposedInterestRate != null) {
+                        Text(
+                            text = "이자율 조정됨",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BillageTextSecondary,
+                            modifier = androidx.compose.ui.Modifier.padding(bottom = 4.dp)
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "%.2f%%".format(message.originalInterestRate),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = BillageTextSecondary,
+                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                            )
+                            Text(
+                                text = " → ",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = BillagePrimary
+                            )
+                            Text(
+                                text = "%.2f%%".format(message.proposedInterestRate),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = BillagePrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    if (message.modifications.isNotEmpty()) {
+                        Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
+                        message.modifications.forEach { mod ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = androidx.compose.ui.Modifier
+                                        .size(4.dp)
+                                        .background(BillagePrimary, androidx.compose.foundation.shape.CircleShape)
+                                )
+                                Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                                Text(
+                                    text = mod,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = BillageTextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
+            
+            // 자세히보기 버튼
+            androidx.compose.material3.Button(
+                onClick = onViewDetailsClick,
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = androidx.compose.ui.Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                    Text(
+                        text = "제안서 자세히 보기",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
 
-// ==========================================
-// 도메인 맞춤 카드 프리뷰
-// ==========================================
+
 @Preview(showBackground = true, name = "1. 초안 카드 (작업 대기)")
 @Composable
 fun PreviewDraftRequest_Pending() {
