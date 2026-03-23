@@ -1,7 +1,7 @@
 import os
-# 멀티스레드 데드락(무한 대기) 방지 환경 변수를 파일 최상단에 강제 주입 (Phase 1 실측용으로 임시 비활성화)
-# os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# os.environ["OMP_NUM_THREADS"] = "1"
+# 멀티스레드 데드락(무한 대기) 방지 환경 변수를 파일 최상단에 강제 주입
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os

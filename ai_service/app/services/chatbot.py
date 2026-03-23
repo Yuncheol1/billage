@@ -56,13 +56,12 @@ class ChatbotService:
         """
         query_vector = None
         try:
-            # RAG 엔진의 임베딩 모델을 사용하여 질문 벡터화 (Phase 1 실측용으로 임시 비활성화)
-            # query_vector = self.rag_engine.embedding_model.embed_query(message)
-            # cached_reply = await cache_manager.get_cache(query_vector)
-            # 
-            # if cached_reply:
-            #     return cached_reply
-            pass
+            # RAG 엔진의 임베딩 모델을 사용하여 질문 벡터화
+            query_vector = self.rag_engine.embedding_model.embed_query(message)
+            cached_reply = await cache_manager.get_cache(query_vector)
+            
+            if cached_reply:
+                return cached_reply
         except Exception as e:
             logger.warning(f"⚠️ 시맨틱 캐시 조회 중 오류 (무시하고 진행): {str(e)}")
 
@@ -82,11 +81,11 @@ class ChatbotService:
             system_instruction=LEGAL_SYSTEM_PROMPT
         )
         
-        # 4. 결과 캐시에 저장 (Phase 1 실측용으로 임시 비활성화)
-        # if query_vector:
-        #     try:
-        #         await cache_manager.set_cache(query_vector, message, ai_reply)
-        #     except Exception as e:
-        #         logger.warning(f"⚠️ 시맨틱 캐시 저장 중 오류: {str(e)}")
+        # 4. 결과 캐시에 저장
+        if query_vector:
+            try:
+                await cache_manager.set_cache(query_vector, message, ai_reply)
+            except Exception as e:
+                logger.warning(f"⚠️ 시맨틱 캐시 저장 중 오류: {str(e)}")
             
         return ai_reply

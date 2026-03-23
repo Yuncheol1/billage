@@ -1,4 +1,4 @@
-from locust import HttpUser, task, between, events
+from locust import HttpUser, task, between, constant, events
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -22,11 +22,11 @@ class AIServiceUser(HttpUser):
     # 기본 호스트 설정 (tests/.env 또는 기본값)
     host = os.getenv("TEST_BASE_URL", "http://3.35.206.231:8000")
     
-    # 테스트 속도를 높이기 위해 대기 시간을 1~3초로 단축합니다.
-    wait_time = between(1, 3)
+    # 쉴 틈 없이 맹공격하도록 대기 시간을 0초로 설정
+    wait_time = constant(0)
     
-    # 자동 종료를 위한 설정 (환경 변수 또는 기본값)
-    max_requests = int(os.getenv("TEST_MAX_REQUESTS", "50"))
+    # 자동 종료를 위한 설정 (옵션 또는 인당 8회 고정)
+    max_requests = 8
     request_count = 0
 
     def on_start(self):
