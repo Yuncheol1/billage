@@ -3,6 +3,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 컨테이너 시간을 한국 시간(KST)으로 고정합니다.
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # 의존성 먼저 복사 (캐시 활용)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
