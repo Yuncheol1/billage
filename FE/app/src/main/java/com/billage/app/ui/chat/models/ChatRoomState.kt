@@ -1,5 +1,7 @@
 package com.billage.app.ui.chat.models
 
+import com.billage.app.data.remote.api.ContractDetailResponse
+
 /**
  * 채팅방의 현재 대화 모드를 정의합니다.
  */
@@ -8,13 +10,10 @@ enum class ChatRoomMode {
     CONTRACT    // 타겟 차용증 협의 모드
 }
 
-/**
- * 바텀 시트에서 선택할 수 있는 차용증 목록 요소입니다.
- */
 data class ContractSummary(
+    val contractSeq: Int,
     val contractId: String,
-    val title: String,
-    val targetUserName: String // 대상자 이름 (예: "김철수")
+    val counterpartyName: String
 )
 
 /**
@@ -24,5 +23,7 @@ data class ChatRoomState(
     val roomId: String = "",
     val roomName: String = "대화방",
     val mode: ChatRoomMode = ChatRoomMode.NORMAL,
-    val selectedContract: ContractSummary? = null
+    val selectedContract: ContractSummary? = null,
+    val draftProposal: String? = null,
+    val draftContractDetail: ContractDetailResponse? = null
 )

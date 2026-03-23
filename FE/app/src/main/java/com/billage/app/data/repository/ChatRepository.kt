@@ -80,7 +80,7 @@ class ChatRepository @Inject constructor(
         _session.value = null
     }
 
-    fun sendMessage(roomId: String, senderSeq: Int, content: String) {
+    fun sendMessage(roomId: String, senderSeq: Int, content: String, isContractMsg: Boolean = false, msgType: String = "TEXT") {
         val currentSession = _session.value
         if (currentSession == null) {
             Log.e(TAG, "Cannot send message: session is null. Attempting to reconnect...")
@@ -94,11 +94,12 @@ class ChatRepository @Inject constructor(
                     roomId = roomId,
                     senderSeq = senderSeq,
                     content = content,
-                    isContractMsg = false
+                    isContractMsg = isContractMsg,
+                    msgType = msgType
                 )
                 val jsonPayload = Json.encodeToString(req)
                 currentSession.sendText("/pub/chat/message", jsonPayload)
-                Log.d(TAG, "Message sent to $roomId: $content")
+                Log.d(TAG, "Message sent[$msgType] to $roomId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
                 clearSession()
