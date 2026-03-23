@@ -64,7 +64,7 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
@@ -91,7 +91,7 @@ fun NavGraphBuilder.appNavGraph(
         com.billage.app.ui.chat.ChatListScreen(
             onChatRoomClick = { roomId, opponentName -> appNavController.navigateToChatRoom(roomId, opponentName) },
             onHomeClick = { appNavController.navigateToHome() },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onContractClick = { appNavController.navigateToMypage() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
@@ -275,7 +275,7 @@ fun NavGraphBuilder.appNavGraph(
         ContractCompleteScreen(
             formState = formState,
             onHomeClick = { appNavController.popToHome() },
-            onChatClick = { appNavController.navigateToChatList() },
+            onChatClick = { appNavController.navigateToChatListFromContract() },
             role = formState.role
         )
     }

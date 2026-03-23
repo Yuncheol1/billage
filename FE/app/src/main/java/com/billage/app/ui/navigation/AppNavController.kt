@@ -78,8 +78,10 @@ class AppNavController(
                     inclusive = true
                 }
             } else {
+                // BottomBar에서 Home 이동 시, 그래프의 원래 시작점(보통 Home)까지 스택 정리
                 popUpTo(AppDestination.Home.route) {
-                    saveState = true
+                    saveState = false
+                    inclusive = false
                 }
             }
             launchSingleTop = true
@@ -103,6 +105,22 @@ class AppNavController(
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    /**
+     * ContractComplete → ChatList 전용.
+     * 일반 navigateToChatList()는 saveState=true로 계약 플로우 상태를 저장하는데,
+     * 이후 홈 버튼 클릭 시 restoreState=true가 계약 플로우를 복원해
+     * contractComplete로 돌아가는 문제가 생김.
+     * saveState=false로 계약 플로우 상태를 저장하지 않아 해결.
+     */
+    fun navigateToChatListFromContract() {
+        navController.navigate(AppDestination.ChatList.route) {
+            popUpTo(AppDestination.Home.route) {
+                saveState = false  // 계약 플로우 상태 저장 안 함 → 홈 버튼 시 복원 방지
+            }
+            launchSingleTop = true
         }
     }
 
