@@ -38,6 +38,10 @@ sealed interface AppDestination {
         override val route: String = "mypage"
     }
 
+    data object Settings : AppDestination {
+        override val route: String = "settings"
+    }
+
     data object ContractComplete : AppDestination {
         override val route: String = "contract_complete"
     }
@@ -128,6 +132,12 @@ class AppNavController(
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    fun navigateToSettings() {
+        navController.navigate(AppDestination.Settings.route) {
+            launchSingleTop = true
         }
     }
 

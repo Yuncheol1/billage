@@ -50,6 +50,7 @@ fun HomeScreen(
     onScheduleAllClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onMypageClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: HomeViewModel = viewModel()
@@ -224,7 +225,10 @@ fun HomeScreen(
                         showMenu = false
                         onMypageClick()
                     },
-                    onSettingsClick = { showMenu = false },
+                    onSettingsClick = {
+                        showMenu = false
+                        onSettingsClick()
+                    },
                     onSupportClick = { showMenu = false },
                     onTermsClick = { showMenu = false },
                     onPrivacyClick = { showMenu = false },

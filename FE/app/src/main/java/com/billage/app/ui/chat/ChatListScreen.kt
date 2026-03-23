@@ -64,6 +64,7 @@ fun ChatListScreen(
     onHomeClick: () -> Unit,
     onAddContractClick: () -> Unit,
     onContractClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState()
 ) {
@@ -387,7 +388,10 @@ fun ChatListScreen(
                         onContractClick()
                     },
                     onReportMenuClick = { showMenu = false },
-                    onSettingsClick = { showMenu = false },
+                    onSettingsClick = {
+                        showMenu = false
+                        onSettingsClick()
+                    },
                     onSupportClick = { showMenu = false },
                     onTermsClick = { showMenu = false },
                     onPrivacyClick = { showMenu = false },

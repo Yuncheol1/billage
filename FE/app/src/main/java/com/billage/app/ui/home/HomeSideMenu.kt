@@ -223,6 +223,7 @@ fun HomeSideMenu(
             OutlinedButton(
                 onClick = onLogoutClick,
                 enabled = !isLoggingOut,
+                border = null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 20.dp),
