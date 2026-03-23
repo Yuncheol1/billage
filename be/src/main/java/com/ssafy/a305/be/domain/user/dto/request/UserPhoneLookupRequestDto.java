@@ -6,8 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 public record UserPhoneLookupRequestDto(
         @NotBlank(message = "phone is required.")
         String phone,
-        @JsonProperty("real_name")
-        @NotBlank(message = "real_name is required.")
+        @NotBlank(message = "realName is required.")
         String realName
 ) {
 }
