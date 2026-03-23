@@ -7,6 +7,10 @@ WORKDIR /app
 ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
+# HuggingFace 및 PyTorch 멀티스레드 데드락 방지 옵션 (Phase 1 실측용으로 임시 비활성화)
+# ENV TOKENIZERS_PARALLELISM=false
+# ENV OMP_NUM_THREADS=1
+
 # 의존성 먼저 복사 (캐시 활용)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
