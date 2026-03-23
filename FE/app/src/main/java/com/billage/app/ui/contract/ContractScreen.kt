@@ -69,14 +69,17 @@ fun ContractScreen(
     }
     val searchState by viewModel.searchState.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.resetForm(role) }
+    // role이 바뀌거나 화면이 처음 진입할 때 항상 폼을 초기화
+    LaunchedEffect(role) { viewModel.resetForm(role) }
 
     // submitState 관찰 — 성공하면 contractSeq를 들고 다음 화면으로 이동
     LaunchedEffect(submitState) {
         if (submitState is ContractSubmitState.Success) {
             val success = submitState as ContractSubmitState.Success
-            onContractComplete(success.contractSeq)
+            // 재진입 시 Success 상태로 LaunchedEffect가 재실행되는 것을 방지하기 위해
+            // 화면 이동 전에 먼저 상태를 초기화
             viewModel.resetSubmitState()
+            onContractComplete(success.contractSeq)
         }
     }
 

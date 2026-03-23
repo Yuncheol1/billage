@@ -89,9 +89,10 @@ class AppNavController(
 
     fun navigateToContract(role: ContractRole = ContractRole.CREDITOR) {
         navController.navigate("${AppDestination.Contract.route}/${role.name}") {
-            popUpTo(AppDestination.Home.route) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
+            // 이전 계약 과정(contractComplete, specialTerms 포함)이 백스택에 남지 않도록
+            // saveState=false, restoreState 제거 → 항상 새 계약 1단계부터 시작
+            popUpTo(AppDestination.Home.route) { saveState = false }
+            launchSingleTop = false
         }
     }
 
@@ -132,6 +133,25 @@ class AppNavController(
 
     fun popBackStack() {
         navController.popBackStack()
+    }
+
+    /**
+     * ContractComplete → Home 전용.
+     * navigate() 기반 navigateToHome()은 launchSingleTop + saveState/restoreState 조합으로
+     * ContractComplete처럼 깊은 백스택에서는 no-op이 되는 경우가 있어
+     * popBackStack()으로 직접 되감는 방식을 사용.
+     */
+    fun popToHome() {
+        val popped = navController.popBackStack(
+            route = AppDestination.Home.route,
+            inclusive = false
+        )
+        if (!popped) {
+            // Home이 백스택에 없는 예외 상황 → 강제로 Home 이동
+            navController.navigate(AppDestination.Home.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
     }
 
     fun navigateToContractComplete() {

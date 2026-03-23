@@ -257,7 +257,7 @@ fun NavGraphBuilder.appNavGraph(
 
         ContractCompleteScreen(
             formState = formState,
-            onHomeClick = { appNavController.navigateToHome() },
+            onHomeClick = { appNavController.popToHome() },
             onChatClick = { appNavController.navigateToChatList() },
             role = formState.role
         )
