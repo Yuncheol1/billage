@@ -24,6 +24,9 @@ public class User {
     @Column(name = "phone", unique = true)
     private String phone;
 
+    @Column(name = "ssafy_user_key", unique = true, length = 100)
+    private String ssafyUserKey;
+
     /** PENDING / ACTIVE / DELETED / BLOCKED */
     @Column(name = "state")
     private String state;
@@ -52,6 +55,11 @@ public class User {
 
     public void updatePhone(String phone) {
         this.phone = phone;
+        this.updatedDttm = LocalDateTime.now();
+    }
+
+    public void updateSsafyUserKey(String ssafyUserKey) {
+        this.ssafyUserKey = ssafyUserKey;
         this.updatedDttm = LocalDateTime.now();
     }
 

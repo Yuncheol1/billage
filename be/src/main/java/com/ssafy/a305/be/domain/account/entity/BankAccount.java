@@ -21,23 +21,24 @@ public class BankAccount {
     private Integer accountSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_seq", nullable = false)
+    @JoinColumn(name = "user_seq", nullable = true)
     private User user;
 
-    @Column(name = "provider")
+    /** External account provider (e.g. SSAFY) */
+    @Column(name = "provider", nullable = false, length = 30)
     private String provider;
 
-    @Column(name = "bank_code")
-    private String bankCode;
+    /** Product unique number used for account opening request */
+    @Column(name = "account_type_unique_no", nullable = false, length = 40)
+    private String accountTypeUniqueNo;
 
-    @Column(name = "account_number_masked")
-    private String accountNumberMasked;
+    /** Provider account identifier */
+    @Column(name = "account_no", nullable = false, unique = true, length = 64)
+    private String accountNo;
 
-    @Column(name = "account_token")
-    private String accountToken;
-
-    @Column(name = "account_holder_name")
-    private String accountHolderName;
+    /** Masked account number for UI display */
+    @Column(name = "account_no_masked", length = 64)
+    private String accountNoMasked;
 
     @Column(name = "is_primary")
     private Boolean isPrimary;
@@ -45,7 +46,10 @@ public class BankAccount {
     @Column(name = "linked_dttm")
     private LocalDateTime linkedDttm;
 
+    @Column(name = "closed_dttm")
+    private LocalDateTime closedDttm;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", nullable = false, length = 20)
     private BankAccountStatus status;
 }
