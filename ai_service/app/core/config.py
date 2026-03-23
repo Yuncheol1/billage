@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     CHROMA_DB_DIR: str = "./chroma_db"
     
     # Redis 설정 (Semantic Cache 전용)
-    REDIS_HOST: str = "redis-cache" # Docker Network 내부 DNS (컨테이너 이름)
+    REDIS_HOST: str = "billage-redis" # Docker Link를 통한 내부망 통신 호스트명
     REDIS_PORT: int = 6379
     REDIS_DB: int = 1
     SEMANTIC_CACHE_THRESHOLD: float = 0.95  # 유사도 임계값
