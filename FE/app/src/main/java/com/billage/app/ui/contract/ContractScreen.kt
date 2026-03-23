@@ -59,7 +59,7 @@ fun ContractScreen(
     onNavigateBack: () -> Unit,
     onContractComplete: (contractSeq: Int) -> Unit, // ← contractSeq 전달받도록 변경
     role: ContractRole = ContractRole.CREDITOR,
-    viewModel: ContractViewModel = hiltViewModel() // ← viewModel() → hiltViewModel()
+    viewModel: ContractViewModel = hiltViewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val formState by viewModel.formState.collectAsState()
@@ -67,8 +67,9 @@ fun ContractScreen(
     val isNextEnabled by remember(currentStep, formState) {
         derivedStateOf { viewModel.isNextEnabled() }
     }
+    val searchState by viewModel.searchState.collectAsState()
 
-    LaunchedEffect(role) { viewModel.updateRole(role) }
+    LaunchedEffect(Unit) { viewModel.resetForm(role) }
 
     // submitState 관찰 — 성공하면 contractSeq를 들고 다음 화면으로 이동
     LaunchedEffect(submitState) {
@@ -130,18 +131,12 @@ fun ContractScreen(
             ) { step ->
                 when (step) {
                     1 -> Step6DebtorScreen(
-                        name = formState.debtorName,
-                        onNameChange = { viewModel.updateDebtorName(it) },
+                        realName = formState.debtorName,
+                        onRealNameChange = { viewModel.updateDebtorName(it) },
                         phone = formState.debtorPhone,
                         onPhoneChange = { viewModel.updateDebtorPhone(it) },
-                        selectedUserSeq = formState.debtorUserSeq,
-                        onUserSelect = { userSeq: Int, name: String, phone: String ->
-                            if (userSeq == -1) {
-                                viewModel.updateDebtorPhone(phone)
-                            } else {
-                                viewModel.updateDebtorUser(userSeq, name, phone)
-                            }
-                        },
+                        searchState = searchState,
+                        onSearch = { viewModel.searchUser() },
                         role = formState.role
                     )
                     2 -> Step1FamilyScreen(

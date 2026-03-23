@@ -238,7 +238,8 @@ fun NavGraphBuilder.appNavGraph(
 
         ContractSpecialTermsScreen(
             onSkip = { appNavController.navigateToContractComplete() },
-            onComplete = { appNavController.navigateToContractComplete() }
+            onComplete = { appNavController.navigateToContractComplete() },
+            viewModel = hiltViewModel()  // ← hiltViewModel()로 교체
         )
     }
 

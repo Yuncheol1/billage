@@ -27,7 +27,7 @@ interface ContractApi {
 // ─────────────────────────────────────────
 @Serializable
 data class CreateContractRequest(
-    val family: String,              // "FAMILY" 또는 "NOT_FAMILY"
+    val family: Boolean,              // "FAMILY" 또는 "NOT_FAMILY"
     val creditorUserSeq: Int,        // 채권자(빌려주는 사람) PK
     val debtorUserSeq: Int,          // 채무자(빌리는 사람) PK
     val principalAmount: Long,       // 원금 (0보다 커야 함)

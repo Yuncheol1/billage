@@ -23,14 +23,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.billage.app.ui.theme.*
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun ContractSpecialTermsScreen(
-    onSkip: () -> Unit,      // 건너뛰기 → ContractCompleteScreen
-    onComplete: () -> Unit,  // 완료하기 → ContractCompleteScreen (이미 저장 완료된 상태)
-    viewModel: ContractSpecialTermsViewModel = viewModel()
+    onSkip: () -> Unit,
+    onComplete: () -> Unit,
+    viewModel: ContractSpecialTermsViewModel = hiltViewModel()  // ← 교체
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
