@@ -4,9 +4,9 @@ import android.content.Context
 import com.billage.app.BuildConfig
 import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.data.remote.api.ChatApi
+import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.UserApi
 import com.billage.app.data.remote.api.NotificationApi
-import com.billage.app.data.remote.api.ContractApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

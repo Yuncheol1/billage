@@ -17,12 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +34,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.contract.ContractRole
+import com.billage.app.ui.contract.UserSearchState
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
@@ -47,19 +45,11 @@ import com.billage.app.ui.theme.BillageSurface
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.theme.BillageWarningBackground
-
-// 검색 결과 더미 데이터 모델
-data class UserSearchResult(
-    val userSeq: Int,
-    val name: String,
-    val phone: String
-)
-
-private fun isValidPhone(phone: String): Boolean {
-    return phone.matches(Regex("^010\\d{8}$"))
-}
+import com.billage.app.ui.theme.KakaoYellow
+import com.billage.app.ui.theme.KakaoTextBrown
 
 // 숫자만 저장하고 화면에만 하이픈을 표시하는 VisualTransformation
+// (예: "01012345678" 저장 → 화면에 "010-1234-5678"으로 보여줌)
 private object PhoneVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val digits = text.text
@@ -86,33 +76,20 @@ private object PhoneVisualTransformation : VisualTransformation {
     }
 }
 
-// TODO: BE API 연동 — 전화번호로 회원 검색
-// GET /api/users/search?phone={phone}
-// 현재는 더미 데이터로 동작
-private fun searchUserByPhone(phone: String): List<UserSearchResult> {
-    val dummyUsers = listOf(
-        UserSearchResult(1, "홍길동", "01012345678"),
-        UserSearchResult(2, "김철수", "01087654321"),
-        UserSearchResult(3, "이영희", "01011112222"),
-    )
-    return dummyUsers.filter { it.phone.contains(phone) }
-}
+private fun isValidPhone(phone: String) = phone.matches(Regex("^010\\d{8}$"))
 
 @Composable
 fun Step6DebtorScreen(
-    name: String,
-    onNameChange: (String) -> Unit,
+    realName: String,
+    onRealNameChange: (String) -> Unit,
     phone: String,
     onPhoneChange: (String) -> Unit,
-    selectedUserSeq: Int?,
-    onUserSelect: (userSeq: Int, name: String, phone: String) -> Unit,
+    searchState: UserSearchState,
+    onSearch: () -> Unit,
     role: ContractRole = ContractRole.CREDITOR
 ) {
-    val isPhoneValid = isValidPhone(phone)
-
-    // UI 전용 상태 — 검색 결과 및 검색 완료 여부
-    var searchResults by remember { mutableStateOf<List<UserSearchResult>?>(null) }
-    var hasSearched by remember { mutableStateOf(false) }
+    val isSearchEnabled = realName.isNotBlank() && isValidPhone(phone)
+            && searchState !is UserSearchState.Loading
 
     Column(
         modifier = Modifier
@@ -120,15 +97,14 @@ fun Step6DebtorScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 32.dp)
     ) {
+        // ── 헤더 ──────────────────────────────────
         Text(
             text = "계약 만들기",
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = BillagePrimary
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
         Text(
             text = if (role == ContractRole.CREDITOR) "누구에게\n빌려주시나요?" else "누구에게\n빌리시나요?",
             fontSize = 26.sp,
@@ -139,16 +115,46 @@ fun Step6DebtorScreen(
 
         Spacer(modifier = Modifier.height(40.dp))
 
+        // ── 이름 입력 ──────────────────────────────
+        Text(
+            text = "상대방 이름",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = BillageTextPrimary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        BasicTextField(
+            value = realName,
+            onValueChange = onRealNameChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(color = BillageBackground, shape = RoundedCornerShape(16.dp))
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            textStyle = TextStyle(
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = BillageTextPrimary
+            ),
+            cursorBrush = SolidColor(BillagePrimary),
+            singleLine = true,
+            decorationBox = { innerTextField ->
+                if (realName.isEmpty()) {
+                    Text(text = "홍길동", fontSize = 18.sp, color = BillageTextSecondary)
+                }
+                innerTextField()
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── 전화번호 입력 + 검색 버튼 ──────────────
         Text(
             text = "전화번호",
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = BillageTextPrimary
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
-        // 전화번호 입력 + 검색 버튼 한 행
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -159,17 +165,10 @@ fun Step6DebtorScreen(
                 onValueChange = { input ->
                     val digits = input.filter { it.isDigit() }.take(11)
                     onPhoneChange(digits)
-                    // 번호 바뀌면 검색 결과 초기화
-                    searchResults = null
-                    hasSearched = false
-                    onUserSelect(-1, "", digits)
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .background(
-                        color = BillageBackground,
-                        shape = RoundedCornerShape(16.dp)
-                    )
+                    .background(color = BillageBackground, shape = RoundedCornerShape(16.dp))
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 textStyle = TextStyle(
                     fontSize = 18.sp,
@@ -182,61 +181,117 @@ fun Step6DebtorScreen(
                 visualTransformation = PhoneVisualTransformation,
                 decorationBox = { innerTextField ->
                     if (phone.isEmpty()) {
-                        Text(
-                            text = "010-0000-0000",
-                            fontSize = 18.sp,
-                            color = BillageTextSecondary
-                        )
+                        Text(text = "010-0000-0000", fontSize = 18.sp, color = BillageTextSecondary)
                     }
                     innerTextField()
                 }
             )
 
-            // 검색 버튼
+            // 검색 버튼 — 이름 + 전화번호 둘 다 입력됐을 때만 활성화
             Box(
                 modifier = Modifier
                     .background(
-                        color = if (isPhoneValid) BillagePrimary else BillageCardBorder,
+                        color = if (isSearchEnabled) BillagePrimary else BillageCardBorder,
                         shape = RoundedCornerShape(16.dp)
                     )
-                    .clickable(enabled = isPhoneValid) {
-                        searchResults = searchUserByPhone(phone)
-                        hasSearched = true
-                    }
+                    .clickable(enabled = isSearchEnabled) { onSearch() }
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "검색",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                if (searchState is UserSearchState.Loading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "검색",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 검색 결과 영역
-        when {
-            // 검색 전
-            !hasSearched -> {
+        // ── 검색 결과 영역 ─────────────────────────
+        when (searchState) {
+
+            // 검색 전 안내
+            is UserSearchState.Idle -> {
                 Text(
-                    text = "전화번호를 입력하고 검색해주세요",
+                    text = "이름과 전화번호를 입력하고 검색해 주세요",
                     fontSize = 13.sp,
                     color = BillageTextSecondary
                 )
             }
 
-            // 검색 결과 없음 — 미가입 안내
-            searchResults.isNullOrEmpty() -> {
+            // 검색 중 (버튼에 이미 로딩 표시)
+            is UserSearchState.Loading -> {}
+
+            // 등록된 사용자 발견
+            is UserSearchState.Found -> {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "이 분이 맞나요?",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = BillageTextPrimary
+                    )
+                    // 검색된 사용자 카드 — 항상 선택된 상태로 표시
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(color = BillagePrimaryLight, shape = RoundedCornerShape(16.dp))
+                            .border(width = 2.dp, color = BillagePrimary, shape = RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 이름 첫 글자 프로필 아이콘
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(color = BillageIconBackground, shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = searchState.name.first().toString(),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BillagePrimary
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = searchState.name,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = BillageTextPrimary
+                            )
+                            // 저장된 숫자를 하이픈 형식으로 표시
+                            Text(
+                                text = searchState.phone.let {
+                                    "${it.substring(0, 3)}-${it.substring(3, 7)}-${it.substring(7)}"
+                                },
+                                fontSize = 13.sp,
+                                color = BillageTextSecondary
+                            )
+                        }
+                        Text(text = "✓", fontSize = 18.sp, color = BillagePrimary)
+                    }
+                }
+            }
+
+            // 미등록 사용자 — 초대 유도
+            is UserSearchState.NotFound -> {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            color = BillageWarningBackground,
-                            shape = RoundedCornerShape(16.dp)
-                        )
+                        .background(color = BillageWarningBackground, shape = RoundedCornerShape(16.dp))
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -247,128 +302,40 @@ fun Step6DebtorScreen(
                         color = BillageTextPrimary
                     )
                     Text(
-                        text = "상대방이 빌리지에 가입해야 계약을 진행할 수 있어요. 초대 링크를 보내보세요!",
+                        text = "상대방이 빌리지에 가입해야 계약을 진행할 수 있어요.\n초대 메시지를 보내보세요!",
                         fontSize = 13.sp,
                         color = BillageTextSecondary,
                         lineHeight = 18.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    // 카카오톡 초대 버튼
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                color = BillagePrimary,
-                                shape = RoundedCornerShape(10.dp)
-                            )
+                            .background(color = KakaoYellow, shape = RoundedCornerShape(10.dp))
                             .clickable {
-                                // TODO: 카카오톡/문자로 초대 링크 전송
+                                // TODO: 카카오톡 초대 링크 전송 구현
                             }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "초대 링크 보내기",
+                            text = "카카오톡으로 초대하기",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    // TODO: 개발용 임시 버튼 — API 연동 후 제거
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = BillageTextSecondary,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            .clickable {
-                                onUserSelect(9999, "개발테스트", "01000000000")
-                            }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "[개발용] 임시로 다음 단계 진행",
-                            fontSize = 13.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium
+                            color = KakaoTextBrown
                         )
                     }
                 }
             }
 
-            // 검색 결과 있음
-            else -> {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "이 분이 맞나요?",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = BillageTextPrimary
-                    )
-
-                    searchResults!!.forEach { user ->
-                        val isSelected = selectedUserSeq == user.userSeq
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = if (isSelected) BillagePrimaryLight else BillageSurface,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .border(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) BillagePrimary else BillageCardBorder,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .clickable {
-                                    onUserSelect(user.userSeq, user.name, user.phone)
-                                }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // 프로필 아이콘
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .background(
-                                        color = BillageIconBackground,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = user.name.first().toString(),
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BillagePrimary
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = user.name,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = BillageTextPrimary
-                                )
-                                Text(
-                                    text = user.phone.let {
-                                        "${it.substring(0, 3)}-${it.substring(3, 7)}-${it.substring(7)}"
-                                    },
-                                    fontSize = 13.sp,
-                                    color = BillageTextSecondary
-                                )
-                            }
-
-                            if (isSelected) {
-                                Text(text = "✓", fontSize = 18.sp, color = BillagePrimary)
-                            }
-                        }
-                    }
-                }
+            // 에러
+            is UserSearchState.Error -> {
+                Text(
+                    text = searchState.message,
+                    fontSize = 13.sp,
+                    color = BillageDanger
+                )
             }
         }
     }

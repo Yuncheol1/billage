@@ -47,7 +47,7 @@ class ChatListViewModel @Inject constructor(
                 .collect { query ->
                     if (query.length >= 2) {
                         try {
-                            _userSearchResults.value = userApi.searchUsers(query)
+                            _userSearchResults.value = userApi.searchUsersByEmail(query)
                                 .filter { it.userSeq != myUserSeq }
                         } catch (e: Exception) {
                             Log.e("ChatListViewModel", "Search failed", e)
