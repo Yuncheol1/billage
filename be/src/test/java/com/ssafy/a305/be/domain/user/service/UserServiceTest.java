@@ -1,10 +1,12 @@
 package com.ssafy.a305.be.domain.user.service;
 
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
+import com.ssafy.a305.be.domain.auth.service.RefreshTokenService;
 import com.ssafy.a305.be.domain.user.dto.response.UserMeResponseDto;
 import com.ssafy.a305.be.domain.user.dto.response.UserPhoneLookupResponseDto;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
+import com.ssafy.a305.be.domain.user.repository.SocialAuthRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
@@ -37,6 +39,12 @@ class UserServiceTest {
 
     @Mock
     private ContractRepository contractRepository;
+
+    @Mock
+    private SocialAuthRepository socialAuthRepository;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @InjectMocks
     private UserService userService;
@@ -97,8 +105,12 @@ class UserServiceTest {
         userService.withdraw(1);
 
         assertEquals("DELETED", user.getState());
+        assertTrue(user.getEmail().matches("example@example\\.com_del\\d{17}"));
+        assertTrue(user.getPhone().matches("01012345678_del\\d{17}"));
         assertNotNull(user.getDeletedDttm());
         verify(contractRepository).existsByUserSeqAndStatuses(1, BLOCKING_CONTRACT_STATUSES);
+        verify(refreshTokenService).delete(1);
+        verify(socialAuthRepository).deleteByUserUserSeq(1);
     }
 
     @Test

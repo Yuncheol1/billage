@@ -1,6 +1,8 @@
 package com.ssafy.a305.be.domain.user.service;
 
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
+import com.ssafy.a305.be.domain.auth.service.RefreshTokenService;
+import com.ssafy.a305.be.domain.user.repository.SocialAuthRepository;
 import com.ssafy.a305.be.domain.user.dto.response.UserMeResponseDto;
 import com.ssafy.a305.be.domain.user.dto.response.UserPhoneLookupResponseDto;
 import com.ssafy.a305.be.domain.user.dto.response.UserSearchResponseDto;
@@ -27,6 +29,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final ContractRepository contractRepository;
+    private final SocialAuthRepository socialAuthRepository;
+    private final RefreshTokenService refreshTokenService;
 
     public UserMeResponseDto getMyInfo(Integer userSeq) {
         User user = userRepository.findById(userSeq)
@@ -49,6 +53,8 @@ public class UserService {
             throw new CustomBusinessException(ErrorCode.ACTIVE_CONTRACT_EXISTS);
         }
 
+        refreshTokenService.delete(userSeq);
+        socialAuthRepository.deleteByUserUserSeq(userSeq);
         user.markDeleted();
     }
 
