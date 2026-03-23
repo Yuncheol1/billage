@@ -41,7 +41,8 @@ pipeline {
                     string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
                     string(credentialsId: 'kakao-client-id', variable: 'KAKAO_CLIENT_ID'),
                     string(credentialsId: 'kakao-client-secret', variable: 'KAKAO_CLIENT_SECRET'),
-                    string(credentialsId: 'jpa-ddl-auto', variable: 'JPA_DDL_AUTO')
+                    string(credentialsId: 'jpa-ddl-auto', variable: 'JPA_DDL_AUTO'),
+                    string(credentialsId: 'ssafy-api-key', variable: 'SSAFY_API_KEY')
                 ]) {
                     sh '''
                         docker stop billage-be || true
@@ -61,6 +62,7 @@ pipeline {
                             -e KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID \
                             -e KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET \
                             -e JPA_DDL_AUTO=$JPA_DDL_AUTO \
+                            -e SSAFY_API_KEY=$SSAFY_API_KEY \
                             billage-be
                         docker image prune -f
                     '''
