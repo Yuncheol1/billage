@@ -75,6 +75,7 @@ fun MypageScreen(
     onNotificationClick: () -> Unit = {},
     onAddContractClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState()
 ) {
@@ -203,7 +204,10 @@ fun MypageScreen(
                     onProfileClick = { showMenu = false },
                     onContractMenuClick = { showMenu = false },
                     onReportMenuClick = { showMenu = false },
-                    onSettingsClick = { showMenu = false },
+                    onSettingsClick = {
+                        showMenu = false
+                        onSettingsClick()
+                    },
                     onSupportClick = { showMenu = false },
                     onTermsClick = { showMenu = false },
                     onPrivacyClick = { showMenu = false },

@@ -30,6 +30,7 @@ import com.billage.app.ui.contract.ContractCompleteScreen
 import com.billage.app.ui.contract.ContractRole
 import com.billage.app.ui.contract.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.ContractViewModel
+import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
@@ -68,6 +69,7 @@ fun NavGraphBuilder.appNavGraph(
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
             onMypageClick = { appNavController.navigateToMypage() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
@@ -93,6 +95,7 @@ fun NavGraphBuilder.appNavGraph(
             onHomeClick = { appNavController.navigateToHome() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onContractClick = { appNavController.navigateToMypage() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
@@ -243,12 +246,20 @@ fun NavGraphBuilder.appNavGraph(
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
+            onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
         )
     }
 
     // ← 특약 추가 화면 (ContractComplete 바로 위에 위치)
+    composable(route = AppDestination.Settings.route) {
+        WithdrawalSettingsScreen(
+            onBackClick = { appNavController.popBackStack() },
+            onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) }
+        )
+    }
+
     composable(route = AppDestination.ContractSpecialTerms.routeWithArg) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")
             ?.toIntOrNull() ?: -1
