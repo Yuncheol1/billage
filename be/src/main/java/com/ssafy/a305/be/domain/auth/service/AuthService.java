@@ -5,11 +5,13 @@ import com.ssafy.a305.be.domain.auth.client.dto.KakaoTokenResponse;
 import com.ssafy.a305.be.domain.auth.client.dto.KakaoUserInfoResponse;
 import com.ssafy.a305.be.domain.auth.config.JwtProperties;
 import com.ssafy.a305.be.domain.auth.dto.request.ConsentCompletionRequestDto;
+import com.ssafy.a305.be.domain.auth.dto.request.DevTokenIssueRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.KakaoLoginRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.LogoutRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.TokenReissueRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.response.ConsentCompletionResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.ConsentListResponseDto;
+import com.ssafy.a305.be.domain.auth.dto.response.DevTokenIssueResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.KakaoLoginResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.TokenReissueResponseDto;
 import com.ssafy.a305.be.domain.enums.TermsType;
@@ -115,6 +117,28 @@ public class AuthService {
         return TokenReissueResponseDto.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
+                .accessTokenExpiresIn(jwtProperties.getAccessTokenExpirationSeconds())
+                .refreshTokenExpiresIn(jwtProperties.getRefreshTokenExpirationSeconds())
+                .userState(user.getState())
+                .build();
+    }
+
+    @Transactional
+    public DevTokenIssueResponseDto issueDevToken(Integer userSeq) {
+        User user = userRepository.findById(userSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.USER_NOT_FOUND));
+
+        validateLoginAllowed(user);
+
+        String accessToken = jwtTokenProvider.createAccessToken(userSeq);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userSeq);
+        refreshTokenService.save(userSeq, refreshToken, jwtProperties.getRefreshTokenExpirationSeconds());
+
+        return DevTokenIssueResponseDto.builder()
+                .userSeq(user.getUserSeq())
+                .email(user.getEmail())
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .accessTokenExpiresIn(jwtProperties.getAccessTokenExpirationSeconds())
                 .refreshTokenExpiresIn(jwtProperties.getRefreshTokenExpirationSeconds())
                 .userState(user.getState())

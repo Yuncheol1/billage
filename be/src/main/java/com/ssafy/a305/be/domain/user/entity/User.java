@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "users")
@@ -12,6 +13,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class User {
+
+    private static final DateTimeFormatter DELETED_VALUE_TIMESTAMP_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,8 +68,18 @@ public class User {
     }
 
     public void markDeleted() {
+        LocalDateTime deletedAt = LocalDateTime.now();
         this.state = "DELETED";
-        this.deletedDttm = LocalDateTime.now();
-        this.updatedDttm = this.deletedDttm;
+        this.email = appendDeletionSuffix(this.email, deletedAt);
+        this.phone = appendDeletionSuffix(this.phone, deletedAt);
+        this.deletedDttm = deletedAt;
+        this.updatedDttm = deletedAt;
+    }
+
+    private String appendDeletionSuffix(String value, LocalDateTime deletedAt) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value + "_del" + deletedAt.format(DELETED_VALUE_TIMESTAMP_FORMATTER);
     }
 }

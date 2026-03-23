@@ -2,11 +2,13 @@ package com.ssafy.a305.be.domain.auth.controller;
 
 import com.ssafy.a305.be.domain.auth.config.KakaoOAuthProperties;
 import com.ssafy.a305.be.domain.auth.dto.request.ConsentCompletionRequestDto;
+import com.ssafy.a305.be.domain.auth.dto.request.DevTokenIssueRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.KakaoLoginRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.LogoutRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.request.TokenReissueRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.response.ConsentCompletionResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.ConsentListResponseDto;
+import com.ssafy.a305.be.domain.auth.dto.response.DevTokenIssueResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.KakaoLoginResponseDto;
 import com.ssafy.a305.be.domain.auth.dto.response.TokenReissueResponseDto;
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
@@ -112,6 +114,15 @@ public class AuthController {
         return ResponseEntity.ok(successResponse("Token reissued", responseDto));
     }
 
+    @PostMapping("/dev-token")
+    public ResponseEntity<Map<String, Object>> issueDevToken(
+            @Valid @RequestBody DevTokenIssueRequestDto requestDto,
+            HttpServletRequest request) {
+        validateLocalRequest(request);
+        DevTokenIssueResponseDto responseDto = authService.issueDevToken(requestDto.userSeq());
+        return ResponseEntity.ok(successResponse("Dev token issued", responseDto));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(@Valid @RequestBody LogoutRequestDto requestDto) {
         authService.logout(requestDto);
@@ -141,6 +152,15 @@ public class AuthController {
     private void validateKakaoClientId() {
         if (kakaoOAuthProperties.getClientId() == null || kakaoOAuthProperties.getClientId().isBlank()) {
             throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "KAKAO_CLIENT_ID is required.");
+        }
+    }
+
+    private void validateLocalRequest(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        if (!"127.0.0.1".equals(remoteAddr)
+                && !"0:0:0:0:0:0:0:1".equals(remoteAddr)
+                && !"::1".equals(remoteAddr)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "개발용 토큰 발급 API는 로컬 환경에서만 사용할 수 있습니다.");
         }
     }
 
