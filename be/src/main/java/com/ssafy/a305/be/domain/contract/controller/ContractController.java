@@ -56,11 +56,13 @@ public class ContractController {
 
     @PatchMapping("/{contractSeq}/clauses/{clauseSeq}")
     public ResponseEntity<Map<String, Object>> updateClause(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
             @PathVariable Integer contractSeq,
             @PathVariable Integer clauseSeq,
             @Valid @RequestBody ClauseRequestDto requestDto) {
 
-        contractService.updateClause(contractSeq, clauseSeq, requestDto, tempUserSeq);
+        Integer userSeq = authUser.userSeq();
+        contractService.updateClause(contractSeq, clauseSeq, requestDto, userSeq);
 
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),
