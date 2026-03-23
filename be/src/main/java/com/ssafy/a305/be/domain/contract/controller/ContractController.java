@@ -2,10 +2,14 @@ package com.ssafy.a305.be.domain.contract.controller;
 
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.request.ContractSignatureRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.ContractSignatureResponseDto;
 import com.ssafy.a305.be.domain.contract.service.ContractService;
+import com.ssafy.a305.be.domain.contract.service.ContractSignatureService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import java.util.List;
@@ -25,6 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ContractController {
     private final ContractService contractService;
+    private final ContractSignatureService contractSignatureService;
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> createContractDraft(
@@ -106,6 +111,42 @@ public class ContractController {
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),
                 "message", "계약이 성공적으로 삭제되었습니다."));
+    }
+
+    @PostMapping("/{contractSeq}/signatures")
+    public ResponseEntity<Map<String, Object>> submitSignature(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq,
+            @Valid @RequestBody ContractSignatureRequestDto requestDto,
+            HttpServletRequest request) {
+        Integer userSeq = authUser.userSeq();
+        String clientIp = extractClientIp(request);
+        ContractSignatureResponseDto responseDto =
+                contractSignatureService.submitSignature(contractSeq, userSeq, requestDto, clientIp);
+
+        String message = responseDto.isContractFullySigned()
+                ? "양측 서명이 완료되어 계약이 체결되었습니다."
+                : "서명이 완료되었습니다.";
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "status", HttpStatus.CREATED.value(),
+                "message", message,
+                "data", responseDto
+        ));
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp.trim();
+        }
+
+        return request.getRemoteAddr();
     }
 
 }

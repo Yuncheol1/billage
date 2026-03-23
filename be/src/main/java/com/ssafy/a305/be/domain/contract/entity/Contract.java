@@ -91,4 +91,10 @@ public class Contract {
     public void addRepaymentSchedule(RepaymentSchedule schedule) {
         this.repaymentSchedules.add(schedule);
     }
+
+    public void markSigned(LocalDateTime signedAt) {
+        this.status = "SIGNED";
+        this.signedDttm = signedAt;
+        this.updatedDttm = signedAt;
+    }
 }

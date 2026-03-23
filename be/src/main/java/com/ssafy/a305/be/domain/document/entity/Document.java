@@ -48,4 +48,10 @@ public class Document {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "doc_content_json", nullable = false, columnDefinition = "json")
     private String docContentJson;
+
+    public void refreshContent(String docContentJson, String sha256Hash, LocalDateTime generatedDttm) {
+        this.docContentJson = docContentJson;
+        this.sha256Hash = sha256Hash;
+        this.generatedDttm = generatedDttm;
+    }
 }
