@@ -109,8 +109,8 @@ public class AutoTransferBatchConfig {
                 return null; // null 반환 → Writer에 전달되지 않음 (필터링)
             }
 
-            String withdrawalAccountNo = registration.getDebtorAccount().getAccountToken();
-            String depositAccountNo = registration.getCreditorAccount().getAccountToken();
+            String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
+            String depositAccountNo = registration.getCreditorAccount().getAccountNo();
             BigDecimal amount = schedule.getTotalDue();
 
             // 2. SSAFY 계좌이체 API 호출 (실패 시 TransferFailException → Skip)
