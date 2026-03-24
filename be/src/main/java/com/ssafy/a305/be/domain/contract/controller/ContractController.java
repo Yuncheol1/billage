@@ -143,6 +143,19 @@ public class ContractController {
                 "message", "계약이 성공적으로 삭제되었습니다."));
     }
 
+    @PutMapping("/{contractSeq}/accept")
+    public ResponseEntity<Map<String, Object>> acceptContract(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq,
+            @RequestParam("roomId") String roomId) {
+        Integer userSeq = authUser.userSeq();
+        ContractDetailResponseDto result = contractService.acceptContract(contractSeq, userSeq, roomId);
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "계약 조건을 수락했습니다.",
+                "data", result));
+    }
+
     @PostMapping("/{contractSeq}/signatures")
     public ResponseEntity<Map<String, Object>> submitSignature(
             @AuthenticationPrincipal AuthenticatedUser authUser,
