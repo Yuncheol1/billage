@@ -124,6 +124,12 @@ public class Contract {
         this.debtorAccepted = false;
     }
 
+    public void resetToNegotiating() {
+        this.signedDttm = null;
+        this.status = "NEGOTIATING";
+        resetAgreement();
+    }
+
     public void accept(Integer userSeq) {
         if (creditor.getUserSeq().equals(userSeq)) {
             this.creditorAccepted = true;

@@ -9,4 +9,5 @@ import org.springframework.stereotype.Repository;
 public interface SignatureRepository extends JpaRepository<Signature, SignatureId> {
     boolean existsByDocumentDocumentSeqAndUserUserSeq(Integer documentSeq, Integer userSeq);
     long countByDocumentDocumentSeq(Integer documentSeq);
+    void deleteByDocumentContractContractSeq(Integer contractSeq);
 }
