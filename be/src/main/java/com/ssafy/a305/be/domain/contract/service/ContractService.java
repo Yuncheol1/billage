@@ -41,6 +41,8 @@ public class ContractService {
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
+    private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
 
     // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
     // private final AIService aiService;
@@ -465,5 +467,43 @@ public class ContractService {
         }
 
         contractRepository.delete(contract);
+    }
+
+    @Transactional
+    public ContractDetailResponseDto acceptContract(Integer contractSeq, Integer userSeq, String roomId) {
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 수락할 권한이 없습니다.");
+        }
+
+        // 수락 처리
+        contract.accept(userSeq);
+        contractRepository.save(contract);
+
+        // 시스템 메시지 발송
+        String userName = userProfileRepository.findByUserUserSeq(userSeq)
+                .map(UserProfile::getRealName)
+                .orElse("알 수 없음");
+
+        String content = String.format("%s님이 계약 조건을 수락했습니다.", userName);
+        
+        com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto messageRequest = 
+            new com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto(
+                roomId,
+                userSeq,
+                content,
+                true,
+                "SYSTEM"
+            );
+        
+        com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto response = chatService.saveMessage(messageRequest);
+        messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
+
+        return getContractDetail(contractSeq, userSeq);
     }
 }

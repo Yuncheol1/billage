@@ -40,6 +40,13 @@ oauth:
     token-uri: ${KAKAO_TOKEN_URI:https://kauth.kakao.com/oauth/token}
     user-info-uri: ${KAKAO_USER_INFO_URI:https://kapi.kakao.com/v2/user/me}
 
+ssafy:
+  api:
+    base-url: https://finopenapi.ssafy.io
+    api-key: ${SSAFY_API_KEY:}
+    member-search-path: /ssafy/api/v1/member/search
+    member-create-path: /ssafy/api/v1/member
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

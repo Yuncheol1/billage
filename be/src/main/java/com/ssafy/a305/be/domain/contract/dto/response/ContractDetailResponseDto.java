@@ -27,6 +27,8 @@ public class ContractDetailResponseDto {
     private final String aiDraftContent;
     private final LocalDateTime signedDttm;
     private final List<ClauseDetailDto> clauses;
+    private final Boolean isMeAccepted;
+    private final Boolean isOpponentAccepted;
 
     public ContractDetailResponseDto(Contract contract, Integer myUserSeq, String counterpartyName){
         this.contractSeq=contract.getContractSeq();
@@ -43,6 +45,14 @@ public class ContractDetailResponseDto {
         this.endDt = contract.getEndDt();
         this.aiDraftContent = contract.getAiDraftContent();
         this.signedDttm = contract.getSignedDttm();
+
+        if ("CREDITOR".equals(this.myRole)) {
+            this.isMeAccepted = contract.getCreditorAccepted();
+            this.isOpponentAccepted = contract.getDebtorAccepted();
+        } else {
+            this.isMeAccepted = contract.getDebtorAccepted();
+            this.isOpponentAccepted = contract.getCreditorAccepted();
+        }
 
         this.clauses=contract.getClauses().stream()
                 .map(ClauseDetailDto::new)
