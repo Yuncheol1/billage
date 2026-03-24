@@ -4,7 +4,7 @@ import com.ssafy.a305.be.domain.account.entity.BankAccount;
 import com.ssafy.a305.be.domain.account.repository.BankAccountRepository;
 import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
 import com.ssafy.a305.be.domain.bank.client.SsafyDemandDepositClient;
-import com.ssafy.a305.be.domain.bank.client.dto.SsafyCreateDemandDepositAccountResponseDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
 import com.ssafy.a305.be.domain.enums.BankAccountStatus;
 import com.ssafy.a305.be.domain.user.entity.User;

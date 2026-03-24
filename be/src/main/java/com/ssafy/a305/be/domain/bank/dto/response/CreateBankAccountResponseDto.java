@@ -4,6 +4,7 @@ import com.ssafy.a305.be.domain.account.entity.BankAccount;
 
 import java.time.LocalDateTime;
 
+/** 우리 서버의 계좌 생성 API 응답 DTO */
 public record CreateBankAccountResponseDto(
         Integer accountSeq,
         String bankCode,
