@@ -64,6 +64,7 @@ fun ContractListScreen(
     onChatClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onInsightListClick: () -> Unit = {},
     onContractDetailClick: (contractId: Int) -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: ContractListViewModel = hiltViewModel()
@@ -241,8 +242,10 @@ fun ContractListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
-                    onContractMenuClick = { showMenu = false },
-                    onReportMenuClick = { showMenu = false },
+                    onInsightListClick = {
+                        showMenu = false
+                        onInsightListClick()
+                    },
                     onSettingsClick = { showMenu = false; onSettingsClick() },
                     onSupportClick = { showMenu = false },
                     onTermsClick = { showMenu = false },

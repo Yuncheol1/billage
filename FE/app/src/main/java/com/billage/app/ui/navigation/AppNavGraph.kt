@@ -35,6 +35,8 @@ import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
+import com.billage.app.ui.home.InsightDetailScreen
+import com.billage.app.ui.home.InsightListScreen
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
@@ -76,6 +78,8 @@ fun NavGraphBuilder.appNavGraph(
             onMypageClick = { appNavController.navigateToMypage() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            onInsightListClick = { appNavController.navigateToInsightList() },
+            onInsightDetailClick = { index -> appNavController.navigateToInsightDetail(index) },
             menuProfileState = menuProfileState
         )
     }
@@ -322,6 +326,21 @@ fun NavGraphBuilder.appNavGraph(
             viewModel = viewModel,
             onBackClick = { appNavController.popBackStack() },
             onSaveSuccess = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.InsightList.route) {
+        InsightListScreen(
+            onInsightClick = { index -> appNavController.navigateToInsightDetail(index) },
+            onBackClick = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.InsightDetail.routeWithArg) { backStackEntry ->
+        val insightIndex = backStackEntry.arguments?.getString("insightIndex")?.toIntOrNull() ?: 0
+        InsightDetailScreen(
+            insightIndex = insightIndex,
+            onBackClick = { appNavController.popBackStack() }
         )
     }
 

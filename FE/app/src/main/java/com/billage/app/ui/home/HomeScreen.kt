@@ -51,6 +51,8 @@ fun HomeScreen(
     onMypageClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onInsightListClick: () -> Unit = {},
+    onInsightDetailClick: (Int) -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -101,7 +103,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(28.dp))
                 SectionTitle(title = "알아두면 좋아요")
                 Spacer(modifier = Modifier.height(12.dp))
-                TipSlider()
+                TipSlider(items = insightItems, onItemClick = onInsightDetailClick)
 
                 Spacer(modifier = Modifier.height(28.dp))
                 SectionTitleWithAction(
@@ -157,13 +159,9 @@ fun HomeScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
-                    onContractMenuClick = {
+                    onInsightListClick = {
                         showMenu = false
-                        onMypageClick()
-                    },
-                    onReportMenuClick = {
-                        showMenu = false
-                        onMypageClick()
+                        onInsightListClick()
                     },
                     onSettingsClick = {
                         showMenu = false
