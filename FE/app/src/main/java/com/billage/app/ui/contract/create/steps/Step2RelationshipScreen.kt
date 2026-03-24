@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.billage.app.ui.contract.ContractRole
+import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageTextPrimary
@@ -40,7 +40,7 @@ import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageIconBackground
 
 @Composable
-fun Step1FamilyScreen(
+fun Step2RelationshipScreen(
     isFamily: Boolean?,
     onSelect: (Boolean) -> Unit,
     role: ContractRole = ContractRole.CREDITOR

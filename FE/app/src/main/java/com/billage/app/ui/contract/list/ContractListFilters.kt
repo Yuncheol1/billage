@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,8 +28,8 @@ import com.billage.app.ui.theme.BillageTextSecondary
 
 enum class ContractRoleFilter(val label: String, val apiValue: String?) {
     All("전체", null),
-    Lend("내가 빌려준 계약", "CREDITOR"),
-    Borrow("내가 빌린 계약", "DEBTOR")
+    Lend("빌려준 계약", "CREDITOR"),
+    Borrow("빌린 계약", "DEBTOR")
 }
 
 /**

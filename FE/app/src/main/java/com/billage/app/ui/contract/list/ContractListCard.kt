@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -102,7 +102,7 @@ fun ContractListCard(
         )
     }
     val isLend = contract.role == ContractRoleFilter.Lend
-    val badgeLabel = if (isLend) "🤝 내가 빌려준 계약" else "🤲 내가 빌린 계약"
+    val badgeLabel = if (isLend) "🤝 빌려준 계약" else "🤲 빌린 계약"
     val headerBgColor = if (isLend) BillagePrimary else Color(0xFFFF7A5F)
 
     val (statusText, statusBgColor, statusTextColor) = when (contract.status) {

@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.detail
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

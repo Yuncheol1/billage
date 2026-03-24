@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.billage.app.ui.contract.ContractRole
+import com.billage.app.ui.contract.create.ContractRole
 
 sealed interface AppDestination {
     val route: String

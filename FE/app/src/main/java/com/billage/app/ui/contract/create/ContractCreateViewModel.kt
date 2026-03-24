@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.create
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -57,7 +57,7 @@ sealed class ContractSubmitState {
 }
 
 @HiltViewModel
-class ContractViewModel @Inject constructor(
+class ContractCreateViewModel @Inject constructor(
     private val contractApi: ContractApi,
     private val userApi: UserApi,
     private val authSessionStorage: AuthSessionStorage

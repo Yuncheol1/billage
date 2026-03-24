@@ -37,7 +37,7 @@ import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.MenuProfileState
 import com.billage.app.ui.common.TopBar
-import com.billage.app.ui.contract.ContractRole
+import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.common.rememberLogoutUiState
 import com.billage.app.ui.home.components.*
 import com.billage.app.ui.theme.*

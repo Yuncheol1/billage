@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

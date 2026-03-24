@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,7 +63,7 @@ private fun addPeriod(startDateStr: String, months: Long): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Step4DateScreen(
+fun Step5DateScreen(
     startDate: String,
     endDate: String,
     onStartDateSelect: (String) -> Unit,

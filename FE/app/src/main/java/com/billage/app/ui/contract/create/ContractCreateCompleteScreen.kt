@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.create
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,7 +68,7 @@ private fun formatRepaymentMethod(method: RepaymentMethod?): String = when (meth
 }
 
 @Composable
-fun ContractCompleteScreen(
+fun ContractCreateCompleteScreen(
     formState: ContractFormState,
     onHomeClick: () -> Unit,
     onChatClick: () -> Unit,

@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,8 +33,8 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.billage.app.ui.contract.ContractRole
-import com.billage.app.ui.contract.UserSearchState
+import com.billage.app.ui.contract.create.ContractRole
+import com.billage.app.ui.contract.create.UserSearchState
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
@@ -79,7 +79,7 @@ private object PhoneVisualTransformation : VisualTransformation {
 private fun isValidPhone(phone: String) = phone.matches(Regex("^010\\d{8}$"))
 
 @Composable
-fun Step6DebtorScreen(
+fun Step1CounterpartyScreen(
     realName: String,
     onRealNameChange: (String) -> Unit,
     phone: String,

@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.billage.app.ui.contract.RepaymentMethod
+import com.billage.app.ui.contract.create.RepaymentMethod
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
@@ -75,7 +75,7 @@ private fun calculateRemainderMonths(months: Long, method: RepaymentMethod): Int
 }
 
 @Composable
-fun Step5RepaymentScreen(
+fun Step6RepaymentScreen(
     startDate: String,
     endDate: String,
     selectedMethod: RepaymentMethod?,
