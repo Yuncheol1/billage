@@ -8,6 +8,9 @@ import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
+import com.ssafy.a305.be.domain.document.entity.Document;
+import com.ssafy.a305.be.domain.document.repository.DocumentRepository;
+import com.ssafy.a305.be.domain.document.repository.SignatureRepository;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
@@ -38,7 +41,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ContractService {
 
+    private static final String CONTRACT_ORIGINAL = "CONTRACT_ORIGINAL";
+
     private final ContractRepository contractRepository;
+    private final DocumentRepository documentRepository;
+    private final SignatureRepository signatureRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
@@ -446,7 +453,59 @@ public class ContractService {
                 .map(UserProfile::getRealName)
                 .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
 
-        return new ContractDetailResponseDto(contract, userSeq, counterpartyName);
+        SignatureStatus signatureStatus = resolveSignatureStatus(contract, userSeq);
+        return new ContractDetailResponseDto(
+                contract,
+                userSeq,
+                counterpartyName,
+                signatureStatus.isMeSigned(),
+                signatureStatus.isOpponentSigned()
+        );
+    }
+
+    private SignatureStatus resolveSignatureStatus(Contract contract, Integer myUserSeq) {
+        Document latestDocument = documentRepository
+                .findTopByContractContractSeqAndDocTypeOrderByVersionDesc(contract.getContractSeq(), CONTRACT_ORIGINAL)
+                .orElse(null);
+
+        boolean creditorSigned = false;
+        boolean debtorSigned = false;
+
+        if (latestDocument != null) {
+            Integer documentSeq = latestDocument.getDocumentSeq();
+            creditorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getCreditor().getUserSeq()
+            );
+            debtorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getDebtor().getUserSeq()
+            );
+        }
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(myUserSeq);
+        return new SignatureStatus(
+                isCreditor ? creditorSigned : debtorSigned,
+                isCreditor ? debtorSigned : creditorSigned
+        );
+    }
+
+    private static final class SignatureStatus {
+        private final boolean meSigned;
+        private final boolean opponentSigned;
+
+        private SignatureStatus(boolean meSigned, boolean opponentSigned) {
+            this.meSigned = meSigned;
+            this.opponentSigned = opponentSigned;
+        }
+
+        private boolean isMeSigned() {
+            return meSigned;
+        }
+
+        private boolean isOpponentSigned() {
+            return opponentSigned;
+        }
     }
     @Transactional
     public void deleteContract(Integer contractSeq, Integer userSeq) {
