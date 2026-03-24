@@ -5,7 +5,8 @@ import com.ssafy.a305.be.domain.bank.client.dto.request.header.SsafyApiHeaderDto
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -20,7 +21,7 @@ public class SsafyApiHeaderFactory {
     private final SsafyApiProperties ssafyApiProperties;
 
     public SsafyApiHeaderDto create(String apiName, String userKey) {
-        LocalDateTime now = LocalDateTime.now();
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         return new SsafyApiHeaderDto(
                 apiName,
                 DATE_FORMATTER.format(now),
@@ -34,7 +35,7 @@ public class SsafyApiHeaderFactory {
         );
     }
 
-    private String generateInstitutionTransactionUniqueNo(LocalDateTime now) {
+    private String generateInstitutionTransactionUniqueNo(ZonedDateTime now) {
         int random = ThreadLocalRandom.current().nextInt(100000, 1_000_000);
         return TX_FORMATTER.format(now) + random;
     }
