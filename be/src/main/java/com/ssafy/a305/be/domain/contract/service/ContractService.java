@@ -19,6 +19,8 @@ import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,8 +53,8 @@ public class ContractService {
     private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
     private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
 
-    // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
-    // private final AIService aiService;
+    // AI 연동 서비스 (FastAPI 연동)
+    private final AIService aiService;
 
     @Transactional
     public ContractDraftResponseDto createDraft(Integer myUserSeq, ContractDraftRequestDto requestDto) {
@@ -122,7 +124,7 @@ public class ContractService {
     }
 
     @Transactional
-    public Integer addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+    public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
@@ -138,24 +140,40 @@ public class ContractService {
             throw new CustomBusinessException(ErrorCode.ACCESS_DENIED);
         }
 
-        // 4. AI 서비스 호출 (Mock 처리)
-        String refinedContent = "[AI 변환] " + clauseContent;
+        // 4. AI 서비스 연동 호출
+        String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
+                contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
+
+        AiClauseRequestDto aiRequest = AiClauseRequestDto.builder()
+                .contractSeq(contractSeq)
+                .userIntent(clauseContent)
+                .contractContext(contractContext)
+                .templateType("custom")
+                .build();
+
+        AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // 5. ContractClause 엔티티 생성 및 추가
         int nextOrderNo = contract.getClauses().size() + 1;
+        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isEmpty())
+                ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
+        String newContent = (aiResponse.getLegalClause() != null && !aiResponse.getLegalClause().isEmpty())
+                ? aiResponse.getLegalClause() : clauseContent;
+        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isEmpty())
+                ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
         ContractClause clause = ContractClause.builder()
                 .contract(contract)
-                .clauseId("SPECIAL_" + nextOrderNo)
-                .title("특약사항 " + nextOrderNo)
-                .content(refinedContent)
+                .clauseId(newClauseId)
+                .title(newTitle)
+                .content(newContent)
                 .orderNo(nextOrderNo)
                 .createdDttm(LocalDateTime.now())
                 .build();
 
         contract.addClause(clause);
         contractRepository.flush();
-        return clause.getClauseSeq();
+        return clause;
     }
 
     @Transactional
