@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.contract.service;
 
+import com.ssafy.a305.be.domain.chat.service.ChatService;
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
@@ -8,6 +9,9 @@ import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
+import com.ssafy.a305.be.domain.document.entity.Document;
+import com.ssafy.a305.be.domain.document.repository.DocumentRepository;
+import com.ssafy.a305.be.domain.document.repository.SignatureRepository;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
@@ -16,8 +20,11 @@ import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,23 +45,36 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ContractService {
 
+    private static final String CONTRACT_ORIGINAL = "CONTRACT_ORIGINAL";
+
     private final ContractRepository contractRepository;
+    private final DocumentRepository documentRepository;
+    private final SignatureRepository signatureRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
-    private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
-    private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
+    private final ChatService chatService;
+    private final SimpMessageSendingOperations messagingTemplate;
 
-    // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
-    // private final AIService aiService;
+    // AI 연동 서비스 (FastAPI 연동)
+    private final AIService aiService;
 
     @Transactional
-    public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
+    public ContractDraftResponseDto createDraft(Integer myUserSeq, ContractDraftRequestDto requestDto) {
 
-        // 1. 도메인 유효성 및 엣지 케이스 점검
-        validateBusinessRules(creditorUserSeq, requestDto);
+        // 1. 로그인한 사용자가 채권자인지 채무자인지 판별
+        boolean iAmCreditor = myUserSeq.equals(requestDto.getCreditorUserSeq());
+        boolean iAmDebtor   = myUserSeq.equals(requestDto.getDebtorUserSeq());
 
-        // 2. 채권자/채무자 회원 엔티티 조회
-        User creditor = userRepository.findById(creditorUserSeq)
+        if (!iAmCreditor && !iAmDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED,
+                    "계약 생성자는 채권자 또는 채무자 중 한 명이어야 합니다.");
+        }
+
+        // 2. 도메인 유효성 및 엣지 케이스 점검
+        validateBusinessRules(requestDto);
+
+        // 3. 채권자/채무자 회원 엔티티 조회
+        User creditor = userRepository.findById(requestDto.getCreditorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
 
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
@@ -106,40 +126,56 @@ public class ContractService {
     }
 
     @Transactional
-    public Integer addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+    public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
         // 2. 상태 검증
         if (!"DRAFT".equals(contract.getStatus())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS);
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
         }
 
         // 3. 권한 검증
         if (!contract.getCreditor().getUserSeq().equals(userSeq)
                 && !contract.getDebtor().getUserSeq().equals(userSeq)) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED);
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
         }
 
-        // 4. AI 서비스 호출 (Mock 처리)
-        String refinedContent = "[AI 변환] " + clauseContent;
+        // 4. AI 서비스 연동 호출
+        String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
+                contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
+
+        AiClauseRequestDto aiRequest = AiClauseRequestDto.builder()
+                .contractSeq(contractSeq)
+                .userIntent(clauseContent)
+                .contractContext(contractContext)
+                .templateType("custom")
+                .build();
+
+        AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // 5. ContractClause 엔티티 생성 및 추가
         int nextOrderNo = contract.getClauses().size() + 1;
+        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isEmpty())
+                ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
+        String newContent = (aiResponse.getLegalClause() != null && !aiResponse.getLegalClause().isEmpty())
+                ? aiResponse.getLegalClause() : clauseContent;
+        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isEmpty())
+                ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
         ContractClause clause = ContractClause.builder()
                 .contract(contract)
-                .clauseId("SPECIAL_" + nextOrderNo)
-                .title("특약사항 " + nextOrderNo)
-                .content(refinedContent)
+                .clauseId(newClauseId)
+                .title(newTitle)
+                .content(newContent)
                 .orderNo(nextOrderNo)
                 .createdDttm(LocalDateTime.now())
                 .build();
 
         contract.addClause(clause);
         contractRepository.flush();
-        return clause.getClauseSeq();
+        return clause;
     }
 
     @Transactional
@@ -174,7 +210,7 @@ public class ContractService {
     }
 
     @Transactional
-    public void updateContract(Integer contractSeq, ContractUpdateRequestDto requestDto, Integer userSeq) {
+    public void updateContract(Integer contractSeq, ContractUpdateRequestDto requestDto, Integer userSeq, String roomId) {
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
@@ -185,18 +221,93 @@ public class ContractService {
         }
 
         String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약만 수정할 수 있습니다.");
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status) && !"SIGNED".equals(status) && !"ACTIVE".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "수정 가능한 상태가 아닙니다.");
+        }
+
+        // 이미 서명이 시작된 경우(SIGNED 이상), 기존 서명 무효화 처리
+        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
+            signatureRepository.deleteByDocumentContractContractSeq(contractSeq);
+            // Contract 엔티티 상태 초기화는 updateContractTerms 에서 resetAgreement 호출함
+            // 추가로 signedDttm 및 status 초기화 (Service 레벨에서 처리)
+            // contract.resetToNegotiating(); // 만약 엔티티에 메서드가 있다면 사용
+        }
+
+        // 브로드캐스트를 위한 이전 데이터 보관 및 변경 내역 계산
+        BigDecimal originalPrincipal = contract.getPrincipalAmount();
+        BigDecimal originalInterest = contract.getInterestRate();
+        List<String> dynamicModifications = new java.util.ArrayList<>();
+
+        // 데이터 업데이트 (내부적으로 resetAgreement() 호출됨)
+        if (requestDto.getPrincipalAmount() != null && (originalPrincipal == null || originalPrincipal.compareTo(requestDto.getPrincipalAmount()) != 0)) {
+            dynamicModifications.add(String.format("원금 변경: %,d원 → %,d원", 
+                originalPrincipal != null ? originalPrincipal.longValue() : 0, 
+                requestDto.getPrincipalAmount().longValue()));
+        }
+
+        if (requestDto.getInterestRate() != null && (originalInterest == null || originalInterest.compareTo(requestDto.getInterestRate()) != 0)) {
+            dynamicModifications.add(String.format("이자율 변경: %.2f%% → %.2f%%", 
+                originalInterest != null ? originalInterest.doubleValue() : 0.0, 
+                requestDto.getInterestRate().doubleValue()));
         }
 
         contract.updateContractTerms(requestDto.getPrincipalAmount(), requestDto.getInterestRate());
+
+        // 서명 상태 초기화 (status 재조정)
+        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
+            contract.resetToNegotiating();
+        }
 
         if (requestDto.getClauses() != null) {
             for (ContractUpdateRequestDto.ClauseUpdateDto reqClause : requestDto.getClauses()) {
                 contract.getClauses().stream()
                         .filter(c -> c.getClauseSeq().equals(reqClause.getClauseSeq()))
                         .findFirst()
-                        .ifPresent(clause -> clause.updateContent(reqClause.getContent()));
+                        .ifPresent(clause -> {
+                            if (!clause.getContent().equals(reqClause.getContent())) {
+                                dynamicModifications.add(String.format("'%s' 조항 내용 수정됨", clause.getTitle()));
+                                clause.updateContent(reqClause.getContent());
+                            }
+                        });
+            }
+        }
+
+        // 아무런 변경이 없었다면 브로드캐스트 생략 가능 (필요 시)
+        if (dynamicModifications.isEmpty() && (roomId == null || roomId.isBlank())) {
+            return;
+        }
+
+        // 채팅방에 수정 완료 알림 발송 (roomId가 있을 때만)
+        if (roomId != null && !roomId.isBlank()) {
+            try {
+                // AiProposalPayload 구조와 동일하게 생성
+                Map<String, Object> payload = Map.of(
+                    "contractTitle", "빌리지 거래 제안서 (수정)",
+                    "contractSeq", contractSeq,
+                    "originalPrincipal", originalPrincipal != null ? originalPrincipal.doubleValue() : 0.0,
+                    "originalInterestRate", originalInterest != null ? originalInterest.doubleValue() : 0.0,
+                    "proposedInterestRate", contract.getInterestRate() != null ? contract.getInterestRate().doubleValue() : 0.0,
+                    "modifications", dynamicModifications.isEmpty() ? List.of("기타 약정 변경") : dynamicModifications,
+                    "isInitial", false
+                );
+
+                ObjectMapper mapper = new ObjectMapper();
+                String contentJson = mapper.writeValueAsString(payload);
+
+                com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto msgRequest = 
+                    new com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto(
+                        roomId, 
+                        userSeq, 
+                        contentJson, 
+                        true, 
+                        "AI_PROPOSAL"
+                    );
+
+                com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto response = chatService.saveMessage(msgRequest);
+                messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
+
+            } catch (Exception e) {
+                log.error("채팅방 수정 제안서 발송 실패", e);
             }
         }
     }
@@ -329,10 +440,10 @@ public class ContractService {
                     );
         }).collect(Collectors.toList());
     }
-    
-    private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
+
+    private void validateBusinessRules(ContractDraftRequestDto request) {
         // 본인 거래 방지
-        if (creditorUserSeq.equals(request.getDebtorUserSeq())) {
+        if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
         }
 
@@ -446,7 +557,59 @@ public class ContractService {
                 .map(UserProfile::getRealName)
                 .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
 
-        return new ContractDetailResponseDto(contract, userSeq, counterpartyName);
+        SignatureStatus signatureStatus = resolveSignatureStatus(contract, userSeq);
+        return new ContractDetailResponseDto(
+                contract,
+                userSeq,
+                counterpartyName,
+                signatureStatus.isMeSigned(),
+                signatureStatus.isOpponentSigned()
+        );
+    }
+
+    private SignatureStatus resolveSignatureStatus(Contract contract, Integer myUserSeq) {
+        Document latestDocument = documentRepository
+                .findTopByContractContractSeqAndDocTypeOrderByVersionDesc(contract.getContractSeq(), CONTRACT_ORIGINAL)
+                .orElse(null);
+
+        boolean creditorSigned = false;
+        boolean debtorSigned = false;
+
+        if (latestDocument != null) {
+            Integer documentSeq = latestDocument.getDocumentSeq();
+            creditorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getCreditor().getUserSeq()
+            );
+            debtorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getDebtor().getUserSeq()
+            );
+        }
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(myUserSeq);
+        return new SignatureStatus(
+                isCreditor ? creditorSigned : debtorSigned,
+                isCreditor ? debtorSigned : creditorSigned
+        );
+    }
+
+    private static final class SignatureStatus {
+        private final boolean meSigned;
+        private final boolean opponentSigned;
+
+        private SignatureStatus(boolean meSigned, boolean opponentSigned) {
+            this.meSigned = meSigned;
+            this.opponentSigned = opponentSigned;
+        }
+
+        private boolean isMeSigned() {
+            return meSigned;
+        }
+
+        private boolean isOpponentSigned() {
+            return opponentSigned;
+        }
     }
     @Transactional
     public void deleteContract(Integer contractSeq, Integer userSeq) {

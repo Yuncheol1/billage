@@ -28,6 +28,10 @@ public class BankAccount {
     @Column(name = "provider", nullable = false, length = 30)
     private String provider;
 
+    /** Bank code from SSAFY API response (e.g. "001") */
+    @Column(name = "bank_code", length = 3)
+    private String bankCode;
+
     /** Product unique number used for account opening request */
     @Column(name = "account_type_unique_no", nullable = false, length = 40)
     private String accountTypeUniqueNo;

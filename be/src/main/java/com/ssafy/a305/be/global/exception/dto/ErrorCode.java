@@ -25,7 +25,8 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "진행 중인 계약이 존재하여 탈퇴할 수 없습니다."),
     SIGNATURE_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이미 서명을 완료했습니다."),
-    AUTH_CONFIG_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "인증 설정이 올바르지 않습니다.");
+    AUTH_CONFIG_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "인증 설정이 올바르지 않습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final HttpStatus status;
     private final String message;
