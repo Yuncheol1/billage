@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.create
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

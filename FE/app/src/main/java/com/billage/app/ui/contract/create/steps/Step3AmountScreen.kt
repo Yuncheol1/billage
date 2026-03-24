@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -66,7 +66,7 @@ private fun formatWithComma(raw: String): String {
 }
 
 @Composable
-fun Step2AmountScreen(
+fun Step3AmountScreen(
     amount: String,
     onAmountChange: (String) -> Unit
 ) {

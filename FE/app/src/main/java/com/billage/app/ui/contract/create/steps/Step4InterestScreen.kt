@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract.steps
+package com.billage.app.ui.contract.create.steps
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -80,7 +80,7 @@ private fun adjustRate(current: String, delta: Double): String {
 }
 
 @Composable
-fun Step3InterestScreen(
+fun Step4InterestScreen(
     interestRate: String,
     isFamily: Boolean,
     amount: String,

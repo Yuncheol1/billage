@@ -6,8 +6,8 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.billage.app.ui.auth.ConditionsOfUseScreen
 import com.billage.app.ui.auth.LoginScreen
-import com.billage.app.ui.auth.MypageScreen
-import com.billage.app.ui.contract.ContractScreen
+import com.billage.app.ui.contract.list.ContractListScreen
+import com.billage.app.ui.contract.create.ContractCreateScreen
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.common.MenuProfileViewModel
 import com.billage.app.ui.chat.ChatRoomScreen
@@ -31,16 +31,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.billage.app.ui.contract.ContractCompleteScreen
-import com.billage.app.ui.contract.ContractRole
-import com.billage.app.ui.contract.ContractSpecialTermsScreen
-import com.billage.app.ui.contract.ContractViewModel
+import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
+import com.billage.app.ui.contract.create.ContractRole
+import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
+import com.billage.app.ui.contract.create.ContractCreateViewModel
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.billage.app.ui.contract.ContractSubmitState
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -84,7 +83,7 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Contract.routeWithArg) { backStackEntry ->
         val role = backStackEntry.arguments?.getString("role")
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
-        ContractScreen(
+        ContractCreateScreen(
             onNavigateBack = { appNavController.popBackStack() },
             onContractComplete = { contractSeq, roomId, opponentName -> 
                 appNavController.navigateToContractComplete(contractSeq, roomId, opponentName)
@@ -242,13 +241,14 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Mypage.route) {
         val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
-        MypageScreen(
+        ContractListScreen(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            onContractDetailClick = { contractId -> appNavController.navigateToContractDetail(contractId.toString()) },
             menuProfileState = menuProfileState
         )
     }
@@ -285,12 +285,10 @@ fun NavGraphBuilder.appNavGraph(
                 backStackEntry
             }
         }
-        val viewModel: ContractViewModel = viewModel(parentEntry)
+        val viewModel: ContractCreateViewModel = viewModel(parentEntry)
         val formState by viewModel.formState.collectAsState()
 
-        val submitState by viewModel.submitState.collectAsState()
-
-        ContractCompleteScreen(
+        ContractCreateCompleteScreen(
             formState = formState,
             onHomeClick = { appNavController.popToHome() },
             onChatClick = {
@@ -311,13 +309,13 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(route = AppDestination.ContractEdit.routeWithArg) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
-        val viewModel: com.billage.app.ui.contract.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 
         androidx.compose.runtime.LaunchedEffect(contractSeq) {
             if (contractSeq != -1) viewModel.fetchContractDetail(contractSeq)
         }
 
-        com.billage.app.ui.contract.ContractEditScreen(
+        com.billage.app.ui.contract.detail.ContractEditScreen(
             contractSeq = contractSeq.toString(),
             viewModel = viewModel,
             onBackClick = { appNavController.popBackStack() },
@@ -327,13 +325,13 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(route = AppDestination.ContractDetail.routeWithArg) { backStackEntry ->
         val contractId = backStackEntry.arguments?.getString("contractId") ?: ""
-        val viewModel: com.billage.app.ui.contract.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 
         androidx.compose.runtime.LaunchedEffect(contractId) {
             contractId.toIntOrNull()?.let { viewModel.fetchContractDetail(it) }
         }
 
-        com.billage.app.ui.contract.ContractDetailScreen(
+        com.billage.app.ui.contract.detail.ContractDetailScreen(
             contractSeq = contractId,
             viewModel = viewModel,
             onBackClick = { appNavController.popBackStack() }

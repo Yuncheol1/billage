@@ -54,6 +54,12 @@ interface ContractApi {
         @retrofit2.http.Path("contractSeq") contractSeq: Int
     ): ContractupdateBaseResponse
 
+    // 계약 취소/거절 (서명 전 DRAFT/NEGOTIATING 상태만 가능)
+    @DELETE("/api/v1/contracts/{contractSeq}")
+    suspend fun deleteContract(
+        @Path("contractSeq") contractSeq: Int
+    ): DeleteContractResponse
+
     @retrofit2.http.PUT("api/v1/contracts/{contractSeq}/accept")
     suspend fun acceptContract(
         @Path("contractSeq") contractSeq: Int,
@@ -66,6 +72,12 @@ interface ContractApi {
         @Body request: ContractSignatureRequest
     ): ContractSignatureBaseResponse
 }
+
+@Serializable
+data class DeleteContractResponse(
+    val status: Int,
+    val message: String
+)
 
 // ─────────────────────────────────────────
 // 차용증 초안 생성 Request

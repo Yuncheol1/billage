@@ -1,4 +1,4 @@
-package com.billage.app.ui.contract
+package com.billage.app.ui.contract.create
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -43,23 +43,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.billage.app.ui.contract.steps.Step1FamilyScreen
-import com.billage.app.ui.contract.steps.Step2AmountScreen
-import com.billage.app.ui.contract.steps.Step3InterestScreen
-import com.billage.app.ui.contract.steps.Step4DateScreen
-import com.billage.app.ui.contract.steps.Step5RepaymentScreen
-import com.billage.app.ui.contract.steps.Step6DebtorScreen
+import com.billage.app.ui.contract.create.steps.Step1CounterpartyScreen
+import com.billage.app.ui.contract.create.steps.Step2RelationshipScreen
+import com.billage.app.ui.contract.create.steps.Step3AmountScreen
+import com.billage.app.ui.contract.create.steps.Step4InterestScreen
+import com.billage.app.ui.contract.create.steps.Step5DateScreen
+import com.billage.app.ui.contract.create.steps.Step6RepaymentScreen
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryDisabled
 import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageTextPrimary
 
 @Composable
-fun ContractScreen(
+fun ContractCreateScreen(
     onNavigateBack: () -> Unit,
     onContractComplete: (contractSeq: Int, roomId: String, opponentName: String) -> Unit,
     role: ContractRole = ContractRole.CREDITOR,
-    viewModel: ContractViewModel = hiltViewModel()
+    viewModel: ContractCreateViewModel = hiltViewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val formState by viewModel.formState.collectAsState()
@@ -133,7 +133,7 @@ fun ContractScreen(
                 label = "StepTransition"
             ) { step ->
                 when (step) {
-                    1 -> Step6DebtorScreen(
+                    1 -> Step1CounterpartyScreen(
                         realName = formState.debtorName,
                         onRealNameChange = { viewModel.updateDebtorName(it) },
                         phone = formState.debtorPhone,
@@ -142,28 +142,28 @@ fun ContractScreen(
                         onSearch = { viewModel.searchUser() },
                         role = formState.role
                     )
-                    2 -> Step1FamilyScreen(
+                    2 -> Step2RelationshipScreen(
                         isFamily = formState.isFamily,
                         onSelect = { viewModel.updateIsFamily(it) },
                         role = formState.role
                     )
-                    3 -> Step2AmountScreen(
+                    3 -> Step3AmountScreen(
                         amount = formState.amount,
                         onAmountChange = { viewModel.updateAmount(it) }
                     )
-                    4 -> Step3InterestScreen(
+                    4 -> Step4InterestScreen(
                         interestRate = formState.interestRate,
                         isFamily = formState.isFamily ?: false,
                         amount = formState.amount,
                         onRateChange = { viewModel.updateInterestRate(it) }
                     )
-                    5 -> Step4DateScreen(
+                    5 -> Step5DateScreen(
                         startDate = formState.startDate,
                         endDate = formState.endDate,
                         onStartDateSelect = { viewModel.updateStartDate(it) },
                         onEndDateSelect = { viewModel.updateEndDate(it) }
                     )
-                    6 -> Step5RepaymentScreen(
+                    6 -> Step6RepaymentScreen(
                         startDate = formState.startDate,
                         endDate = formState.endDate,
                         selectedMethod = formState.repaymentMethod,
@@ -174,11 +174,11 @@ fun ContractScreen(
             }
 
             ContractNextButton(
-                text = if (currentStep == ContractViewModel.TOTAL_STEPS) "완료하기" else "다음",
+                text = if (currentStep == ContractCreateViewModel.TOTAL_STEPS) "완료하기" else "다음",
                 enabled = isNextEnabled && submitState !is ContractSubmitState.Loading,
                 isLoading = submitState is ContractSubmitState.Loading,
                 onClick = {
-                    if (currentStep == ContractViewModel.TOTAL_STEPS) {
+                    if (currentStep == ContractCreateViewModel.TOTAL_STEPS) {
                         // TODO: 로그인한 사용자의 userSeq를 AuthSessionStorage에서 가져와야 해요
                         // 현재는 임시로 1 사용 — 로그인 연동 후 실제 값으로 교체
                         viewModel.submitContractDraft()
@@ -229,7 +229,7 @@ private fun ContractTopBar(
                 )
             }
             Text(
-                text = "$currentStep / ${ContractViewModel.TOTAL_STEPS}",
+                text = "$currentStep / ${ContractCreateViewModel.TOTAL_STEPS}",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = BillageTextPrimary,
@@ -240,7 +240,7 @@ private fun ContractTopBar(
         Spacer(modifier = Modifier.height(4.dp))
 
         LinearProgressIndicator(
-            progress = { currentStep.toFloat() / ContractViewModel.TOTAL_STEPS },
+            progress = { currentStep.toFloat() / ContractCreateViewModel.TOTAL_STEPS },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp),
