@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.contract.service;
 
+import com.ssafy.a305.be.domain.chat.service.ChatService;
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
@@ -23,6 +24,7 @@ import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,9 +52,8 @@ public class ContractService {
     private final SignatureRepository signatureRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
-    private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
-    private final com.ssafy.a305.be.domain.document.repository.SignatureRepository signatureRepository;
-    private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
+    private final ChatService chatService;
+    private final SimpMessageSendingOperations messagingTemplate;
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
