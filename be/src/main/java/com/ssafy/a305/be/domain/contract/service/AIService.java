@@ -19,7 +19,12 @@ import org.springframework.http.MediaType;
 @Service
 public class AIService {
 
-    @Value("${AI_INTERNAL_API_KEY:super-secret-key-change-me-in-production}")
+    private final RestTemplate restTemplate;
+
+    @Value("${ai.server.url}")
+    private String aiServerUrl;
+
+    @Value("${ai.internal.api.key}")
     private String internalApiKey;
 
     public AiClauseResponseDto generateClause(AiClauseRequestDto requestDto) {
@@ -55,7 +60,11 @@ public class AIService {
             } else if (e.getStatusCode().value() == 422) {
                 throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "AI 서버 검증 실패(422 Unprocessable Entity)");
             }
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "AI 서버 연동 실패 - Bad Request");
+            throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
+                    "AI 서버 요청 실패: " + e.getResponseBodyAsString());
+        } catch (HttpServerErrorException e) {
+            log.error("AI Server Server Error (5xx): {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 서버 장애가 발생했습니다.");
         } catch (Exception e) {
             log.error("AI Server 통신 에러 발생: ", e);
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "AI 특약 생성 서버 요청 중 오류가 발생했습니다.");

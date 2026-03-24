@@ -47,6 +47,13 @@ ssafy:
     member-search-path: /ssafy/api/v1/member/search
     member-create-path: /ssafy/api/v1/member
 
+ai:
+  server:
+    url: ${AI_SERVER_URL}
+  internal:
+    api:
+      key: ${AI_INTERNAL_API_KEY}
+
 logging:
   level:
     org.hibernate.SQL: DEBUG
