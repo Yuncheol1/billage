@@ -312,14 +312,14 @@ public class AuthService {
     private void syncUserProfile(User user, KakaoUserInfoResponse userInfo, LocalDateTime now) {
         String realName = extractRealName(userInfo);
         Boolean phoneVerified = extractPhoneVerified(userInfo);
+        String maskedRrn = resolveMaskedRrn(userInfo);
 
         userProfileRepository.findByUserUserSeq(user.getUserSeq())
                 .ifPresentOrElse(
-                        userProfile -> userProfile.syncFromKakao(realName, phoneVerified),
+                        userProfile -> userProfile.syncFromKakao(realName, phoneVerified, maskedRrn),
                         () -> userProfileRepository.save(UserProfile.builder()
                                 .user(user)
-                                // Placeholder until resident registration number is collected separately.
-                                .rrn(EMPTY_RRN_PLACEHOLDER)
+                                .rrn(maskedRrn)
                                 .realName(realName)
                                 .phoneVerified(phoneVerified)
                                 .profileCompletedDt(null)
@@ -335,6 +335,57 @@ public class AuthService {
                                 .updatedDttm(now)
                                 .build())
                 );
+    }
+
+    private String resolveMaskedRrn(KakaoUserInfoResponse userInfo) {
+        if (userInfo.kakaoAccount() == null) {
+            return EMPTY_RRN_PLACEHOLDER;
+        }
+
+        KakaoUserInfoResponse.KakaoAccount kakaoAccount = userInfo.kakaoAccount();
+        String birthyear = kakaoAccount.birthyear();
+        String birthday = kakaoAccount.birthday();
+        String gender = kakaoAccount.gender();
+
+        if (birthyear == null || birthyear.isBlank()
+                || birthday == null || birthday.isBlank()
+                || gender == null || gender.isBlank()) {
+            return EMPTY_RRN_PLACEHOLDER;
+        }
+
+        if (!birthyear.matches("\\d{4}") || !birthday.matches("\\d{4}")) {
+            return EMPTY_RRN_PLACEHOLDER;
+        }
+
+        char genderCode = resolveMaskedRrnGenderCode(Integer.parseInt(birthyear), gender);
+        if (genderCode == 0) {
+            return EMPTY_RRN_PLACEHOLDER;
+        }
+
+        return birthyear.substring(2) + birthday + "-" + genderCode + "xxxxxx";
+    }
+
+    private char resolveMaskedRrnGenderCode(int birthYear, String gender) {
+        boolean isMale = "male".equalsIgnoreCase(gender);
+        boolean isFemale = "female".equalsIgnoreCase(gender);
+
+        if (!isMale && !isFemale) {
+            return 0;
+        }
+
+        if (birthYear >= 2000 && birthYear <= 2099) {
+            return isMale ? '3' : '4';
+        }
+
+        if (birthYear >= 1900 && birthYear <= 1999) {
+            return isMale ? '1' : '2';
+        }
+
+        if (birthYear >= 1800 && birthYear <= 1899) {
+            return isMale ? '9' : '0';
+        }
+
+        return 0;
     }
 
     private String extractRealName(KakaoUserInfoResponse userInfo) {
