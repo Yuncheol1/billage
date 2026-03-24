@@ -29,6 +29,12 @@ interface ChatApi {
         @Body request: ChatRoomCreateReq
     ): ChatRoomRes
 
+    @POST("api/v1/chats/rooms/user/{targetUserSeq}")
+    suspend fun createRoomByUserSeq(
+        @retrofit2.http.Header("userSeq") userSeq: Int,
+        @Path("targetUserSeq") targetUserSeq: Int
+    ): ChatRoomRes
+
     @POST("api/v1/chats/{roomId}/leave")
     suspend fun leaveRoom(
         @retrofit2.http.Header("userSeq") userSeq: Int,

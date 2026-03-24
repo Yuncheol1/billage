@@ -25,5 +25,7 @@ data class ChatRoomState(
     val mode: ChatRoomMode = ChatRoomMode.NORMAL,
     val selectedContract: ContractSummary? = null,
     val draftProposal: String? = null,
-    val draftContractDetail: ContractDetailResponse? = null
+    val draftContractDetail: ContractDetailResponse? = null,
+    val isMeAccepted: Boolean = false,
+    val isOpponentAccepted: Boolean = false
 )

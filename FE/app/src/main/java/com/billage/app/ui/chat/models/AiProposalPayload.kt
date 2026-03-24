@@ -12,5 +12,6 @@ data class AiProposalPayload(
     val contractSeq: Int,
     val originalInterestRate: Double,
     val proposedInterestRate: Double,
-    val modifications: List<String> = emptyList()
+    val modifications: List<String> = emptyList(),
+    val isInitial: Boolean = false
 )
