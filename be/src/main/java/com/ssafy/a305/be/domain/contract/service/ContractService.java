@@ -55,13 +55,22 @@ public class ContractService {
     // private final AIService aiService;
 
     @Transactional
-    public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
+    public ContractDraftResponseDto createDraft(Integer myUserSeq, ContractDraftRequestDto requestDto) {
 
-        // 1. 도메인 유효성 및 엣지 케이스 점검
-        validateBusinessRules(creditorUserSeq, requestDto);
+        // 1. 로그인한 사용자가 채권자인지 채무자인지 판별
+        boolean iAmCreditor = myUserSeq.equals(requestDto.getCreditorUserSeq());
+        boolean iAmDebtor   = myUserSeq.equals(requestDto.getDebtorUserSeq());
 
-        // 2. 채권자/채무자 회원 엔티티 조회
-        User creditor = userRepository.findById(creditorUserSeq)
+        if (!iAmCreditor && !iAmDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED,
+                    "계약 생성자는 채권자 또는 채무자 중 한 명이어야 합니다.");
+        }
+
+        // 2. 도메인 유효성 및 엣지 케이스 점검
+        validateBusinessRules(requestDto);
+
+        // 3. 채권자/채무자 회원 엔티티 조회
+        User creditor = userRepository.findById(requestDto.getCreditorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
 
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
@@ -337,9 +346,9 @@ public class ContractService {
         }).collect(Collectors.toList());
     }
 
-    private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
+    private void validateBusinessRules(ContractDraftRequestDto request) {
         // 본인 거래 방지
-        if (creditorUserSeq.equals(request.getDebtorUserSeq())) {
+        if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
         }
 
