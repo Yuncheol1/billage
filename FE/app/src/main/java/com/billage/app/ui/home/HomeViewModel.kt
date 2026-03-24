@@ -58,12 +58,15 @@ class HomeViewModel @Inject constructor(
     fun fetchContracts() {
         viewModelScope.launch {
             try {
-                // 서명이 모두 완료되어 진행 중인(ACTIVE) 계약만 전체 조회
-                val response = contractApi.getContracts(role = "ALL", status = "ACTIVE")
+                // status = null → CLOSED(상환 완료)를 포함한 전체 상태 조회
+                // CREDITOR/DEBTOR 건수는 UI에서 role 필드로 구분
+                val response = contractApi.getContracts(role = "ALL", status = null)
                 if (response.status == 200) {
                     val contracts = response.data
-                    val lent = contracts.count { it.role == "CREDITOR" }
-                    val borrowed = contracts.count { it.role == "DEBTOR" }
+                    // DRAFT·NEGOTIATING(서명 전 협의 단계)은 아직 확정된 계약이 아니므로 제외
+                    val confirmedStatuses = setOf("SIGNED", "ACTIVE", "OVERDUE", "DISPUTED")
+                    val lent = contracts.count { it.role == "CREDITOR" && it.status in confirmedStatuses }
+                    val borrowed = contracts.count { it.role == "DEBTOR" && it.status in confirmedStatuses }
                     
                     _uiState.update { it.copy(
                         lentCount = lent,
