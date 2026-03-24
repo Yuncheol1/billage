@@ -27,5 +27,10 @@ data class ChatRoomState(
     val draftProposal: String? = null,
     val draftContractDetail: ContractDetailResponse? = null,
     val isMeAccepted: Boolean = false,
-    val isOpponentAccepted: Boolean = false
+    val isOpponentAccepted: Boolean = false,
+    val isMeSigned: Boolean = false,
+    val isOpponentSigned: Boolean = false,
+    val isSubmittingSignature: Boolean = false,
+    val signatureErrorMessage: String? = null,
+    val signatureSuccessMessage: String? = null
 )

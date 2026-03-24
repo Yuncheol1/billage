@@ -17,7 +17,10 @@ object BiometricLoginManager {
         activity: FragmentActivity,
         onSuccess: () -> Unit,
         onError: (String) -> Unit,
-        onEnrollmentRequired: () -> Unit
+        onEnrollmentRequired: () -> Unit,
+        title: String = "로그인",
+        subtitle: String = "지문으로 로그인 해주세요.",
+        negativeButtonText: String = "취소"
     ) {
         when (BiometricManager.from(activity).canAuthenticate(AUTHENTICATORS)) {
             BiometricManager.BIOMETRIC_SUCCESS -> Unit
@@ -57,10 +60,10 @@ object BiometricLoginManager {
 
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("로그인")
-                .setSubtitle("지문으로 로그인 해주세요.")
+                .setTitle(title)
+                .setSubtitle(subtitle)
                 .setAllowedAuthenticators(AUTHENTICATORS)
-                .setNegativeButtonText("취소")
+                .setNegativeButtonText(negativeButtonText)
                 .build()
         )
     }
