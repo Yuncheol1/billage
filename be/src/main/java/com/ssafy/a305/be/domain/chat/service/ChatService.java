@@ -120,8 +120,10 @@ public class ChatService {
         com.ssafy.a305.be.domain.user.entity.User targetUser = userRepository.findByEmail(targetEmail)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + targetEmail));
         
-        Integer targetUserSeq = targetUser.getUserSeq();
-        
+        return createRoomByUserSeq(myUserSeq, targetUser.getUserSeq());
+    }
+
+    public ChatRoomResponseDto createRoomByUserSeq(Integer myUserSeq, Integer targetUserSeq) {
         if (myUserSeq.equals(targetUserSeq)) {
             throw new IllegalArgumentException("자기 자신과 채팅방을 생성할 수 없습니다.");
         }
@@ -137,7 +139,7 @@ public class ChatService {
         if (existingRoom != null) {
             chatRoom = existingRoom;
         } else {
-            // 새로운 방 생성 (id는 몽고DB ObjectId 자동 생성 혹은 무작위 UUID)
+            // 새로운 방 생성
             chatRoom = ChatRoom.builder()
                 .id(java.util.UUID.randomUUID().toString())
                 .participants(List.of(myUserSeq, targetUserSeq))
@@ -150,10 +152,9 @@ public class ChatService {
 
         // DTO 반환
         List<ParticipantDto> participantDtos = chatRoom.getParticipants().stream()
-            .map(this::apply2)
+            .map(this::apply)
             .collect(Collectors.toList());
 
-        // LocalDateTime.MIN 대신 안전한 과거 시각 사용
         LocalDateTime lastReadAt = chatRoom.getLastReadAt().getOrDefault(String.valueOf(myUserSeq), LocalDateTime.of(1970, 1, 1, 0, 0));
         long unreadCount = chatMessageRepository.countByRoomIdAndCreatedAtAfterAndSenderSeqNot(chatRoom.getId(), lastReadAt, myUserSeq);
 
@@ -189,13 +190,6 @@ public class ChatService {
     }
 
     private ParticipantDto apply(Integer seq) {
-        String name = userProfileRepository.findByUserUserSeq(seq)
-                .map(UserProfile::getRealName)
-                .orElse("알 수 없음");
-        return ParticipantDto.of(seq, name);
-    }
-
-    private ParticipantDto apply2(Integer seq) {
         String name = userProfileRepository.findByUserUserSeq(seq)
                 .map(UserProfile::getRealName)
                 .orElse("알 수 없음");

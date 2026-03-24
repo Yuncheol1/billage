@@ -8,6 +8,9 @@ import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
+import com.ssafy.a305.be.domain.document.entity.Document;
+import com.ssafy.a305.be.domain.document.repository.DocumentRepository;
+import com.ssafy.a305.be.domain.document.repository.SignatureRepository;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
@@ -40,19 +43,35 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ContractService {
 
+    private static final String CONTRACT_ORIGINAL = "CONTRACT_ORIGINAL";
+
     private final ContractRepository contractRepository;
+    private final DocumentRepository documentRepository;
+    private final SignatureRepository signatureRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
+    private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
 
+    // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
 
     @Transactional
-    public ContractDraftResponseDto createDraft(Integer creatorUserSeq, ContractDraftRequestDto requestDto) {
+    public ContractDraftResponseDto createDraft(Integer myUserSeq, ContractDraftRequestDto requestDto) {
 
-        // 1. 도메인 유효성 및 엣지 케이스 점검
-        validateBusinessRules(creatorUserSeq, requestDto);
+        // 1. 로그인한 사용자가 채권자인지 채무자인지 판별
+        boolean iAmCreditor = myUserSeq.equals(requestDto.getCreditorUserSeq());
+        boolean iAmDebtor   = myUserSeq.equals(requestDto.getDebtorUserSeq());
 
-        // 2. 채권자/채무자 회원 엔티티 조회
+        if (!iAmCreditor && !iAmDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED,
+                    "계약 생성자는 채권자 또는 채무자 중 한 명이어야 합니다.");
+        }
+
+        // 2. 도메인 유효성 및 엣지 케이스 점검
+        validateBusinessRules(requestDto);
+
+        // 3. 채권자/채무자 회원 엔티티 조회
         User creditor = userRepository.findById(requestDto.getCreditorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
 
@@ -345,12 +364,7 @@ public class ContractService {
         }).collect(Collectors.toList());
     }
 
-    private void validateBusinessRules(Integer creatorUserSeq, ContractDraftRequestDto request) {
-        // 계약 생성자 본인 포함 여부 검증
-        if (!creatorUserSeq.equals(request.getCreditorUserSeq()) && !creatorUserSeq.equals(request.getDebtorUserSeq())) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "본인이 포함된 계약만 생성할 수 있습니다.");
-        }
-
+    private void validateBusinessRules(ContractDraftRequestDto request) {
         // 본인 거래 방지
         if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
@@ -466,7 +480,59 @@ public class ContractService {
                 .map(UserProfile::getRealName)
                 .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
 
-        return new ContractDetailResponseDto(contract, userSeq, counterpartyName);
+        SignatureStatus signatureStatus = resolveSignatureStatus(contract, userSeq);
+        return new ContractDetailResponseDto(
+                contract,
+                userSeq,
+                counterpartyName,
+                signatureStatus.isMeSigned(),
+                signatureStatus.isOpponentSigned()
+        );
+    }
+
+    private SignatureStatus resolveSignatureStatus(Contract contract, Integer myUserSeq) {
+        Document latestDocument = documentRepository
+                .findTopByContractContractSeqAndDocTypeOrderByVersionDesc(contract.getContractSeq(), CONTRACT_ORIGINAL)
+                .orElse(null);
+
+        boolean creditorSigned = false;
+        boolean debtorSigned = false;
+
+        if (latestDocument != null) {
+            Integer documentSeq = latestDocument.getDocumentSeq();
+            creditorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getCreditor().getUserSeq()
+            );
+            debtorSigned = signatureRepository.existsByDocumentDocumentSeqAndUserUserSeq(
+                    documentSeq,
+                    contract.getDebtor().getUserSeq()
+            );
+        }
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(myUserSeq);
+        return new SignatureStatus(
+                isCreditor ? creditorSigned : debtorSigned,
+                isCreditor ? debtorSigned : creditorSigned
+        );
+    }
+
+    private static final class SignatureStatus {
+        private final boolean meSigned;
+        private final boolean opponentSigned;
+
+        private SignatureStatus(boolean meSigned, boolean opponentSigned) {
+            this.meSigned = meSigned;
+            this.opponentSigned = opponentSigned;
+        }
+
+        private boolean isMeSigned() {
+            return meSigned;
+        }
+
+        private boolean isOpponentSigned() {
+            return opponentSigned;
+        }
     }
     @Transactional
     public void deleteContract(Integer contractSeq, Integer userSeq) {
@@ -487,5 +553,43 @@ public class ContractService {
         }
 
         contractRepository.delete(contract);
+    }
+
+    @Transactional
+    public ContractDetailResponseDto acceptContract(Integer contractSeq, Integer userSeq, String roomId) {
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
+        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
+
+        if (!isCreditor && !isDebtor) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약을 수락할 권한이 없습니다.");
+        }
+
+        // 수락 처리
+        contract.accept(userSeq);
+        contractRepository.save(contract);
+
+        // 시스템 메시지 발송
+        String userName = userProfileRepository.findByUserUserSeq(userSeq)
+                .map(UserProfile::getRealName)
+                .orElse("알 수 없음");
+
+        String content = String.format("%s님이 계약 조건을 수락했습니다.", userName);
+        
+        com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto messageRequest = 
+            new com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto(
+                roomId,
+                userSeq,
+                content,
+                true,
+                "SYSTEM"
+            );
+        
+        com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto response = chatService.saveMessage(messageRequest);
+        messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
+
+        return getContractDetail(contractSeq, userSeq);
     }
 }

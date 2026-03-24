@@ -75,12 +75,20 @@ public class Contract {
     @Column(name = "signed_dttm")
     private LocalDateTime signedDttm;
 
-    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @Column(name = "creditor_accepted")
+    private Boolean creditorAccepted = false;
+
+    @Builder.Default
+    @Column(name = "debtor_accepted")
+    private Boolean debtorAccepted = false;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<ContractClause> clauses = new java.util.ArrayList<>();
 
-    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<RepaymentSchedule> repaymentSchedules = new java.util.ArrayList<>();
 
     public void addClause(ContractClause clause) {
@@ -106,6 +114,21 @@ public class Contract {
         }
         if (interestRate != null) {
             this.interestRate = interestRate;
+        }
+        this.updatedDttm = LocalDateTime.now();
+        resetAgreement();
+    }
+
+    public void resetAgreement() {
+        this.creditorAccepted = false;
+        this.debtorAccepted = false;
+    }
+
+    public void accept(Integer userSeq) {
+        if (creditor.getUserSeq().equals(userSeq)) {
+            this.creditorAccepted = true;
+        } else if (debtor.getUserSeq().equals(userSeq)) {
+            this.debtorAccepted = true;
         }
         this.updatedDttm = LocalDateTime.now();
     }
