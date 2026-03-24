@@ -16,6 +16,8 @@ import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,17 +44,16 @@ public class ContractService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
 
-    // AI 연동 인터페이스. 실제 구현체는 따로 있다고 가정합니다.
-    // private final AIService aiService;
+    private final AIService aiService;
 
     @Transactional
-    public ContractDraftResponseDto createDraft(Integer creditorUserSeq, ContractDraftRequestDto requestDto) {
+    public ContractDraftResponseDto createDraft(Integer creatorUserSeq, ContractDraftRequestDto requestDto) {
 
         // 1. 도메인 유효성 및 엣지 케이스 점검
-        validateBusinessRules(creditorUserSeq, requestDto);
+        validateBusinessRules(creatorUserSeq, requestDto);
 
         // 2. 채권자/채무자 회원 엔티티 조회
-        User creditor = userRepository.findById(creditorUserSeq)
+        User creditor = userRepository.findById(requestDto.getCreditorUserSeq())
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채권자 회원을 찾을 수 없습니다."));
 
         User debtor = userRepository.findById(requestDto.getDebtorUserSeq())
@@ -104,40 +105,56 @@ public class ContractService {
     }
 
     @Transactional
-    public Integer addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+    public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND));
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
         // 2. 상태 검증
         if (!"DRAFT".equals(contract.getStatus())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS);
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
         }
 
         // 3. 권한 검증
         if (!contract.getCreditor().getUserSeq().equals(userSeq)
                 && !contract.getDebtor().getUserSeq().equals(userSeq)) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED);
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
         }
 
-        // 4. AI 서비스 호출 (Mock 처리)
-        String refinedContent = "[AI 변환] " + clauseContent;
+        // 4. AI 서비스 연동 호출
+        String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
+                contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
+
+        AiClauseRequestDto aiRequest = AiClauseRequestDto.builder()
+                .contractSeq(contractSeq)
+                .userIntent(clauseContent)
+                .contractContext(contractContext)
+                .templateType("custom")
+                .build();
+
+        AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // 5. ContractClause 엔티티 생성 및 추가
         int nextOrderNo = contract.getClauses().size() + 1;
+        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isEmpty())
+                ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
+        String newContent = (aiResponse.getLegalClause() != null && !aiResponse.getLegalClause().isEmpty())
+                ? aiResponse.getLegalClause() : clauseContent;
+        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isEmpty())
+                ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
         ContractClause clause = ContractClause.builder()
                 .contract(contract)
-                .clauseId("SPECIAL_" + nextOrderNo)
-                .title("특약사항 " + nextOrderNo)
-                .content(refinedContent)
+                .clauseId(newClauseId)
+                .title(newTitle)
+                .content(newContent)
                 .orderNo(nextOrderNo)
                 .createdDttm(LocalDateTime.now())
                 .build();
 
         contract.addClause(clause);
         contractRepository.flush();
-        return clause.getClauseSeq();
+        return clause;
     }
 
     @Transactional
@@ -328,9 +345,14 @@ public class ContractService {
         }).collect(Collectors.toList());
     }
 
-    private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
+    private void validateBusinessRules(Integer creatorUserSeq, ContractDraftRequestDto request) {
+        // 계약 생성자 본인 포함 여부 검증
+        if (!creatorUserSeq.equals(request.getCreditorUserSeq()) && !creatorUserSeq.equals(request.getDebtorUserSeq())) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "본인이 포함된 계약만 생성할 수 있습니다.");
+        }
+
         // 본인 거래 방지
-        if (creditorUserSeq.equals(request.getDebtorUserSeq())) {
+        if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
         }
 
