@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "signature")
-@IdClass(SignatureId.class)
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -24,7 +23,6 @@ public class Signature {
     @Column(name = "signature_seq")
     private Integer signatureSeq;
 
-    @Id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "key_seq")
     private UserDeviceKey userDeviceKey;
