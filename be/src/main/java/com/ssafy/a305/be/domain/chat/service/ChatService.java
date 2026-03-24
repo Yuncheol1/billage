@@ -61,10 +61,22 @@ public class ChatService {
             .msgType(requestDto.msgType())
             .build();
 
+        // 미리보기 텍스트 정제 (JSON이나 긴 시스템 메시지 대신 요약 노출)
+        String previewText = message.getContent();
+        if ("AI_PROPOSAL".equals(message.getMsgType())) {
+            previewText = "[거래 제안서] 가 도착했습니다.";
+        } else if ("SYSTEM".equals(message.getMsgType())) {
+            if (message.getContent().contains("수락")) {
+                previewText = "[알림] 상대방이 조건을 수락했습니다.";
+            } else {
+                previewText = "[시스템 메시지]";
+            }
+        }
+
         ChatMessage savedMessage = chatMessageRepository.save(message);
 
         // 방 정보 업데이트 (마지막 메시지 등 & 보낸 사람 읽음 처리)
-        chatRoom.updateLastMessage(savedMessage.getContent(), savedMessage.getCreatedAt());
+        chatRoom.updateLastMessage(previewText, savedMessage.getCreatedAt());
         chatRoom.getLastReadAt().put(String.valueOf(requestDto.senderSeq()), savedMessage.getCreatedAt());
         chatRoomRepository.save(chatRoom);
 
