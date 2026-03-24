@@ -42,10 +42,14 @@ oauth:
 
 ssafy:
   api:
-    base-url: https://finopenapi.ssafy.io
+    base-url: ${SSAFY_API_BASE_URL:https://finopenapi.ssafy.io}
     api-key: ${SSAFY_API_KEY:}
-    member-search-path: /ssafy/api/v1/member/search
-    member-create-path: /ssafy/api/v1/member
+    institution-code: ${SSAFY_INSTITUTION_CODE:00100}
+    fintech-app-no: ${SSAFY_FINTECH_APP_NO:001}
+    member-search-path: ${SSAFY_MEMBER_SEARCH_PATH:/ssafy/api/v1/member/search}
+    member-create-path: ${SSAFY_MEMBER_CREATE_PATH:/ssafy/api/v1/member}
+    create-demand-deposit-account-path: ${SSAFY_CREATE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/createDemandDepositAccount}
+    demand-deposit-account-type-unique-no: ${SSAFY_DEMAND_DEPOSIT_ACCOUNT_TYPE_UNIQUE_NO:001-1-f8b3869eff034c}
 
 ai:
   server:

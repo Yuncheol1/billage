@@ -11,6 +11,10 @@ public class SsafyApiProperties {
 
     private String baseUrl;
     private String apiKey;
+    private String institutionCode;
+    private String fintechAppNo;
     private String memberSearchPath;
     private String memberCreatePath;
+    private String createDemandDepositAccountPath;
+    private String demandDepositAccountTypeUniqueNo;
 }
