@@ -93,9 +93,15 @@ class AuthServiceRedisIntegrationTest {
                         12345L,
                         new KakaoUserInfoResponse.KakaoAccount(
                                 "test@example.com",
+                                null,
+                                null,
+                                false,
                                 true,
                                 true,
-                                true
+                                true,
+                                "male",
+                                "0216",
+                                "1998"
                         )
                 ));
         when(socialAuthRepository.findByProviderAndProviderUserId("KAKAO", "12345"))

@@ -68,9 +68,12 @@ public class UserProfile {
     @Column(name = "updated_dttm")
     private LocalDateTime updatedDttm;
 
-    public void syncFromKakao(String realName, Boolean phoneVerified) {
+    public void syncFromKakao(String realName, Boolean phoneVerified, String rrn) {
         this.realName = realName;
         this.phoneVerified = phoneVerified;
+        if ((this.rrn == null || this.rrn.isBlank()) && rrn != null && !rrn.isBlank()) {
+            this.rrn = rrn;
+        }
         this.updatedDttm = LocalDateTime.now();
     }
 }

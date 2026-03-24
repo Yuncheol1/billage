@@ -19,7 +19,10 @@ public record KakaoUserInfoResponse(
             @JsonProperty("is_email_valid")
             Boolean isEmailValid,
             @JsonProperty("is_email_verified")
-            Boolean isEmailVerified
+            Boolean isEmailVerified,
+            String gender,
+            String birthday,
+            String birthyear
     ) {
     }
 }
