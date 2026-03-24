@@ -41,4 +41,17 @@ public class GlobalExceptionHandler {
                         .timestamp(LocalDateTime.now())
                         .build());
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e) {
+        log.error("UnexpectedException", e);
+        return ResponseEntity
+                .internalServerError()
+                .body(ErrorResponse.builder()
+                        .status(500)
+                        .error("INTERNAL_SERVER_ERROR")
+                        .message(e.getMessage() != null ? e.getMessage() : "서버 내부 오류가 발생했습니다.")
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
 }

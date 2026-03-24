@@ -1,20 +1,19 @@
 package com.ssafy.a305.be.domain.contract.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AiClauseResponseDto {
 
+    private String title;
+    
     @JsonProperty("clause_id")
     private String clauseId;
-
-    private String title;
 
     @JsonProperty("legal_clause")
     private String legalClause;

@@ -41,9 +41,17 @@ public class ChatRoomController {
     @PostMapping("/rooms")
     public ResponseEntity<ChatRoomResponseDto> createRoomByEmail(
             @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
-            @org.springframework.web.bind.annotation.RequestBody ChatRoomCreateRequestDto request) {
-        // 실제로는 인증 정보에서 userSeq를 추출
+            @RequestBody ChatRoomCreateRequestDto request) {
         ChatRoomResponseDto room = chatService.createRoomByEmail(userSeq, request.targetEmail());
+        return ResponseEntity.ok(room);
+    }
+
+    // 유저 시퀀스로 새로운 채팅방 생성 (계약 생성 후 사용)
+    @PostMapping("/rooms/user/{targetUserSeq}")
+    public ResponseEntity<ChatRoomResponseDto> createRoomByUserSeq(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @PathVariable("targetUserSeq") Integer targetUserSeq) {
+        ChatRoomResponseDto room = chatService.createRoomByUserSeq(userSeq, targetUserSeq);
         return ResponseEntity.ok(room);
     }
 
