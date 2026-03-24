@@ -63,6 +63,7 @@ public class AuthService {
     private final SocialAuthRepository socialAuthRepository;
     private final TermsMasterRepository termsMasterRepository;
     private final UserConsentRepository userConsentRepository;
+    private final SsafyMemberService ssafyMemberService;
 
     @Transactional
     public KakaoLoginResponseDto loginWithKakao(KakaoLoginRequestDto requestDto) {
@@ -241,6 +242,11 @@ public class AuthService {
                 .providerUserId(providerUserId)
                 .connectedDttm(now)
                 .build());
+
+        if (newUser.getEmail() != null && !newUser.getEmail().isBlank()) {
+            String userKey = ssafyMemberService.getOrCreateUserKey(newUser.getEmail());
+            newUser.updateSsafyUserKey(userKey);
+        }
 
         return SocialLoginResult.newUser(newUser);
     }
