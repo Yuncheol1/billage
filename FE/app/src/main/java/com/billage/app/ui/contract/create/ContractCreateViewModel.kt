@@ -202,18 +202,26 @@ class ContractCreateViewModel @Inject constructor(
     // ─────────────────────────────────────────
 
     fun submitContractDraft() {
-        val creditorUserSeq = authSessionStorage.getUserSeq()
-        if (creditorUserSeq == -1) {
+        val myUserSeq = authSessionStorage.getUserSeq()
+        if (myUserSeq == -1) {
             _submitState.value = ContractSubmitState.Error("로그인 정보를 찾을 수 없어요. 다시 로그인해 주세요.")
             return
         }
 
         val form = _formState.value
 
-        val debtorSeq = form.debtorUserSeq ?: run {
+        val counterpartySeq = form.debtorUserSeq ?: run {
             _submitState.value = ContractSubmitState.Error("상대방 정보가 없어요.")
             return
         }
+
+        // 역할에 따라 채권자/채무자 결정
+        // TODO: [BE 수정 필요] 빌리기(DEBTOR) 역할로 계약 생성 시 서버에서 "본인과의 계약은 불가합니다" 오류 발생.
+        //  현재 서버가 creditorUserSeq를 JWT 사용자로 강제 설정하는 것으로 추정됨.
+        //  백엔드에서 채무자(debtorUserSeq == JWT.userSeq) 개시 계약을 지원하도록 수정 후
+        //  아래 로직이 정상 동작하는지 재확인 필요.
+        val creditorUserSeq = if (form.role == ContractRole.CREDITOR) myUserSeq else counterpartySeq
+        val debtorSeq       = if (form.role == ContractRole.CREDITOR) counterpartySeq else myUserSeq
         val isFamily = form.isFamily ?: run {
             _submitState.value = ContractSubmitState.Error("가족 여부를 선택해 주세요.")
             return

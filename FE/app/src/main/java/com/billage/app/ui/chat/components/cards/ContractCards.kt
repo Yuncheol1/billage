@@ -377,7 +377,7 @@ fun ContractCompleteCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "양측 모두 전자서명을 완료하여 상환 타임라인이 시작되었습니다.",
+                text = "서로가 모두 전자서명을 완료하여 상환 타임라인이 시작되었습니다.",
                 style = MaterialTheme.typography.bodySmall,
                 color = BillageTextSecondary.copy(alpha = 0.8f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
