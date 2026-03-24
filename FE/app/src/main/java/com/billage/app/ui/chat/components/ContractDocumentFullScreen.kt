@@ -39,18 +39,31 @@ fun ContractDocumentFullScreen(
     onAccept: () -> Unit,
     onEdit: () -> Unit = {},
     isMeAccepted: Boolean = false,
-    isOpponentAccepted: Boolean = false
+    isOpponentAccepted: Boolean = false,
+    originalPrincipal: Double? = null,
+    originalInterestRate: Double? = null,
+    isInitial: Boolean = false
 ) {
-    var showEditLockAlert by remember { mutableStateOf(false) }
+    var showModificationWarning by remember { mutableStateOf(false) }
 
-    if (showEditLockAlert) {
+    if (showModificationWarning) {
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showEditLockAlert = false },
-            title = { Text("수정 불가", fontWeight = FontWeight.Bold) },
-            text = { Text("이미 양측이 모든 조건에 수락한 계약입니다.\n수정하시려면 상대방에게 수정 요청을 하시거나 채팅으로 대화해주세요.") },
+            onDismissRequest = { showModificationWarning = false },
+            title = { Text("수정 시 수락 초기화 안내", fontWeight = FontWeight.Bold) },
+            text = { Text("계약 조건을 수정하면 현재의 모든 수락 상태가 초기화됩니다. 계속하시겠습니까?") },
             confirmButton = {
-                TextButton(onClick = { showEditLockAlert = false }) {
-                    Text("확인", color = BillagePrimary)
+                TextButton(
+                    onClick = {
+                        showModificationWarning = false
+                        onEdit()
+                    }
+                ) {
+                    Text("네, 수정할게요", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModificationWarning = false }) {
+                    Text("취소", color = BillageTextSecondary)
                 }
             }
         )
@@ -91,7 +104,7 @@ fun ContractDocumentFullScreen(
 
                 // Tabs
                 var selectedTab by remember { mutableIntStateOf(0) }
-                val tabs = listOf("반영된 원문 보기", "변경사항(Diff) 보기")
+                val tabs = if (isInitial) listOf("반영된 원문 보기") else listOf("반영된 원문 보기", "변경사항(Diff) 보기")
 
                 TabRow(
                     selectedTabIndex = selectedTab,
@@ -125,7 +138,7 @@ fun ContractDocumentFullScreen(
                 // Content
                 Box(modifier = Modifier.weight(1f).background(Color.White)) {
                     if (selectedTab == 1) { // Diff View
-                        DocumentDiffView(contractTitle, contractDetail)
+                        DocumentDiffView(contractTitle, contractDetail, originalPrincipal, originalInterestRate)
                     } else { // Original View
                         DocumentOriginalView(contractTitle, contractDetail)
                     }
@@ -164,8 +177,8 @@ fun ContractDocumentFullScreen(
                     // CTA 2: 조건 수정하기 (보조 액션)
                     OutlinedButton(
                         onClick = {
-                            if (isMeAccepted && isOpponentAccepted) {
-                                showEditLockAlert = true
+                            if (isMeAccepted || isOpponentAccepted) {
+                                showModificationWarning = true
                             } else {
                                 onEdit()
                             }
@@ -236,7 +249,12 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: 
 
 // Diff View
 @Composable
-fun DocumentDiffView(title: String, detail: ContractDetailResponse?) {
+fun DocumentDiffView(
+    title: String, 
+    detail: ContractDetailResponse?,
+    providedOriginalPrincipal: Double? = null,
+    providedOriginalInterest: Double? = null
+) {
     val delStyle = SpanStyle(
         color = Color(0xFFCB2431),
         background = Color(0xFFFFEEF0),
@@ -258,11 +276,11 @@ fun DocumentDiffView(title: String, detail: ContractDetailResponse?) {
     }
 
     val counterparty = detail?.counterpartyName ?: "김철수"
-    val originalPrincipal = detail?.principalAmount?.toLong() ?: 0L
-    val originalInterest = detail?.interestRate ?: 0.0
-
-    val propPrincipal = proposal?.principalAmount?.toLong() ?: originalPrincipal
-    val propInterest = proposal?.interestRate ?: originalInterest
+    val originalPrincipal = providedOriginalPrincipal?.toLong() ?: detail?.principalAmount?.toLong() ?: 0L
+    val originalInterest = providedOriginalInterest ?: detail?.interestRate ?: 0.0
+    
+    val propPrincipal = proposal?.principalAmount?.toLong() ?: detail?.principalAmount?.toLong() ?: originalPrincipal
+    val propInterest = proposal?.interestRate ?: detail?.interestRate ?: originalInterest
 
     Column(
         modifier = Modifier

@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 data class AiProposalPayload(
     val contractTitle: String,
     val contractSeq: Int,
+    val originalPrincipal: Double? = null,
     val originalInterestRate: Double,
     val proposedInterestRate: Double,
     val modifications: List<String> = emptyList(),

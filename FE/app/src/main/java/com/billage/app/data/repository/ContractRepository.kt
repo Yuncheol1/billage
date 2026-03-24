@@ -20,8 +20,8 @@ class ContractRepository @Inject constructor(
         return response.data
     }
 
-    suspend fun updateContract(contractSeq: Int, request: com.billage.app.data.remote.api.ContractUpdateRequest): com.billage.app.data.remote.api.ContractupdateBaseResponse {
-        return contractApi.updateContract(contractSeq, request)
+    suspend fun updateContract(contractSeq: Int, request: com.billage.app.data.remote.api.ContractUpdateRequest, roomId: String? = null): com.billage.app.data.remote.api.ContractupdateBaseResponse {
+        return contractApi.updateContract(contractSeq, request, roomId)
     }
 
     suspend fun createAiProposalMock(contractSeq: Int): com.billage.app.data.remote.api.ContractupdateBaseResponse {
