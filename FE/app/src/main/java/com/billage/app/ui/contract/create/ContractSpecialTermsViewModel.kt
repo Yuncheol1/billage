@@ -36,7 +36,7 @@ data class SpecialTermsUiState(
 @HiltViewModel
 class ContractSpecialTermsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val contractApi: ContractApi  // ← Hilt가 자동 주입
+    private val contractApi: ContractApi
 ) : ViewModel() {
 
     val contractSeq: Int = savedStateHandle.get<String>("contractSeq")?.toIntOrNull() ?: -1
@@ -69,13 +69,22 @@ class ContractSpecialTermsViewModel @Inject constructor(
     fun updateDirectInputText(text: String) {
         _uiState.value = _uiState.value.copy(
             directInputText = text,
-            errorMessage = null
+            errorMessage = null  // 타이핑 시 에러 초기화
         )
     }
 
     fun addDirectInputTerm() {
         val content = _uiState.value.directInputText.trim()
-        if (content.isEmpty()) return
+
+        // 유효성 검사
+        if (content.isEmpty()) {
+            _uiState.value = _uiState.value.copy(errorMessage = "내용을 입력해주세요")
+            return
+        }
+        if (content.length < 10) {
+            _uiState.value = _uiState.value.copy(errorMessage = "조금 더 구체적으로 입력해주세요")
+            return
+        }
 
         callAddClauseApi(
             clauseContent = content,
@@ -87,7 +96,7 @@ class ContractSpecialTermsViewModel @Inject constructor(
     fun removeTerm(termId: String) {
         val term = _uiState.value.addedTerms.find { it.id == termId } ?: return
 
-        // clauseSeq가 없으면 로컈에서만 제거 (서버에 저장 안 된 항목)
+        // clauseSeq가 없으면 로컬에서만 제거 (서버에 저장 안 된 항목)
         if (contractSeq == -1 || term.clauseSeq == -1) {
             _uiState.value = _uiState.value.copy(
                 addedTerms = _uiState.value.addedTerms.filter { it.id != termId }
@@ -140,7 +149,6 @@ class ContractSpecialTermsViewModel @Inject constructor(
                 errorMessage = null
             )
             try {
-                // ← 실제 API 호출
                 val response = contractApi.addClause(
                     contractSeq = contractSeq,
                     request = AddClauseRequest(clauseContent = clauseContent)
@@ -161,14 +169,14 @@ class ContractSpecialTermsViewModel @Inject constructor(
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = response.message
+                        errorMessage = "특약 생성에 실패했어요. 다시 시도해주세요"
                     )
                 }
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "특약 추가에 실패했어요. 다시 시도해 주세요."
+                    errorMessage = "특약 생성에 실패했어요. 다시 시도해주세요"
                 )
             }
         }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun ContractSpecialTermsScreen(
     onSkip: () -> Unit,
     onComplete: () -> Unit,
-    viewModel: ContractSpecialTermsViewModel = hiltViewModel()  // ← 교체
+    viewModel: ContractSpecialTermsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -75,28 +74,18 @@ fun ContractSpecialTermsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 직접 입력 섹션
+            // 직접 입력 섹션 — 에러 메시지 포함
             DirectInputSection(
                 inputText = uiState.directInputText,
                 onInputChange = { viewModel.updateDirectInputText(it) },
                 isLoading = uiState.isLoading,
+                errorMessage = uiState.errorMessage,
                 onAddClick = { viewModel.addDirectInputTerm() }
             )
 
-            // 에러 메시지
-            if (uiState.errorMessage != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = uiState.errorMessage!!,
-                    color = BillageDanger,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-            }
-
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 완료하기 버튼 — 이미 특약이 저장된 상태이므로 API 호출 없이 이동
+            // 완료하기 버튼
             Button(
                 onClick = onComplete,
                 modifier = Modifier
@@ -242,8 +231,7 @@ private fun RecommendedTermsSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // FlowRow 대신 — 3개씩 Row로 직접 배치
-        val rows = recommendedTerms.chunked(3) // 3개씩 묶기
+        val rows = recommendedTerms.chunked(3)
         rows.forEach { rowItems ->
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -258,7 +246,6 @@ private fun RecommendedTermsSection(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                // 마지막 행 아이템이 3개 미만이면 빈 공간으로 채우기
                 repeat(3 - rowItems.size) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
@@ -312,29 +299,59 @@ private fun DirectInputSection(
     inputText: String,
     onInputChange: (String) -> Unit,
     isLoading: Boolean,
+    errorMessage: String?,
     onAddClick: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "직접 입력",
-                color = BillageTextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
+        Text(
+            text = "직접 입력",
+            color = BillageTextSecondary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 텍스트박스 + 내부 우하단 AI 변환 버튼
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = onInputChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 130.dp),
+                placeholder = {
+                    Text(
+                        text = "사연어로 편하게 적어요\n예) 늦으면 이자 더 낼게",
+                        color = BillageTextSecondary,
+                        fontSize = 14.sp
+                    )
+                },
+                enabled = !isLoading,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (errorMessage != null) BillageDanger else BillagePrimary,
+                    unfocusedBorderColor = if (errorMessage != null) BillageDanger else BillageCardBorder,
+                    focusedContainerColor = BillageSurface,
+                    unfocusedContainerColor = BillageSurface
+                )
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            // AI 변환 배지 — 탭하면 입력 내용을 BE로 전송해 AI가 처리
+
+            // AI 변환 버튼 — 텍스트박스 내부 우하단
+            val canConvert = inputText.isNotBlank() && !isLoading
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(BillagePrimary)
-                    .clickable(
-                        enabled = inputText.isNotBlank() && !isLoading,
-                        onClick = onAddClick
-                    )
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 10.dp, bottom = 10.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (canConvert) BillagePrimary else BillagePrimaryDisabled)
+                    .clickable(enabled = canConvert, onClick = onAddClick)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(12.dp),
@@ -342,14 +359,8 @@ private fun DirectInputSection(
                             strokeWidth = 1.5.dp
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(13.dp)
-                        )
+                        Text(text = "✨", fontSize = 12.sp)
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isLoading) "저장 중..." else "AI 변환",
                         color = Color.White,
@@ -360,29 +371,15 @@ private fun DirectInputSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = inputText,
-            onValueChange = onInputChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp),
-            placeholder = {
-                Text(
-                    text = "사연어로 편하게 적어요\n예) 늦으면 이자 더 낼게",
-                    color = BillageTextSecondary,
-                    fontSize = 14.sp
-                )
-            },
-            enabled = !isLoading,
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BillagePrimary,
-                unfocusedBorderColor = BillageCardBorder,
-                focusedContainerColor = BillageSurface,
-                unfocusedContainerColor = BillageSurface
+        // 에러 메시지 — 텍스트박스 바로 아래 인라인
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = errorMessage,
+                color = BillageDanger,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 4.dp)
             )
-        )
+        }
     }
 }
