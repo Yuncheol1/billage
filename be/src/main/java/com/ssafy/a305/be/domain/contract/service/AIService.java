@@ -22,10 +22,10 @@ public class AIService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${ai.server.url:http://3.35.206.231:8000/internal/v1/clauses/generate}")
+    @Value("${ai.server.url}")
     private String aiServerUrl;
 
-    @Value("${ai.internal.api.key:super-secret-key-change-me-in-production}")
+    @Value("${ai.internal.api.key}")
     private String internalApiKey;
 
     public AiClauseResponseDto generateClause(AiClauseRequestDto requestDto) {
@@ -47,7 +47,8 @@ public class AIService {
             if (e.getStatusCode().value() == 403) {
                 throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "AI 서버: API Key 혹은 접근 권한이 없습니다.");
             }
-            throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 서버 요청 실패: " + e.getResponseBodyAsString());
+            throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
+                    "AI 서버 요청 실패: " + e.getResponseBodyAsString());
         } catch (HttpServerErrorException e) {
             log.error("AI Server Server Error (5xx): {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 서버 장애가 발생했습니다.");
