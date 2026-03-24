@@ -10,8 +10,14 @@ import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractSignatureResponseDto;
 import com.ssafy.a305.be.domain.contract.service.ContractService;
 import com.ssafy.a305.be.domain.contract.service.ContractSignatureService;
+import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -46,19 +52,29 @@ public class ContractController {
                 "data", responseDto));
     }
 
+    @Operation(summary = "AI 특약 자동 생성", description = "계약 정보와 사용자 의도를 바탕으로 AI 서버와 통신하여 법적으로 유효한 특약을 생성하고 계약에 추가합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "특약사항 성공적 저장"),
+        @ApiResponse(responseCode = "400", description = "입력값 오류 또는 상태 불일치"),
+        @ApiResponse(responseCode = "500", description = "AI 서버 통신 장애")
+    })
     @PostMapping("/{contractSeq}/clauses")
     public ResponseEntity<Map<String, Object>> addAiClauses(
             @AuthenticationPrincipal AuthenticatedUser authUser,
-            @PathVariable Integer contractSeq,
-            @Valid @RequestBody ClauseRequestDto requestDto) {
+            @Parameter(description = "계약 식별자(PK)") @PathVariable Integer contractSeq,
+            @Parameter(description = "사용자의 자연어 요구사항(user_intent 전달용)") @Valid @RequestBody ClauseRequestDto requestDto) {
 
         Integer userSeq = authUser.userSeq();
-        Integer clauseSeq = contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), userSeq);
+        ContractClause clause = contractService.addAiClauses(contractSeq, requestDto.getClauseContent(), userSeq);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", HttpStatus.CREATED.value(),
                 "message", "특약사항이 성공적으로 저장되었습니다.",
-                "data", Map.of("clauseSeq", clauseSeq)));
+                "data", Map.of(
+                        "clauseSeq", clause.getClauseSeq(),
+                        "title", clause.getTitle(),
+                        "content", clause.getContent()
+                )));
     }
 
     @PatchMapping("/{contractSeq}/clauses/{clauseSeq}")
