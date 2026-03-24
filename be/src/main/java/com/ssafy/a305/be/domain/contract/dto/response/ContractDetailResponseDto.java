@@ -29,8 +29,16 @@ public class ContractDetailResponseDto {
     private final List<ClauseDetailDto> clauses;
     private final Boolean isMeAccepted;
     private final Boolean isOpponentAccepted;
+    private final Boolean isMeSigned;
+    private final Boolean isOpponentSigned;
 
-    public ContractDetailResponseDto(Contract contract, Integer myUserSeq, String counterpartyName){
+    public ContractDetailResponseDto(
+            Contract contract,
+            Integer myUserSeq,
+            String counterpartyName,
+            Boolean isMeSigned,
+            Boolean isOpponentSigned
+    ){
         this.contractSeq=contract.getContractSeq();
         this.contractId=contract.getContractId();
         this.family=contract.getFamily();
@@ -53,6 +61,8 @@ public class ContractDetailResponseDto {
             this.isMeAccepted = contract.getDebtorAccepted();
             this.isOpponentAccepted = contract.getCreditorAccepted();
         }
+        this.isMeSigned = isMeSigned;
+        this.isOpponentSigned = isOpponentSigned;
 
         this.clauses=contract.getClauses().stream()
                 .map(ClauseDetailDto::new)
