@@ -24,6 +24,7 @@ import com.billage.app.ui.theme.*
 fun ContractEditScreen(
     contractSeq: String,
     viewModel: ContractDetailViewModel,
+    roomId: String? = null,
     onBackClick: () -> Unit,
     onSaveSuccess: () -> Unit
 ) {
@@ -77,7 +78,8 @@ fun ContractEditScreen(
                         contractSeq = contractSeq.toInt(),
                         principalAmount = principalAmount.toDoubleOrNull(),
                         interestRate = interestRate.toDoubleOrNull(),
-                        clauses = clauseList.map { com.billage.app.data.remote.api.ClauseUpdateDto(it.clauseSeq, it.content) }
+                        clauses = clauseList.map { com.billage.app.data.remote.api.ClauseUpdateDto(it.clauseSeq, it.content) },
+                        roomId = roomId
                     )
                 },
                 modifier = Modifier

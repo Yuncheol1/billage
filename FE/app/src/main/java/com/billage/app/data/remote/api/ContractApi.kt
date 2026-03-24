@@ -46,7 +46,8 @@ interface ContractApi {
     @retrofit2.http.PUT("/api/v1/contracts/{contractSeq}")
     suspend fun updateContract(
         @retrofit2.http.Path("contractSeq") contractSeq: Int,
-        @retrofit2.http.Body request: ContractUpdateRequest
+        @retrofit2.http.Body request: ContractUpdateRequest,
+        @retrofit2.http.Query("roomId") roomId: String? = null
     ): ContractupdateBaseResponse
 
     @retrofit2.http.POST("/api/v1/contracts/{contractSeq}/ai-propose-mock")

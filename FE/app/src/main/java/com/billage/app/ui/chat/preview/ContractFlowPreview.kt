@@ -3,12 +3,8 @@ package com.billage.app.ui.chat.preview
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -57,6 +53,9 @@ fun ContractFlowPreview() {
                 if (newMode == ChatRoomMode.NORMAL) {
                     chatState = chatState.copy(mode = ChatRoomMode.NORMAL, selectedContract = null)
                 }
+            },
+            onExitModificationMode = {
+                chatState = chatState.copy(mode = ChatRoomMode.NORMAL, selectedContract = null)
             },
             messageListContent = {
                 LazyColumn(

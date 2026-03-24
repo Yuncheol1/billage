@@ -41,6 +41,8 @@ import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 fun NavGraphBuilder.appNavGraph(
@@ -132,18 +134,21 @@ fun NavGraphBuilder.appNavGraph(
             contracts = contracts,
             onFetchContracts = { viewModel.fetchContracts() },
             onBackClick = { appNavController.popBackStack() },
-            onModeChange = { mode -> viewModel.exitModificationMode() },
+            onModeChange = { mode -> viewModel.setMode(mode) },
             onSendMessage = { content -> viewModel.sendMessage(content) },
             onAddMenuClick = {},
             onRequestAiProposal = { viewModel.requestAiProposal() },
             onContractSelectForModify = { contract -> viewModel.setModificationMode(contract) },
-            onCommitProposal = { viewModel.submitProposal() },
+            onExitModificationMode = { viewModel.exitModificationMode() },
             onCancelProposal = { viewModel.cancelProposal() },
-            onDirectEditClick = { contractSeq -> appNavController.navigateToContractEdit(contractSeq) },
             onSubmitSignature = { request -> viewModel.submitContractSignature(request) },
             onDismissSignatureFeedback = { viewModel.clearSignatureFeedback() },
+            onDirectEditClick = { seq -> appNavController.navigateToContractEdit(seq, roomId) },
             messageListContent = {
                 var showProposalDialog by remember { mutableStateOf(false) }
+                var currentOriginalPrincipal by remember { mutableStateOf<Double?>(null) }
+                var currentOriginalInterest by remember { mutableStateOf<Double?>(null) }
+                var isInitialDialog by remember { mutableStateOf(false) }
 
                 // 차용증 전문/제안서 다이얼로그
                 if (showProposalDialog && chatRoomState.draftContractDetail != null) {
@@ -152,6 +157,9 @@ fun NavGraphBuilder.appNavGraph(
                         contractDetail = chatRoomState.draftContractDetail!!,
                         isMeAccepted = chatRoomState.isMeAccepted,
                         isOpponentAccepted = chatRoomState.isOpponentAccepted,
+                        originalPrincipal = currentOriginalPrincipal,
+                        originalInterestRate = currentOriginalInterest,
+                        isInitial = isInitialDialog,
                         onDismissRequest = { showProposalDialog = false },
                         onAccept = {
                             showProposalDialog = false
@@ -164,7 +172,7 @@ fun NavGraphBuilder.appNavGraph(
                             } else {
                                 showProposalDialog = false
                                 chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
-                                    appNavController.navigateToContractEdit(seq)
+                                    appNavController.navigateToContractEdit(seq, roomId)
                                 }
                             }
                         }
@@ -205,6 +213,9 @@ fun NavGraphBuilder.appNavGraph(
                                          isInitial = payload.isInitial
                                      ),
                                      onViewDetailsClick = {
+                                         currentOriginalPrincipal = payload.originalPrincipal
+                                         currentOriginalInterest = payload.originalInterestRate
+                                         isInitialDialog = payload.isInitial
                                          viewModel.fetchContractDetail(payload.contractSeq)
                                          showProposalDialog = true
                                      }
@@ -313,9 +324,25 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(route = AppDestination.ContractEdit.routeWithArg) { backStackEntry ->
+    composable(
+        route = AppDestination.ContractEdit.routeWithArg,
+        arguments = listOf(
+            androidx.navigation.navArgument("contractSeq") { type = androidx.navigation.NavType.StringType },
+            androidx.navigation.navArgument("roomId") {
+                type = androidx.navigation.NavType.StringType
+                nullable = true
+                defaultValue = null
+            }
+        )
+    ) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
-        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val roomId = backStackEntry.arguments?.getString("roomId")
+        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = hiltViewModel(
+            checkNotNull<androidx.lifecycle.ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
+                    "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
+                },
+            null
+        )
 
         androidx.compose.runtime.LaunchedEffect(contractSeq) {
             if (contractSeq != -1) viewModel.fetchContractDetail(contractSeq)
@@ -324,6 +351,7 @@ fun NavGraphBuilder.appNavGraph(
         com.billage.app.ui.contract.detail.ContractEditScreen(
             contractSeq = contractSeq.toString(),
             viewModel = viewModel,
+            roomId = roomId,
             onBackClick = { appNavController.popBackStack() },
             onSaveSuccess = { appNavController.popBackStack() }
         )
