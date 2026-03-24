@@ -27,7 +27,8 @@ public class BankAccountController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
         CreateBankAccountResponseDto responseDto = bankAccountService.createBankAccount(userSeq);
-        return ResponseEntity.status(HttpStatus.CREATED).body(successResponse("계좌 생성 성공", responseDto));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(successResponse(HttpStatus.CREATED, "계좌 생성 성공", responseDto));
     }
 
     private AuthenticatedUser requireAuthenticatedUser(AuthenticatedUser authenticatedUser) {
@@ -37,9 +38,9 @@ public class BankAccountController {
         return authenticatedUser;
     }
 
-    private Map<String, Object> successResponse(String message, Object data) {
+    private Map<String, Object> successResponse(HttpStatus status, String message, Object data) {
         return Map.of(
-                "status", HttpStatus.OK.value(),
+                "status", status.value(),
                 "message", message,
                 "data", data
         );

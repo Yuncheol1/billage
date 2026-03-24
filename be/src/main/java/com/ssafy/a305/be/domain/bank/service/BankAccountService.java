@@ -12,6 +12,7 @@ import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,17 +52,22 @@ public class BankAccountService {
 
         boolean isPrimary = !bankAccountRepository.existsByUserUserSeqAndStatus(userSeq, BankAccountStatus.ACTIVE);
 
-        BankAccount bankAccount = bankAccountRepository.save(BankAccount.builder()
-                .user(user)
-                .provider(PROVIDER_SSAFY)
-                .bankCode(rec.bankCode())
-                .accountTypeUniqueNo(ssafyApiProperties.getDemandDepositAccountTypeUniqueNo())
-                .accountNo(rec.accountNo())
-                .accountNoMasked(maskAccountNo(rec.accountNo()))
-                .isPrimary(isPrimary)
-                .linkedDttm(LocalDateTime.now())
-                .status(BankAccountStatus.ACTIVE)
-                .build());
+        BankAccount bankAccount;
+        try {
+            bankAccount = bankAccountRepository.save(BankAccount.builder()
+                    .user(user)
+                    .provider(PROVIDER_SSAFY)
+                    .bankCode(rec.bankCode())
+                    .accountTypeUniqueNo(ssafyApiProperties.getDemandDepositAccountTypeUniqueNo())
+                    .accountNo(rec.accountNo())
+                    .accountNoMasked(maskAccountNo(rec.accountNo()))
+                    .isPrimary(isPrimary)
+                    .linkedDttm(LocalDateTime.now())
+                    .status(BankAccountStatus.ACTIVE)
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "이미 등록된 계좌번호입니다.");
+        }
 
         return CreateBankAccountResponseDto.from(bankAccount);
     }
