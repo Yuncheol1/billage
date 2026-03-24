@@ -15,7 +15,7 @@
 .cxx
 local.properties
 
-# 로컬 환경 설정
+# Gradle
 gradle/gradle-daemon-jvm.properties
 
 # Firebase
@@ -24,3 +24,11 @@ google-services.json
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Gemini CLI
+.gemini/
+.gemini_history
+.env
+gemini_credentials.json
+GEMINI.local.md
+GEMINI.md

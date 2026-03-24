@@ -50,7 +50,7 @@ sealed interface AppDestination {
 
     data object ContractSpecialTerms : AppDestination {
         override val route: String = "contract_special_terms"
-        const val routeWithArg = "contract_special_terms/{contractSeq}"
+        const val routeWithArg = "contract_special_terms/{contractSeq}/{roomId}/{opponentName}"
     }
 
     data object ContractEdit : AppDestination {
@@ -61,6 +61,15 @@ sealed interface AppDestination {
     data object ContractDetail : AppDestination {
         override val route: String = "contract_detail"
         const val routeWithArg = "contract_detail/{contractId}"
+    }
+
+    data object InsightList : AppDestination {
+        override val route: String = "insight_list"
+    }
+
+    data object InsightDetail : AppDestination {
+        override val route: String = "insight_detail"
+        const val routeWithArg = "insight_detail/{insightIndex}"
     }
 }
 
@@ -217,8 +226,26 @@ class AppNavController(
         }
     }
 
-    fun navigateToSpecialTerms(contractSeq: Int = -1) {
-        navController.navigate("${AppDestination.ContractSpecialTerms.route}/$contractSeq") {
+    fun navigateToSpecialTerms(
+        contractSeq: Int = -1,
+        roomId: String = "none",
+        opponentName: String = "알 수 없음"
+    ) {
+        navController.navigate("${AppDestination.ContractSpecialTerms.route}/$contractSeq/$roomId/$opponentName") {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToInsightList() {
+        navController.navigate(AppDestination.InsightList.route) {
+            popUpTo(AppDestination.Home.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    fun navigateToInsightDetail(insightIndex: Int) {
+        navController.navigate("${AppDestination.InsightDetail.route}/$insightIndex") {
             launchSingleTop = true
         }
     }

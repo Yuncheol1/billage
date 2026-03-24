@@ -64,6 +64,7 @@ fun ChatListScreen(
     onHomeClick: () -> Unit,
     onAddContractClick: (com.billage.app.ui.contract.create.ContractRole) -> Unit,
     onContractClick: () -> Unit = {},
+    onInsightListClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState()
@@ -340,11 +341,10 @@ fun ChatListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
-                    onContractMenuClick = {
+                    onInsightListClick = {
                         showMenu = false
-                        onContractClick()
+                        onInsightListClick()
                     },
-                    onReportMenuClick = { showMenu = false },
                     onSettingsClick = {
                         showMenu = false
                         onSettingsClick()

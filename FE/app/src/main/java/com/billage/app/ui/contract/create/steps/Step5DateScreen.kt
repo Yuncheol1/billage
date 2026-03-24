@@ -74,10 +74,14 @@ fun Step5DateScreen(
     // 만기일 달력 표시 여부
     var showEndDatePicker by remember { mutableStateOf(false) }
 
-    // 시작일이 비어있으면 오늘 날짜 자동 입력
+    // 시작일이 비어있거나 과거인 경우 오늘 날짜로 갱신
+    // (자정 경계: 이전 화면 진입 시 설정한 날짜가 제출 시점엔 과거가 될 수 있음)
     LaunchedEffect(Unit) {
-        if (startDate.isBlank()) {
-            onStartDateSelect(LocalDate.now().toDateString())
+        val today = LocalDate.now()
+        val isBlankOrPast = startDate.isBlank() ||
+            runCatching { LocalDate.parse(startDate, DATE_FORMATTER).isBefore(today) }.getOrDefault(true)
+        if (isBlankOrPast) {
+            onStartDateSelect(today.toDateString())
         }
     }
 
@@ -213,7 +217,7 @@ fun Step5DateScreen(
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { millis ->
                         val selected = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.of("UTC"))
+                            .atZone(ZoneId.systemDefault())
                             .toLocalDate()
                         onStartDateSelect(selected.toDateString())
                         // 시작일이 바뀌면 만기일 초기화
@@ -260,7 +264,7 @@ fun Step5DateScreen(
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { millis ->
                         val selected = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.of("UTC"))
+                            .atZone(ZoneId.systemDefault())
                             .toLocalDate()
                         onEndDateSelect(selected.toDateString())
                     }

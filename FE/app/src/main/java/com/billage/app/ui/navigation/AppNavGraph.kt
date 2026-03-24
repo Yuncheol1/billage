@@ -35,6 +35,8 @@ import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
+import com.billage.app.ui.home.InsightDetailScreen
+import com.billage.app.ui.home.InsightListScreen
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
@@ -78,6 +80,8 @@ fun NavGraphBuilder.appNavGraph(
             onMypageClick = { appNavController.navigateToMypage() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
+            onInsightListClick = { appNavController.navigateToInsightList() },
+            onInsightDetailClick = { index -> appNavController.navigateToInsightDetail(index) },
             menuProfileState = menuProfileState
         )
     }
@@ -87,8 +91,8 @@ fun NavGraphBuilder.appNavGraph(
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
         ContractCreateScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { contractSeq, roomId, opponentName -> 
-                appNavController.navigateToContractComplete(contractSeq, roomId, opponentName)
+            onContractComplete = { contractSeq, roomId, opponentName ->
+                appNavController.navigateToSpecialTerms(contractSeq, roomId, opponentName)
             },
             role = role
         )
@@ -275,11 +279,13 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.ContractSpecialTerms.routeWithArg) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")
             ?.toIntOrNull() ?: -1
+        val roomId = backStackEntry.arguments?.getString("roomId") ?: "none"
+        val opponentName = backStackEntry.arguments?.getString("opponentName") ?: "알 수 없음"
 
         ContractSpecialTermsScreen(
-            onSkip = { appNavController.navigateToContractComplete() },
-            onComplete = { appNavController.navigateToContractComplete() },
-            viewModel = hiltViewModel()  // ← hiltViewModel()로 교체
+            onSkip = { appNavController.navigateToContractComplete(contractSeq, roomId, opponentName) },
+            onComplete = { appNavController.navigateToContractComplete(contractSeq, roomId, opponentName) },
+            viewModel = hiltViewModel()
         )
     }
 
@@ -348,6 +354,21 @@ fun NavGraphBuilder.appNavGraph(
             roomId = roomId,
             onBackClick = { appNavController.popBackStack() },
             onSaveSuccess = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.InsightList.route) {
+        InsightListScreen(
+            onInsightClick = { index -> appNavController.navigateToInsightDetail(index) },
+            onBackClick = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.InsightDetail.routeWithArg) { backStackEntry ->
+        val insightIndex = backStackEntry.arguments?.getString("insightIndex")?.toIntOrNull() ?: 0
+        InsightDetailScreen(
+            insightIndex = insightIndex,
+            onBackClick = { appNavController.popBackStack() }
         )
     }
 

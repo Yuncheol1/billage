@@ -17,10 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
@@ -42,12 +41,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.theme.BillageDanger
-import com.billage.app.ui.theme.BillageInfo
 import com.billage.app.ui.theme.BillagePrimary
+import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageSurface
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
-import com.billage.app.ui.theme.BillageWarning
 
 @Composable
 fun HomeSideMenu(
@@ -56,8 +54,7 @@ fun HomeSideMenu(
     isLoggingOut: Boolean,
     onClose: () -> Unit,
     onProfileClick: () -> Unit,
-    onContractMenuClick: () -> Unit,
-    onReportMenuClick: () -> Unit,
+    onInsightListClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onSupportClick: () -> Unit,
     onTermsClick: () -> Unit,
@@ -162,21 +159,12 @@ fun HomeSideMenu(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 MenuCardItem(
-                    icon = Icons.Default.Description,
-                    iconTint = BillageWarning,
-                    iconBackground = Color(0xFFFFF4D5),
-                    title = "내 계약",
-                    subtitle = "계약서 및 거래 관리",
-                    onClick = onContractMenuClick
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                MenuCardItem(
-                    icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    iconTint = BillageInfo,
-                    iconBackground = Color(0xFFE8F7FF),
-                    title = "계약 통계",
-                    subtitle = "거래 분석 및 리포트",
-                    onClick = onReportMenuClick
+                    icon = Icons.Default.Lightbulb,
+                    iconTint = BillagePrimary,
+                    iconBackground = BillagePrimaryLight,
+                    title = "꿀팁",
+                    subtitle = "알아두면 좋은 금융 상식",
+                    onClick = onInsightListClick
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
