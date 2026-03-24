@@ -52,4 +52,19 @@ public class RepaymentSchedule {
 
     @Column(name = "created_dttm")
     private LocalDateTime createdDttm;
+
+    /**
+     * 상환 완료 처리
+     */
+    public void markPaid(LocalDateTime paidAt) {
+        this.status = "PAID";
+        this.paidDttm = paidAt;
+    }
+
+    /**
+     * 연체 처리
+     */
+    public void markOverdue() {
+        this.status = "OVERDUE";
+    }
 }

@@ -329,7 +329,7 @@ public class ContractService {
                     );
         }).collect(Collectors.toList());
     }
-
+    
     private void validateBusinessRules(Integer creditorUserSeq, ContractDraftRequestDto request) {
         // 본인 거래 방지
         if (creditorUserSeq.equals(request.getDebtorUserSeq())) {
