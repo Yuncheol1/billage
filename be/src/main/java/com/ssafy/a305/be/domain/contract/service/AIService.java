@@ -4,11 +4,13 @@ import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +19,7 @@ import org.springframework.http.MediaType;
 
 @Slf4j
 @Service
+
 public class AIService {
 
     private final RestTemplate restTemplate;
@@ -26,6 +29,10 @@ public class AIService {
 
     @Value("${ai.internal.api.key}")
     private String internalApiKey;
+    public AIService(){
+        this.restTemplate=new RestTemplate();
+    }
+
 
     public AiClauseResponseDto generateClause(AiClauseRequestDto requestDto) {
         // 빈 등록 없이도 바로 생성하여 쓸 수 있게 구성함 (RestTemplate 안전망)
