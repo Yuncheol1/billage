@@ -11,10 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -88,24 +86,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                AnimatedVisibility(
-                    visible = uiState.hasNotification,
-                    enter = slideInVertically(initialOffsetY = { -it }),
-                    exit = slideOutVertically(targetOffsetY = { -it })
-                ) {
-                    Column {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        NotificationBanner(
-                            message = uiState.notificationMessage,
-                            onDismiss = { viewModel.dismissNotification() }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(20.dp))
                 SectionTitle(title = "나의 계약 현황")
                 Spacer(modifier = Modifier.height(12.dp))
@@ -118,6 +99,8 @@ fun HomeScreen(
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
+                SectionTitle(title = "알아두면 좋아요")
+                Spacer(modifier = Modifier.height(12.dp))
                 TipSlider()
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -140,36 +123,6 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
-                SectionTitle(title = "최근 거래활동")
-                Spacer(modifier = Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = BillageSurface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        uiState.recentActivities.forEach { activity ->
-                            ActivityItemRow(activity = activity)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(
-                            onClick = onActivityClick,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "전체 내역 보기",
-                                color = BillagePrimary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
             }
         }
 
