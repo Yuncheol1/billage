@@ -62,11 +62,17 @@ class ContractDetailViewModel @Inject constructor(
         contractSeq: Int,
         principalAmount: Double?,
         interestRate: Double?,
-        clauses: List<ClauseUpdateDto>
+        clauses: List<ClauseUpdateDto>,
+        roomId: String? = null
     ) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                val request = ContractUpdateRequest(
+                    principalAmount = principalAmount,
+                    interestRate = interestRate,
+                    clauses = clauses
+                )
                 contractRepository.updateContract(
                     contractSeq,
                     ContractUpdateRequest(
@@ -75,10 +81,12 @@ class ContractDetailViewModel @Inject constructor(
                         clauses = clauses
                     )
                 )
+                contractRepository.updateContract(contractSeq, request, roomId)
                 _updateSuccess.emit(true)
+                // 성공적으로 업데이트 후 상세 정보를 다시 불러옵니다
                 fetchContractDetail(contractSeq)
             } catch (e: Exception) {
-                _errorMessage.value = "계약 수정에 실패했습니다"
+                _errorMessage.value = "계약 수정에 실패했습니다: ${e.message}"
                 _updateSuccess.emit(false)
             } finally {
                 _isLoading.value = false

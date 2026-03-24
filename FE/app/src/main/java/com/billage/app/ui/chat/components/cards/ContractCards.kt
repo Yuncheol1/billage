@@ -582,14 +582,22 @@ fun AiProposalCard(
                     )
                     
                     if (message.proposedInterestRate != null) {
+                        val isRateChanged = !message.isInitial && message.originalInterestRate != null && 
+                                           message.originalInterestRate != message.proposedInterestRate
+                        
                         Text(
-                            text = if (message.isInitial) "약정 이자율" else "이자율 조정됨",
+                            text = when {
+                                message.isInitial -> "약정 이자율"
+                                isRateChanged -> "이자율 조정됨"
+                                else -> "이자율"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = BillageTextSecondary,
                             modifier = androidx.compose.ui.Modifier.padding(bottom = 4.dp)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!message.isInitial && message.originalInterestRate != null) {
+                            if (!message.isInitial && message.originalInterestRate != null && 
+                                message.originalInterestRate != message.proposedInterestRate) {
                                 Text(
                                     text = "%.2f%%".format(message.originalInterestRate),
                                     style = MaterialTheme.typography.bodyMedium,
@@ -611,9 +619,9 @@ fun AiProposalCard(
                         }
                     }
                     
-                    if (message.modifications.isNotEmpty()) {
+                    if (!message.isInitial && message.modifications.isNotEmpty()) {
                         Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
-                        message.modifications.forEach { mod ->
+                        message.modifications.filter { it.isNotBlank() }.forEach { mod ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 androidx.compose.foundation.layout.Box(
                                     modifier = androidx.compose.ui.Modifier

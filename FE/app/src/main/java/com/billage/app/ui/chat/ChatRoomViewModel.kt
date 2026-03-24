@@ -92,19 +92,22 @@ class ChatRoomViewModel @Inject constructor(
                     }
 
                     if (targetSeq != null) {
-                        // 상세조회로 interestRate 확보
+                        // 상세조회로 데이터 확보
                         val detailRes = contractApi.getContractDetail(targetSeq)
                         if (detailRes.status == 200) {
                             val detail = detailRes.data
                             applyContractDetail(detail)
 
+                            // 1. (제거됨: 온보딩 가이드 메시지)
+                            
+                            // 2. 최초 AI 제안 카드 전송
                             val originalInterest = detail.interestRate ?: 0.0
                             val payload = AiProposalPayload(
-                                contractTitle = "빌리 거래 제안서",
+                                contractTitle = "빌리지 거래 제안서",
                                 contractSeq = detail.contractSeq,
                                 originalInterestRate = originalInterest,
                                 proposedInterestRate = originalInterest,
-                                modifications = listOf("최초 차용증 생성"),
+                                modifications = emptyList(),
                                 isInitial = true
                             )
                             val contentJson = Json.encodeToString(AiProposalPayload.serializer(), payload)
@@ -220,6 +223,10 @@ class ChatRoomViewModel @Inject constructor(
         )}
     }
 
+    fun setMode(mode: ChatRoomMode) {
+        _chatRoomState.update { it.copy(mode = mode) }
+    }
+
     fun exitModificationMode() {
         _chatRoomState.update { it.copy(
             mode = ChatRoomMode.NORMAL,
@@ -259,13 +266,20 @@ class ChatRoomViewModel @Inject constructor(
                                 .interestRate ?: originalInterest
                         } catch (e: Exception) { originalInterest }
 
+                        val modifications = mutableListOf<String>()
+                        if (originalInterest != proposedInterest) {
+                            modifications.add(String.format("이자율 조정 제안: %.2f%% → %.2f%%", originalInterest, proposedInterest))
+                        } else {
+                            modifications.add("계약 조건 검토 제안")
+                        }
+
                         // content = JSON 페이로드, msgType = AI_PROPOSAL
                         val payload = AiProposalPayload(
                             contractTitle = "빌리지 거래 제안서",
                             contractSeq = contract.contractSeq,
                             originalInterestRate = originalInterest,
                             proposedInterestRate = proposedInterest,
-                            modifications = listOf("이자율 조정 제안")
+                            modifications = modifications
                         )
                         val contentJson = kotlinx.serialization.json.Json.encodeToString(
                             AiProposalPayload.serializer(), payload

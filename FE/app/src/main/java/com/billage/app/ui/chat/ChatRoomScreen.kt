@@ -7,22 +7,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.billage.app.data.remote.api.ContractSignatureRequest
@@ -36,8 +41,13 @@ import com.billage.app.ui.chat.models.ChatRoomMode
 import com.billage.app.data.remote.api.ContractListResponse
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.font.FontWeight
 import com.billage.app.ui.chat.models.ContractSummary
+import com.billage.app.ui.theme.BillagePrimary
+import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.chat.security.ContractSignatureUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +62,7 @@ fun ChatRoomScreen(
     onAddMenuClick: () -> Unit = {},
     onRequestAiProposal: () -> Unit = {},
     onContractSelectForModify: (ContractListResponse) -> Unit = {},
+    onExitModificationMode: () -> Unit = {},
     onCommitProposal: () -> Unit = {},
     onCancelProposal: () -> Unit = {},
     onDirectEditClick: (Int) -> Unit = {},
@@ -86,19 +97,37 @@ fun ChatRoomScreen(
         }
     }
 
+    // 수정 확인 다이얼로그 상태
+    var showModificationConfirm by remember { mutableStateOf(false) }
+    var pendingModificationAction by remember { mutableStateOf<() -> Unit>({}) }
+
+    if (showModificationConfirm) {
+        AlertDialog(
+            onDismissRequest = { showModificationConfirm = false },
+            title = { Text("수정 시 수락 초기화 안내", fontWeight = FontWeight.Bold) },
+            text = { Text("계약 조건을 수정하면 현재의 수락 상태가 초기화되어 다시 동의를 받아야 합니다. 계속하시겠습니까?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showModificationConfirm = false
+                        pendingModificationAction()
+                    }
+                ) {
+                    Text("네, 수정할게요", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModificationConfirm = false }) {
+                    Text("아니오", color = BillageTextSecondary)
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             ChatTopBar(
                 title = state.roomName,
-                isNegotiationMode = state.mode == ChatRoomMode.CONTRACT,
-                onNegotiationToggle = { isOn ->
-                    if (isOn) {
-                        onFetchContracts()
-                        showAiSelectDialog = true
-                    } else {
-                        onModeChange(ChatRoomMode.NORMAL)
-                    }
-                },
                 onBackClick = onBackClick
             )
         },
@@ -153,13 +182,15 @@ fun ChatRoomScreen(
             )
 
             // 계약 모드일 경우 상단에 고정되는 핀 배너
-            PinnedContractBanner(
-                selectedContract = state.selectedContract,
-                onCloseClick = { onModeChange(ChatRoomMode.NORMAL) },
-                onGenerateDraftClick = {
-                    onRequestAiProposal()
-                }
-            )
+            if (state.mode == com.billage.app.ui.chat.models.ChatRoomMode.CONTRACT) {
+                PinnedContractBanner(
+                    selectedContract = state.selectedContract,
+                    onExitClick = { onExitModificationMode() },
+                    onAiProposalClick = {
+                        onRequestAiProposal()
+                    }
+                )
+            }
             
             // 메인 메시지 영역
             androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
@@ -182,41 +213,17 @@ fun ChatRoomScreen(
                     .padding(16.dp)
             ) {
                 if (actionSheetState == "MENU") {
-                    androidx.compose.material3.Text(
-                        text = "채팅 액션 메뉴",
-                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    // 차용증 직접 작성/수정 버튼 (프론트/백엔드 폼 이동)
-                    androidx.compose.material3.ListItem(
-                        headlineContent = { androidx.compose.material3.Text("차용증 직접 작성/수정하기") },
-                        supportingContent = { androidx.compose.material3.Text("입력 폼 화면으로 이동하여 항목을 직접 변경합니다.") },
-                        leadingContent = {
-                            androidx.compose.material3.Icon(
-                                imageVector = Icons.Filled.Edit,
-                                contentDescription = "차용증 수정",
-                                tint = com.billage.app.ui.theme.BillagePrimary
-                            )
+                    com.billage.app.ui.chat.components.ChatActionGrid(
+                        onAiNegotiateClick = {
+                            onFetchContracts()
+                            showAiSelectDialog = true
+                            showActionSheet = false
                         },
-                        modifier = Modifier.clickable {
+                        onManualEditClick = {
                             onFetchContracts()
                             actionSheetState = "MANUAL_EDIT_PICKER"
-                        }
-                    )
-                    
-                    // 송금하기 버튼
-                    androidx.compose.material3.ListItem(
-                        headlineContent = { androidx.compose.material3.Text("송금 하기") },
-                        supportingContent = { androidx.compose.material3.Text("상대방에게 돈을 송금합니다.") },
-                        leadingContent = {
-                            androidx.compose.material3.Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "송금",
-                                tint = com.billage.app.ui.theme.BillagePrimary
-                            )
                         },
-                        modifier = Modifier.clickable {
+                        onTransferClick = {
                             showActionSheet = false
                             // TODO: 송금 화면 이동
                         }
@@ -261,7 +268,13 @@ fun ChatRoomScreen(
                                         .clickable {
                                             showActionSheet = false
                                             actionSheetState = "MENU"
-                                            onDirectEditClick(contract.contractSeq)
+                                            val anyAccepted = state.isMeAccepted || state.isOpponentAccepted
+                                            if (anyAccepted) {
+                                                pendingModificationAction = { onDirectEditClick(contract.contractSeq) }
+                                                showModificationConfirm = true
+                                            } else {
+                                                onDirectEditClick(contract.contractSeq)
+                                            }
                                         }
                                 ) {
                                     androidx.compose.foundation.layout.Row(
@@ -349,9 +362,9 @@ fun ChatRoomScreen(
             onDismissRequest = { 
                 showAiSelectDialog = false
                 // 사용자가 다이얼로그를 그냥 닫으면 네고시에이션 모드도 다시 끔
-                onModeChange(ChatRoomMode.NORMAL) 
+                onModeChange(com.billage.app.ui.chat.models.ChatRoomMode.NORMAL)
             },
-            onContractSelect = { contract ->
+            onContractSelect = { contract: com.billage.app.data.remote.api.ContractListResponse ->
                 showAiSelectDialog = false
                 onContractSelectForModify(contract)
             }

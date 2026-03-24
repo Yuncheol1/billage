@@ -237,49 +237,6 @@ fun ChatListScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0F5))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("🛠️ 전자서명(TEE) 저장 및 지문 테스트 (임시) 🛠️", fontWeight = FontWeight.Bold, color = BillagePrimary)
-                            Spacer(Modifier.height(8.dp))
-                            Text(testResult, fontSize = 13.sp)
-                            Spacer(Modifier.height(16.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        val result = SecurityTestBed.testKeyGenerationAndHwStatus(context)
-                                        if (result.startsWith("NEEDS_ENROLLMENT")) {
-                                            showEnrollDialog = true
-                                        } else {
-                                            testResult = result
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("1. TEE 저장상태 확인", fontSize=12.sp) }
-                                Button(
-                                    onClick = {
-                                        val activity = context as? FragmentActivity
-                                        if (activity != null) {
-                                            SecurityTestBed.startBiometricSignature(activity) { res ->
-                                                if (res.startsWith("NEEDS_ENROLLMENT")) {
-                                                    showEnrollDialog = true
-                                                } else {
-                                                    testResult = res
-                                                }
-                                            }
-                                        } else {
-                                            testResult = "에러: MainActivity가 FragmentActivity를 상속받아야 합니다! (현재 변경완료됨)"
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("2. 지문 서명 실행", fontSize=12.sp) }
-                            }
-                        }
-                    }
-                }
                 items(rooms) { room ->
                 // Map ChatRoomRes to ChatPreviewItem for UI
                 // 내 UserSeq가 아닌 참여자의 이름을 찾아서 표시 (없으면 알 수 없음)

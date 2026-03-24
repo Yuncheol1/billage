@@ -55,7 +55,7 @@ sealed interface AppDestination {
 
     data object ContractEdit : AppDestination {
         override val route: String = "contract_edit"
-        const val routeWithArg = "contract_edit/{contractSeq}"
+        const val routeWithArg = "contract_edit/{contractSeq}?roomId={roomId}"
     }
 
     data object ContractDetail : AppDestination {
@@ -200,8 +200,13 @@ class AppNavController(
         }
     }
 
-    fun navigateToContractEdit(contractSeq: Int) {
-        navController.navigate("${AppDestination.ContractEdit.route}/$contractSeq") {
+    fun navigateToContractEdit(contractSeq: Int, roomId: String? = null) {
+        val route = if (roomId != null) {
+            "${AppDestination.ContractEdit.route}/$contractSeq?roomId=$roomId"
+        } else {
+            "${AppDestination.ContractEdit.route}/$contractSeq"
+        }
+        navController.navigate(route) {
             launchSingleTop = true
         }
     }
