@@ -96,10 +96,11 @@ public class ContractController {
     public ResponseEntity<Map<String, Object>> updateContract(
             @AuthenticationPrincipal AuthenticatedUser authUser,
             @PathVariable Integer contractSeq,
-            @Valid @RequestBody ContractUpdateRequestDto requestDto) {
+            @Valid @RequestBody ContractUpdateRequestDto requestDto,
+            @RequestParam(value = "roomId", required = false) String roomId) {
 
         Integer userSeq = authUser.userSeq();
-        contractService.updateContract(contractSeq, requestDto, userSeq);
+        contractService.updateContract(contractSeq, requestDto, userSeq, roomId);
 
         return ResponseEntity.ok(Map.of(
                 "status", HttpStatus.OK.value(),

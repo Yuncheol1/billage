@@ -51,6 +51,7 @@ public class ContractService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final com.ssafy.a305.be.domain.chat.service.ChatService chatService;
+    private final com.ssafy.a305.be.domain.document.repository.SignatureRepository signatureRepository;
     private final org.springframework.messaging.simp.SimpMessageSendingOperations messagingTemplate;
 
     // AI 연동 서비스 (FastAPI 연동)
@@ -208,7 +209,7 @@ public class ContractService {
     }
 
     @Transactional
-    public void updateContract(Integer contractSeq, ContractUpdateRequestDto requestDto, Integer userSeq) {
+    public void updateContract(Integer contractSeq, ContractUpdateRequestDto requestDto, Integer userSeq, String roomId) {
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
@@ -219,18 +220,93 @@ public class ContractService {
         }
 
         String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약만 수정할 수 있습니다.");
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status) && !"SIGNED".equals(status) && !"ACTIVE".equals(status)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "수정 가능한 상태가 아닙니다.");
+        }
+
+        // 이미 서명이 시작된 경우(SIGNED 이상), 기존 서명 무효화 처리
+        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
+            signatureRepository.deleteByDocumentContractContractSeq(contractSeq);
+            // Contract 엔티티 상태 초기화는 updateContractTerms 에서 resetAgreement 호출함
+            // 추가로 signedDttm 및 status 초기화 (Service 레벨에서 처리)
+            // contract.resetToNegotiating(); // 만약 엔티티에 메서드가 있다면 사용
+        }
+
+        // 브로드캐스트를 위한 이전 데이터 보관 및 변경 내역 계산
+        BigDecimal originalPrincipal = contract.getPrincipalAmount();
+        BigDecimal originalInterest = contract.getInterestRate();
+        List<String> dynamicModifications = new java.util.ArrayList<>();
+
+        // 데이터 업데이트 (내부적으로 resetAgreement() 호출됨)
+        if (requestDto.getPrincipalAmount() != null && (originalPrincipal == null || originalPrincipal.compareTo(requestDto.getPrincipalAmount()) != 0)) {
+            dynamicModifications.add(String.format("원금 변경: %,d원 → %,d원", 
+                originalPrincipal != null ? originalPrincipal.longValue() : 0, 
+                requestDto.getPrincipalAmount().longValue()));
+        }
+
+        if (requestDto.getInterestRate() != null && (originalInterest == null || originalInterest.compareTo(requestDto.getInterestRate()) != 0)) {
+            dynamicModifications.add(String.format("이자율 변경: %.2f%% → %.2f%%", 
+                originalInterest != null ? originalInterest.doubleValue() : 0.0, 
+                requestDto.getInterestRate().doubleValue()));
         }
 
         contract.updateContractTerms(requestDto.getPrincipalAmount(), requestDto.getInterestRate());
+
+        // 서명 상태 초기화 (status 재조정)
+        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
+            contract.resetToNegotiating();
+        }
 
         if (requestDto.getClauses() != null) {
             for (ContractUpdateRequestDto.ClauseUpdateDto reqClause : requestDto.getClauses()) {
                 contract.getClauses().stream()
                         .filter(c -> c.getClauseSeq().equals(reqClause.getClauseSeq()))
                         .findFirst()
-                        .ifPresent(clause -> clause.updateContent(reqClause.getContent()));
+                        .ifPresent(clause -> {
+                            if (!clause.getContent().equals(reqClause.getContent())) {
+                                dynamicModifications.add(String.format("'%s' 조항 내용 수정됨", clause.getTitle()));
+                                clause.updateContent(reqClause.getContent());
+                            }
+                        });
+            }
+        }
+
+        // 아무런 변경이 없었다면 브로드캐스트 생략 가능 (필요 시)
+        if (dynamicModifications.isEmpty() && (roomId == null || roomId.isBlank())) {
+            return;
+        }
+
+        // 채팅방에 수정 완료 알림 발송 (roomId가 있을 때만)
+        if (roomId != null && !roomId.isBlank()) {
+            try {
+                // AiProposalPayload 구조와 동일하게 생성
+                Map<String, Object> payload = Map.of(
+                    "contractTitle", "빌리지 거래 제안서 (수정)",
+                    "contractSeq", contractSeq,
+                    "originalPrincipal", originalPrincipal != null ? originalPrincipal.doubleValue() : 0.0,
+                    "originalInterestRate", originalInterest != null ? originalInterest.doubleValue() : 0.0,
+                    "proposedInterestRate", contract.getInterestRate() != null ? contract.getInterestRate().doubleValue() : 0.0,
+                    "modifications", dynamicModifications.isEmpty() ? List.of("기타 약정 변경") : dynamicModifications,
+                    "isInitial", false
+                );
+
+                ObjectMapper mapper = new ObjectMapper();
+                String contentJson = mapper.writeValueAsString(payload);
+
+                com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto msgRequest = 
+                    new com.ssafy.a305.be.domain.chat.dto.ChatMessageRequestDto(
+                        roomId, 
+                        userSeq, 
+                        contentJson, 
+                        true, 
+                        "AI_PROPOSAL"
+                    );
+
+                com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto response = chatService.saveMessage(msgRequest);
+                messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
+
+            } catch (Exception e) {
+                log.error("채팅방 수정 제안서 발송 실패", e);
             }
         }
     }
