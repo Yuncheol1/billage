@@ -52,6 +52,12 @@ interface ContractApi {
     suspend fun createAiProposalMock(
         @retrofit2.http.Path("contractSeq") contractSeq: Int
     ): ContractupdateBaseResponse
+
+    @retrofit2.http.PUT("api/v1/contracts/{contractSeq}/accept")
+    suspend fun acceptContract(
+        @Path("contractSeq") contractSeq: Int,
+        @Query("roomId") roomId: String
+    ): ContractDetailBaseResponse
 }
 
 // ─────────────────────────────────────────
@@ -180,6 +186,8 @@ data class ContractDetailResponse(
     val endDt: String?,
     val aiDraftContent: String? = null,
     val signedDttm: String? = null,
+    val isMeAccepted: Boolean? = false,
+    val isOpponentAccepted: Boolean? = false,
     val clauses: List<ClauseDetailDto> = emptyList()
 )
 

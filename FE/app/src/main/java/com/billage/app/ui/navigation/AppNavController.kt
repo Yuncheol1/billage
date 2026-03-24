@@ -32,6 +32,7 @@ sealed interface AppDestination {
 
     data object ChatRoom : AppDestination {
         override val route: String = "chat_room"
+        const val routeWithArg = "chat_room/{roomId}/{opponentName}/{isNewContract}/{contractSeq}"
     }
 
     data object Mypage : AppDestination {
@@ -44,6 +45,7 @@ sealed interface AppDestination {
 
     data object ContractComplete : AppDestination {
         override val route: String = "contract_complete"
+        const val routeWithArg = "contract_complete/{contractSeq}/{roomId}/{opponentName}"
     }
 
     data object ContractSpecialTerms : AppDestination {
@@ -53,7 +55,7 @@ sealed interface AppDestination {
 
     data object ContractEdit : AppDestination {
         override val route: String = "contract_edit"
-        const val routeWithArg = "contract_edit/{contractId}"
+        const val routeWithArg = "contract_edit/{contractSeq}"
     }
 
     data object ContractDetail : AppDestination {
@@ -138,17 +140,13 @@ class AppNavController(
         }
     }
 
-    fun navigateToChatRoom(roomId: String? = null, opponentName: String? = null) {
-        val route = buildString {
-            append(AppDestination.ChatRoom.route)
-            if (roomId != null) {
-                append("/$roomId")
-                if (opponentName != null) {
-                    append("/$opponentName")
-                }
-            }
-        }
-        navController.navigate(route) {
+    fun navigateToChatRoom(
+        roomId: String,
+        opponentName: String,
+        isNewContract: Boolean = false,
+        contractSeq: Int = -1
+    ) {
+        navController.navigate("${AppDestination.ChatRoom.route}/$roomId/$opponentName/$isNewContract/$contractSeq") {
             launchSingleTop = true
         }
     }
@@ -192,14 +190,18 @@ class AppNavController(
         }
     }
 
-    fun navigateToContractComplete() {
-        navController.navigate(AppDestination.ContractComplete.route) {
-            launchSingleTop = true
+    fun navigateToContractComplete(
+        contractSeq: Int = -1,
+        roomId: String = "none",
+        opponentName: String = "알 수 없음"
+    ) {
+        navController.navigate("contract_complete/$contractSeq/$roomId/$opponentName") {
+            popUpTo(AppDestination.Contract.route) { inclusive = true }
         }
     }
 
-    fun navigateToContractEdit(contractId: String) {
-        navController.navigate("${AppDestination.ContractEdit.route}/$contractId") {
+    fun navigateToContractEdit(contractSeq: Int) {
+        navController.navigate("${AppDestination.ContractEdit.route}/$contractSeq") {
             launchSingleTop = true
         }
     }

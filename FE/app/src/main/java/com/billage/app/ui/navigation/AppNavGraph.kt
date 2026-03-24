@@ -14,6 +14,8 @@ import com.billage.app.ui.chat.ChatRoomScreen
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
 import com.billage.app.ui.chat.models.AiProposalPayload
+import com.billage.app.ui.chat.models.AiProposalMessage
+import kotlinx.serialization.decodeFromString
 import com.billage.app.ui.chat.components.cards.BaseChatCard
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -25,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,6 +40,7 @@ import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.billage.app.ui.contract.ContractSubmitState
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -82,8 +86,8 @@ fun NavGraphBuilder.appNavGraph(
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
         ContractScreen(
             onNavigateBack = { appNavController.popBackStack() },
-            onContractComplete = { contractSeq ->  // ← contractSeq 받아서 전달
-                appNavController.navigateToSpecialTerms(contractSeq)
+            onContractComplete = { contractSeq, roomId, opponentName -> 
+                appNavController.navigateToContractComplete(contractSeq, roomId, opponentName)
             },
             role = role
         )
@@ -103,166 +107,72 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(route = AppDestination.ChatRoom.route + "/{roomId}/{opponentName}") { backStackEntry ->
-        val roomId = backStackEntry.arguments?.getString("roomId") ?: "100"
-        val opponentName = backStackEntry.arguments?.getString("opponentName") ?: "알 수 없음"
+
+    // fallback for route without args just in case
+    composable(route = AppDestination.ChatRoom.routeWithArg) { backStackEntry ->
+        val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
+        val opponentName = backStackEntry.arguments?.getString("opponentName") ?: ""
+        val isNewContract = backStackEntry.arguments?.getString("isNewContract")?.toBoolean() ?: false
+        val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull()
+
         val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
-
-        LaunchedEffect(roomId) {
-            viewModel.joinRoom(roomId, opponentName)
+        LaunchedEffect(roomId) { 
+            viewModel.joinRoom(roomId, opponentName, isNewContract, contractSeq) 
         }
-
+        
         val messages by viewModel.messages.collectAsState()
         val contracts by viewModel.contracts.collectAsState()
         val chatRoomState by viewModel.chatRoomState.collectAsState()
-        val localCards by viewModel.localCards.collectAsState()
 
-        var showProposalDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-
-        // 제안서 다이얼로그: localCards에 AiProposalMessage 등록 후 showProposalDialog=true 하면 오픈
-        if (showProposalDialog && chatRoomState.draftContractDetail != null) {
-            com.billage.app.ui.chat.components.ContractDocumentFullScreen(
-                contractTitle = "계약 #${chatRoomState.selectedContract?.contractId ?: ""} 수정 제안서",
-                contractDetail = chatRoomState.draftContractDetail,
-                onDismissRequest = { showProposalDialog = false },
-                onAccept = {
-                    showProposalDialog = false
-                    viewModel.submitProposal()
-                }
-            )
-        }
-
-        ChatRoomScreen(
+        com.billage.app.ui.chat.ChatRoomScreen(
             state = chatRoomState,
-            onBackClick = { appNavController.popBackStack() },
             contracts = contracts,
             onFetchContracts = { viewModel.fetchContracts() },
-            onModeChange = { mode ->
-                if (mode == com.billage.app.ui.chat.models.ChatRoomMode.NORMAL) {
-                    viewModel.exitModificationMode()
-                }
-            },
+            onBackClick = { appNavController.popBackStack() },
+            onModeChange = { mode -> viewModel.exitModificationMode() },
+            onSendMessage = { content -> viewModel.sendMessage(content) },
             onAddMenuClick = {},
             onRequestAiProposal = { viewModel.requestAiProposal() },
-            onContractSelectForModify = { viewModel.setModificationMode(it) },
+            onContractSelectForModify = { contract -> viewModel.setModificationMode(contract) },
             onCommitProposal = { viewModel.submitProposal() },
             onCancelProposal = { viewModel.cancelProposal() },
-            onSendMessage = { content -> viewModel.sendMessage(content) },
-            onDirectEditClick = { contractId -> appNavController.navigateToContractEdit(contractId) },
+            onDirectEditClick = { contractSeq -> appNavController.navigateToContractEdit(contractSeq) },
             messageListContent = {
-                LazyColumn(
-                    reverseLayout = true,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(messages.asReversed()) { msg ->
-                        val isMe = msg.senderSeq == viewModel.myUserSeq
-                        when (msg.msgType) {
-                            "AI_PROPOSAL" -> {
-                                // JSON content 파싱 → AiProposalCard 렌더링
-                                val parsed = try {
-                                    kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                        .decodeFromString<AiProposalPayload>(msg.content)
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                if (parsed != null) {
-                                    com.billage.app.ui.chat.components.cards.AiProposalCard(
-                                        message = com.billage.app.ui.chat.models.AiProposalMessage(
-                                            id = msg.id,
-                                            sender = if (isMe) MessageSender.ME else MessageSender.OTHER,
-                                            timestamp = java.time.LocalDateTime.now(),
-                                            contractTitle = parsed.contractTitle,
-                                            originalInterestRate = parsed.originalInterestRate,
-                                            proposedInterestRate = parsed.proposedInterestRate,
-                                            modifications = parsed.modifications
-                                        ),
-                                        onViewDetailsClick = {
-                                            // 카드 클릭 시 최신 계약 상세 조회 후 다이얼로그 오픈
-                                            showProposalDialog = true
-                                        }
-                                    )
-                                }
-                            }
-                            "SYSTEM" -> {
-                                // 가운데 시스템 메시지 (isContractMsg=true 포함)
-                                com.billage.app.ui.chat.components.cards.SystemNoticeCard(
-                                    message = com.billage.app.ui.chat.models.SystemNoticeMessage(
-                                        id = msg.id,
-                                        timestamp = java.time.LocalDateTime.now(),
-                                        text = msg.content
-                                    )
-                                )
-                            }
-                            else -> {
-                                if (msg.isContractMsg) {
-                                    // 기존 isContractMsg true 텍스트도 SystemNoticeCard로
-                                    com.billage.app.ui.chat.components.cards.SystemNoticeCard(
-                                        message = com.billage.app.ui.chat.models.SystemNoticeMessage(
-                                            id = msg.id,
-                                            timestamp = java.time.LocalDateTime.now(),
-                                            text = msg.content
-                                        )
-                                    )
-                                } else {
-                                    BaseChatCard(sender = if (isMe) MessageSender.ME else MessageSender.OTHER) {
-                                        Column {
-                                            if (!isMe) {
-                                                Text(
-                                                    text = msg.senderName,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = BillageTextSecondary,
-                                                    modifier = Modifier.padding(bottom = 4.dp)
-                                                )
-                                            }
-                                            Text(
-                                                text = msg.content,
-                                                color = if (isMe) BillageTextPrimary else BillageTextSecondary,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Text(
-                                                text = msg.createdAt.substringAfter("T").substringBefore("."),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = (if (isMe) BillageTextPrimary else BillageTextSecondary).copy(alpha = 0.5f),
-                                                modifier = Modifier.align(Alignment.End).padding(top = 2.dp)
-                                            )
-                                        }
-                                    }
+                var showProposalDialog by remember { mutableStateOf(false) }
+
+                // 차용증 전문/제안서 다이얼로그
+                if (showProposalDialog && chatRoomState.draftContractDetail != null) {
+                    com.billage.app.ui.chat.components.ContractDocumentFullScreen(
+                        contractTitle = chatRoomState.draftContractDetail?.contractId ?: "ID없음",
+                        contractDetail = chatRoomState.draftContractDetail!!,
+                        isMeAccepted = chatRoomState.isMeAccepted,
+                        isOpponentAccepted = chatRoomState.isOpponentAccepted,
+                        onDismissRequest = { showProposalDialog = false },
+                        onAccept = {
+                            showProposalDialog = false
+                            viewModel.submitProposal()
+                        },
+                        onEdit = {
+                            if (chatRoomState.isMeAccepted && chatRoomState.isOpponentAccepted) {
+                                // ViewModel에서 에러 상태를 처리하거나 
+                                // Dialog 내부의 showEditLockAlert로 이미 처리됨
+                            } else {
+                                showProposalDialog = false
+                                chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
+                                    appNavController.navigateToContractEdit(seq)
                                 }
                             }
                         }
-                    }
+                    )
                 }
-            }
-        )
-    }
 
-    // fallback for route without args just in case
-    composable(route = AppDestination.ChatRoom.route) {
-        val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
-        LaunchedEffect(Unit) { viewModel.joinRoom("100", "테스트방") }
-        val messages by viewModel.messages.collectAsState()
-        val contracts by viewModel.contracts.collectAsState()
-
-        com.billage.app.ui.chat.ChatRoomScreen(
-            state = ChatRoomState(
-                roomId = "100",
-                roomName = "알 수 없음"
-            ),
-            onBackClick = { appNavController.popBackStack() },
-            contracts = contracts,
-            onFetchContracts = { viewModel.fetchContracts() },
-            onModeChange = {},
-            onAddMenuClick = {},
-            onSendMessage = { content -> viewModel.sendMessage(content) },
-            onDirectEditClick = { contractId -> appNavController.navigateToContractEdit(contractId) },
-            messageListContent = {
                 LazyColumn(
                     reverseLayout = true,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(messages.asReversed()) { msg ->
                         val isMe = msg.senderSeq == viewModel.myUserSeq
-                        if (msg.isContractMsg) {
+                        if (msg.msgType == "SYSTEM") {
                             com.billage.app.ui.chat.components.cards.SystemNoticeCard(
                                 message = com.billage.app.ui.chat.models.SystemNoticeMessage(
                                     id = msg.id,
@@ -270,10 +180,34 @@ fun NavGraphBuilder.appNavGraph(
                                     text = msg.content
                                 )
                             )
+                        } else if (msg.msgType == "AI_PROPOSAL") {
+                             // AI 카드 (차용증 초안 포함)
+                             val payload = try {
+                                 kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                     .decodeFromString<com.billage.app.ui.chat.models.AiProposalPayload>(msg.content)
+                             } catch (e: Exception) { null }
+
+                             if (payload != null) {
+                                 com.billage.app.ui.chat.components.cards.AiProposalCard(
+                                     message = com.billage.app.ui.chat.models.AiProposalMessage(
+                                         id = msg.id,
+                                         sender = if (isMe) MessageSender.ME else MessageSender.OTHER,
+                                         timestamp = java.time.LocalDateTime.now(),
+                                         contractTitle = payload.contractTitle,
+                                         originalInterestRate = payload.originalInterestRate,
+                                         proposedInterestRate = payload.proposedInterestRate,
+                                         modifications = payload.modifications,
+                                         isInitial = payload.isInitial
+                                     ),
+                                     onViewDetailsClick = {
+                                         viewModel.fetchContractDetail(payload.contractSeq)
+                                         showProposalDialog = true
+                                     }
+                                 )
+                             }
                         } else {
-                            BaseChatCard(
-                                sender = if (isMe) MessageSender.ME else MessageSender.OTHER
-                            ) {
+                            // 일반 메시지
+                            BaseChatCard(sender = if (isMe) MessageSender.ME else MessageSender.OTHER) {
                                 Column {
                                     if (!isMe) {
                                         Text(
@@ -336,36 +270,53 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(route = AppDestination.ContractComplete.route) { entry ->
-        val parentEntry = remember(entry) {
+    composable(route = AppDestination.ContractComplete.routeWithArg) { backStackEntry ->
+        val contractSeq = backStackEntry.arguments?.getString("contractSeq") ?: ""
+        val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
+        val opponentName = backStackEntry.arguments?.getString("opponentName") ?: ""
+        
+        val parentEntry = remember(backStackEntry) {
             try {
                 appNavController.navController
                     .getBackStackEntry(AppDestination.Contract.routeWithArg)
             } catch (e: IllegalArgumentException) {
-                entry
+                backStackEntry
             }
         }
         val viewModel: ContractViewModel = viewModel(parentEntry)
         val formState by viewModel.formState.collectAsState()
 
+        val submitState by viewModel.submitState.collectAsState()
+
         ContractCompleteScreen(
             formState = formState,
             onHomeClick = { appNavController.popToHome() },
-            onChatClick = { appNavController.navigateToChatListFromContract() },
+            onChatClick = {
+                if (roomId.isNotEmpty()) {
+                    appNavController.navigateToChatRoom(
+                        roomId = roomId,
+                        opponentName = opponentName,
+                        isNewContract = true,
+                        contractSeq = contractSeq.toIntOrNull() ?: -1
+                    )
+                } else {
+                    appNavController.navigateToChatListFromContract()
+                }
+            },
             role = formState.role
         )
     }
 
     composable(route = AppDestination.ContractEdit.routeWithArg) { backStackEntry ->
-        val contractId = backStackEntry.arguments?.getString("contractId") ?: ""
+        val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
         val viewModel: com.billage.app.ui.contract.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 
-        androidx.compose.runtime.LaunchedEffect(contractId) {
-            contractId.toIntOrNull()?.let { viewModel.fetchContractDetail(it) }
+        androidx.compose.runtime.LaunchedEffect(contractSeq) {
+            if (contractSeq != -1) viewModel.fetchContractDetail(contractSeq)
         }
 
         com.billage.app.ui.contract.ContractEditScreen(
-            contractSeq = contractId,
+            contractSeq = contractSeq.toString(),
             viewModel = viewModel,
             onBackClick = { appNavController.popBackStack() },
             onSaveSuccess = { appNavController.popBackStack() }

@@ -3,6 +3,7 @@ package com.billage.app.ui.contract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.local.AuthSessionStorage
+import com.billage.app.data.remote.api.ChatApi
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.CreateContractRequest
 import com.billage.app.data.remote.api.UserApi
@@ -52,7 +53,12 @@ sealed class UserSearchState {
 sealed class ContractSubmitState {
     object Idle : ContractSubmitState()
     object Loading : ContractSubmitState()
-    data class Success(val contractSeq: Int, val contractId: String) : ContractSubmitState()
+    data class Success(
+        val contractSeq: Int,
+        val contractId: String,
+        val roomId: String,
+        val opponentName: String
+    ) : ContractSubmitState()
     data class Error(val message: String) : ContractSubmitState()
 }
 
@@ -60,6 +66,7 @@ sealed class ContractSubmitState {
 class ContractViewModel @Inject constructor(
     private val contractApi: ContractApi,
     private val userApi: UserApi,
+    private val chatApi: ChatApi,
     private val authSessionStorage: AuthSessionStorage
 ) : ViewModel() {
 
@@ -250,15 +257,23 @@ class ContractViewModel @Inject constructor(
                 val response = contractApi.createContractDraft(request)
                 val data = response.data
                 if (response.status == 201 && data != null) {
+                    // 계약 생성 성공 후 채팅방 생성/조회 시도
+                    val chatRoom = chatApi.createRoomByUserSeq(
+                        userSeq = creditorUserSeq,
+                        targetUserSeq = debtorSeq
+                    )
+                    
                     _submitState.value = ContractSubmitState.Success(
                         contractSeq = data.contractSeq,
-                        contractId = data.contractId
+                        contractId = data.contractId,
+                        roomId = chatRoom.id,
+                        opponentName = form.debtorName
                     )
                 } else {
                     _submitState.value = ContractSubmitState.Error(response.message)
                 }
             } catch (e: Exception) {
-                _submitState.value = ContractSubmitState.Error("계약 생성에 실패했어요. 다시 시도해 주세요.")
+                _submitState.value = ContractSubmitState.Error("계약 또는 채팅방 생성에 실패했어요. 다시 시도해 주세요.")
             }
         }
     }

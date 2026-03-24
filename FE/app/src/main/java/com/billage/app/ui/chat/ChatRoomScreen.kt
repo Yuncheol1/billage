@@ -46,7 +46,7 @@ fun ChatRoomScreen(
     onContractSelectForModify: (ContractListResponse) -> Unit = {},
     onCommitProposal: () -> Unit = {},
     onCancelProposal: () -> Unit = {},
-    onDirectEditClick: (String) -> Unit = {},
+    onDirectEditClick: (Int) -> Unit = {},
     messageListContent: @Composable () -> Unit
 ) {
     // 입력창 텍스트 관리
@@ -104,6 +104,15 @@ fun ChatRoomScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
+            com.billage.app.ui.chat.components.SignatureBanner(
+                isVisible = state.isMeAccepted && state.isOpponentAccepted,
+                onSignClick = {
+                    // TODO: 전자서명 화면으로 이동
+                    // appNavController.navigateToSignature(state.selectedContract?.contractSeq ?: -1)
+                }
+            )
+
             // 계약 모드일 경우 상단에 고정되는 핀 배너
             PinnedContractBanner(
                 selectedContract = state.selectedContract,
@@ -213,7 +222,7 @@ fun ChatRoomScreen(
                                         .clickable {
                                             showActionSheet = false
                                             actionSheetState = "MENU"
-                                            onDirectEditClick(contract.contractSeq.toString())
+                                            onDirectEditClick(contract.contractSeq)
                                         }
                                 ) {
                                     androidx.compose.foundation.layout.Row(
@@ -284,7 +293,9 @@ fun ChatRoomScreen(
     if (showProposalModal && state.draftContractDetail != null) {
         com.billage.app.ui.chat.components.ContractDocumentFullScreen(
             contractTitle = "계약 #${state.selectedContract?.contractId ?: ""} 수정 제안서",
-            contractDetail = state.draftContractDetail,
+            contractDetail = state.draftContractDetail!!,
+            isMeAccepted = state.isMeAccepted,
+            isOpponentAccepted = state.isOpponentAccepted,
             onDismissRequest = { showProposalModal = false },
             onAccept = {
                 showProposalModal = false

@@ -1,5 +1,6 @@
 package com.billage.app.ui.chat.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,17 +34,32 @@ import kotlinx.serialization.json.Json
 @Composable
 fun ContractDocumentFullScreen(
     contractTitle: String,
-    contractDetail: ContractDetailResponse?,
+    contractDetail: ContractDetailResponse,
     onDismissRequest: () -> Unit,
-    onAccept: () -> Unit
+    onAccept: () -> Unit,
+    onEdit: () -> Unit = {},
+    isMeAccepted: Boolean = false,
+    isOpponentAccepted: Boolean = false
 ) {
-    var selectedTab by remember { mutableStateOf("DIFF") }
+    var showEditLockAlert by remember { mutableStateOf(false) }
+
+    if (showEditLockAlert) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showEditLockAlert = false },
+            title = { Text("수정 불가", fontWeight = FontWeight.Bold) },
+            text = { Text("이미 양측이 모든 조건에 수락한 계약입니다.\n수정하시려면 상대방에게 수정 요청을 하시거나 채팅으로 대화해주세요.") },
+            confirmButton = {
+                TextButton(onClick = { showEditLockAlert = false }) {
+                    Text("확인", color = BillagePrimary)
+                }
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
+            usePlatformDefaultWidth = false
         )
     ) {
         Surface(
@@ -56,13 +73,12 @@ fun ContractDocumentFullScreen(
             ) {
                 // Header
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismissRequest) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기", tint = BillageTextPrimary)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "차용증 전문 보기",
                         style = MaterialTheme.typography.titleLarge,
@@ -74,56 +90,122 @@ fun ContractDocumentFullScreen(
                 HorizontalDivider(color = BillageDivider)
 
                 // Tabs
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    TabButton(
-                        text = "반영된 원문 보기",
-                        isSelected = selectedTab == "ORIGINAL",
-                        onClick = { selectedTab = "ORIGINAL" },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TabButton(
-                        text = "변경사항(Diff) 보기",
-                        isSelected = selectedTab == "DIFF",
-                        onClick = { selectedTab = "DIFF" },
-                        modifier = Modifier.weight(1f)
-                    )
+                var selectedTab by remember { mutableIntStateOf(0) }
+                val tabs = listOf("반영된 원문 보기", "변경사항(Diff) 보기")
+
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = BillageBackground,
+                    contentColor = BillagePrimary,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = BillagePrimary
+                        )
+                    }
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    text = title,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selectedTab == index) BillagePrimary else BillageTextSecondary
+                                )
+                            }
+                        )
+                    }
                 }
-                
+
                 HorizontalDivider(color = BillageDivider)
 
                 // Content
-                Box(modifier = Modifier.weight(1f).background(Color(0xFFFFFDF8))) {
-                    if (selectedTab == "DIFF") {
+                Box(modifier = Modifier.weight(1f).background(Color.White)) {
+                    if (selectedTab == 1) { // Diff View
                         DocumentDiffView(contractTitle, contractDetail)
-                    } else {
+                    } else { // Original View
                         DocumentOriginalView(contractTitle, contractDetail)
                     }
                 }
 
                 // Footer
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .background(BillageSurface)
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.buttonColors(containerColor = BillageSurface, contentColor = BillageTextSecondary),
-                        modifier = Modifier.weight(1f).height(50.dp)
+                    // 수락 상태 표시 (NEW)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        Text("나중에 결정")
+                        AcceptanceStatusBadge(label = "나", isAccepted = isMeAccepted)
+                        AcceptanceStatusBadge(label = "상대방", isAccepted = isOpponentAccepted)
                     }
+
+                    // CTA 1: 수락하기 (Primary)
                     Button(
                         onClick = onAccept,
+                        enabled = !isMeAccepted, // 이미 수락했으면 비활성화
                         colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary, contentColor = Color.White),
-                        modifier = Modifier.weight(1f).height(50.dp)
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("✅ 수락/전자서명", fontWeight = FontWeight.Bold)
+                        Text(if (isMeAccepted) "✅ 수락 완료" else "✅ 수락하기", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // CTA 2: 조건 수정하기 (보조 액션)
+                    OutlinedButton(
+                        onClick = {
+                            if (isMeAccepted && isOpponentAccepted) {
+                                showEditLockAlert = true
+                            } else {
+                                onEdit()
+                            }
+                        },
+                        border = BorderStroke(1.dp, BillagePrimary),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("✏️ 계약 조건 수정하기", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                    }
+
+                    // CTA 3: 닫기 (이전 "나중에 결정하기")
+                    TextButton(
+                        onClick = onDismissRequest,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    ) {
+                        Text("나중에 결정하기", color = BillageTextSecondary, fontSize = 14.sp)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun AcceptanceStatusBadge(label: String, isAccepted: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$label: ", fontSize = 13.sp, color = BillageTextSecondary)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(if (isAccepted) BillagePrimary.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.2f))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = if (isAccepted) "수락 완료" else "대기 중",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isAccepted) BillagePrimary else BillageTextSecondary
+            )
         }
     }
 }
@@ -188,8 +270,13 @@ fun DocumentDiffView(title: String, detail: ContractDetailResponse?) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text("금전소비대차계약서", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        if (title.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("No. $title", fontSize = 11.sp, color = Color(0xFF999999), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+
         Text("채권자와 채무자 '$counterparty'는 빌리지(Billage) 서비스를 통하여 다음과 같이 금전소비대차계약을 체결한다.", fontSize = 14.sp, lineHeight = 22.sp)
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -264,8 +351,12 @@ fun DocumentOriginalView(title: String, detail: ContractDetailResponse?) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text("금전소비대차계약서", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        if (title.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("No. $title", fontSize = 11.sp, color = Color(0xFF999999), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        }
+        Spacer(modifier = Modifier.height(20.dp))
         Text("채권자와 채무자 '$counterparty'는 빌리지(Billage) 서비스를 통하여 다음과 같이 금전소비대차계약을 체결한다.", fontSize = 14.sp, lineHeight = 22.sp)
         
         Spacer(modifier = Modifier.height(24.dp))
