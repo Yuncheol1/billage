@@ -86,10 +86,12 @@ fun ContractListScreen(
     var selectedStatus by rememberSaveable { mutableStateOf(ContractStatusFilter.All) }
 
     // 필터 변경 시 API 재호출
+    // status는 항상 null(전체 조회) — 상태별 apiValues가 복수이므로 서버 필터 불가.
+    // 상태 구분은 아래 클라이언트 사이드 필터링에서만 처리.
     LaunchedEffect(selectedRole, selectedStatus) {
         viewModel.fetchContracts(
             role = selectedRole.apiValue,
-            status = selectedStatus.apiValues.firstOrNull()  // All이면 null → 전체 조회
+            status = null
         )
     }
 

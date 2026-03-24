@@ -1,10 +1,14 @@
 package com.billage.app.ui.contract.list
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,9 +39,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillageDivider
+import com.billage.app.ui.theme.BillageIconBackground
+import com.billage.app.ui.theme.BillageInfo
 import com.billage.app.ui.theme.BillagePrimary
+import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageSurface
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
@@ -68,8 +76,8 @@ data class ContractCardModel(
 
 /**
  * 내 계약 목록의 단일 계약 카드 컴포넌트.
- * - 헤더 색상(민트/산호)으로 역할(빌려줌/빌림)을 직관적으로 구분.
- * - 우측 배지로 현재 진행 상태를 표현.
+ * - 카드 좌측 6dp 액센트 바 색상으로 계약 상태를 직관적으로 구분.
+ * - 우상단 뱃지로 현재 진행 상태를 텍스트로 표현.
  * - 하단 '상세 보기' 버튼 클릭 시 [onDetailClick] 호출.
  */
 @Composable
@@ -101,135 +109,189 @@ fun ContractListCard(
             }
         )
     }
-    val isLend = contract.role == ContractRoleFilter.Lend
-    val badgeLabel = if (isLend) "🤝 빌려준 계약" else "🤲 빌린 계약"
-    val headerBgColor = if (isLend) BillagePrimary else Color(0xFFFF7A5F)
 
-    val (statusText, statusBgColor, statusTextColor) = when (contract.status) {
-        ContractStatusFilter.Signing -> Triple("서명 및 협의 중", Color.White.copy(alpha = 0.2f), Color.White)
-        ContractStatusFilter.Repaying -> Triple("상환 진행 중", Color.White.copy(alpha = 0.2f), Color.White)
-        ContractStatusFilter.Closed -> Triple("상환 완료", Color.White.copy(alpha = 0.2f), Color.White)
-        ContractStatusFilter.All -> Triple("", Color.Transparent, Color.Transparent)
+    // 역할 레이블
+    val isLend = contract.role == ContractRoleFilter.Lend
+    val roleLabel = if (isLend) "🤝 빌려준 계약" else "🤲 빌린 계약"
+    // BillageDanger는 Color.kt 토큰 중 산호/오렌지 계열에 가장 가까운 값으로 사용
+    val roleLabelColor = if (isLend) BillagePrimary else BillageDanger
+
+    // 상태별 액센트 바 색상 + 뱃지 색상 (레이블은 enum.label 사용)
+    data class StatusStyle(
+        val accentColor: Color,
+        val badgeBg: Color,
+        val badgeText: Color
+    )
+
+    val statusStyle = when (contract.status) {
+        ContractStatusFilter.Signing  -> StatusStyle(BillageInfo,          BillageInfo,           Color.White)
+        ContractStatusFilter.Repaying -> StatusStyle(BillagePrimary,       BillagePrimaryLight,   BillagePrimary)
+        ContractStatusFilter.Closed   -> StatusStyle(BillageTextSecondary, BillageIconBackground, BillageTextSecondary)
+        ContractStatusFilter.All      -> StatusStyle(BillageCardBorder,    Color.Transparent,     Color.Transparent)
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = BillageSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, BillageCardBorder),
         modifier = modifier.fillMaxWidth()
     ) {
-        Column {
-            // ── 헤더 (역할 뱃지 + 상태 배지) ──────────────────────
-            Row(
+        // IntrinsicSize.Min: 액센트 바가 Column 콘텐츠 높이에 맞춰 늘어나도록
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+
+            // ── 좌측 액센트 바 ────────────────────────────────────
+            // Card의 clip이 좌상단·좌하단을 12dp로 잘라주므로 별도 shape 불필요
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(headerBgColor)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = badgeLabel,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Spacer(modifier = Modifier.weight(1f))
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(statusStyle.accentColor)
+            )
 
-                if (statusText.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = statusBgColor
-                    ) {
-                        Text(
-                            text = statusText,
-                            color = statusTextColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
+            // ── 본문 영역 ─────────────────────────────────────────
+            Column(modifier = Modifier.weight(1f)) {
 
-            // ── 본문 (상대방 이름, 금액, 만기일 등) ────────────────
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Text(
-                        text = contract.counterparty,
-                        color = BillageTextPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = contract.amount,
-                        color = BillagePrimary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
-                ) {
-                    ContractMetaText(text = "만기일  ${contract.dueDate}")
-                    ContractMetaText(text = contract.dDayLabel, color = Color(contract.dDayColorHex))
-                    ContractMetaText(text = contract.interestLabel)
-                }
-            }
-
-            HorizontalDivider(color = BillageDivider, thickness = 1.dp)
-
-            // ── 하단 버튼 행 ─────────────────────────────────────
-            if (onDeleteClick != null) {
-                // DRAFT / NEGOTIATING: 삭제 버튼 + 상세 보기 버튼 분할
+                // ── 헤더 (역할 레이블 + 상태 뱃지) ─────────────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text(
+                        text = roleLabel,
+                        color = roleLabelColor,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (contract.status != ContractStatusFilter.All) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = statusStyle.badgeBg
+                        ) {
+                            Text(
+                                text = contract.status.label,
+                                color = statusStyle.badgeText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // ── 계약 정보 ────────────────────────────────────
+                Column(modifier = Modifier.padding(horizontal = 14.dp)) {
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { showDeleteDialog = true }
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "계약 삭제",
-                            tint = BillageDanger,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = "삭제",
-                            color = BillageDanger,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            text = contract.counterparty,
+                            color = BillageTextPrimary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = contract.amount,
+                            color = BillagePrimary,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    VerticalDivider(color = BillageDivider, thickness = 1.dp)
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                    ) {
+                        ContractMetaText(text = "만기일  ${contract.dueDate}")
+                        ContractMetaText(text = contract.dDayLabel, color = Color(contract.dDayColorHex))
+                        ContractMetaText(text = contract.interestLabel)
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                HorizontalDivider(color = BillageDivider, thickness = 1.dp)
+
+                // ── 하단 버튼 행 ──────────────────────────────────
+                if (onDeleteClick != null) {
+                    // DRAFT / NEGOTIATING: 삭제 버튼 + 상세 보기 버튼 분할
                     Row(
                         modifier = Modifier
-                            .weight(2f)
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { showDeleteDialog = true }
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "계약 삭제",
+                                tint = BillageDanger,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "삭제",
+                                color = BillageDanger,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        VerticalDivider(color = BillageDivider, thickness = 1.dp)
+                        Row(
+                            modifier = Modifier
+                                .weight(2f)
+                                .clickable(onClick = onDetailClick)
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = "계약 상세 보기",
+                                tint = BillagePrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "상세 보기",
+                                color = BillagePrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = BillagePrimary
+                            )
+                        }
+                    }
+                } else {
+                    // SIGNED / ACTIVE / CLOSED: 상세 보기만
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .clickable(onClick = onDetailClick)
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Description,
                             contentDescription = "계약 상세 보기",
                             tint = BillagePrimary,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
                         Text(
                             text = "상세 보기",
                             color = BillagePrimary,
@@ -243,35 +305,6 @@ fun ContractListCard(
                             tint = BillagePrimary
                         )
                     }
-                }
-            } else {
-                // ACTIVE / CLOSED: 상세 보기만
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onDetailClick)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Description,
-                        contentDescription = "계약 상세 보기",
-                        tint = BillagePrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(
-                        text = "상세 보기",
-                        color = BillagePrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = BillagePrimary
-                    )
                 }
             }
         }
