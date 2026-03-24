@@ -50,7 +50,7 @@ sealed interface AppDestination {
 
     data object ContractSpecialTerms : AppDestination {
         override val route: String = "contract_special_terms"
-        const val routeWithArg = "contract_special_terms/{contractSeq}"
+        const val routeWithArg = "contract_special_terms/{contractSeq}/{roomId}/{opponentName}"
     }
 
     data object ContractEdit : AppDestination {
@@ -212,8 +212,12 @@ class AppNavController(
         }
     }
 
-    fun navigateToSpecialTerms(contractSeq: Int = -1) {
-        navController.navigate("${AppDestination.ContractSpecialTerms.route}/$contractSeq") {
+    fun navigateToSpecialTerms(
+        contractSeq: Int = -1,
+        roomId: String = "none",
+        opponentName: String = "알 수 없음"
+    ) {
+        navController.navigate("${AppDestination.ContractSpecialTerms.route}/$contractSeq/$roomId/$opponentName") {
             launchSingleTop = true
         }
     }
