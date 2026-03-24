@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.remote.api.ChatApi
 import com.billage.app.data.remote.api.ContractApi
+import com.billage.app.data.remote.api.ContractDetailResponse
+import com.billage.app.data.remote.api.ContractSignatureRequest
 import com.billage.app.data.remote.api.ContractListResponse
 import com.billage.app.data.repository.ChatRepository
 import com.billage.app.data.repository.ContractRepository
@@ -19,10 +21,14 @@ import com.billage.app.ui.chat.models.MessageSender
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.headers.StompSubscribeHeaders
 import com.billage.app.data.local.AuthSessionStorage
+import retrofit2.HttpException
 import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
@@ -55,33 +61,86 @@ class ChatRoomViewModel @Inject constructor(
     private val _localCards = MutableStateFlow<List<BaseChatMessage>>(emptyList())
     val localCards: StateFlow<List<BaseChatMessage>> = _localCards.asStateFlow()
 
-    fun joinRoom(roomId: String, roomName: String) {
+    fun joinRoom(roomId: String, roomName: String, isNewContract: Boolean = false, contractSeq: Int? = null) {
         if (_chatRoomState.value.roomId == roomId && _messages.value.isNotEmpty()) return 
         _chatRoomState.update { it.copy(roomId = roomId, roomName = roomName) }
-        Log.d(TAG, "Joining room: $roomId")
+        Log.d(TAG, "Joining room: $roomId (isNewContract: $isNewContract)")
 
         viewModelScope.launch {
             // 0. 읽음 처리
             try {
                 chatApi.markAsRead(myUserSeq, roomId)
-                Log.d(TAG, "Marked as read: $roomId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark as read", e)
             }
 
-            // 1. 과거 메시지 내역 로드 (REST API)
+            // 1. 과거 메시지 내역 로드
             try {
                 val history = chatApi.getChatHistory(roomId)
                 _messages.value = history
-                Log.d(TAG, "History loaded: ${history.size} messages")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load history", e)
             }
 
-            // 2. STOMP 세션 관찰 및 구독
+            // 2. 만약 새 계약이라면, 최초 카드 제안 전송
+            if (isNewContract && _messages.value.none { it.msgType == "AI_PROPOSAL" }) {
+                try {
+                    val targetSeq = contractSeq ?: run {
+                        // 만약 contractSeq 가 없으면 이전처럼 목록에서 첫번째 시도
+                        val res = contractApi.getContracts()
+                        if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
+                    }
+
+                    if (targetSeq != null) {
+                        // 상세조회로 interestRate 확보
+                        val detailRes = contractApi.getContractDetail(targetSeq)
+                        if (detailRes.status == 200) {
+                            val detail = detailRes.data
+                            applyContractDetail(detail)
+
+                            val originalInterest = detail.interestRate ?: 0.0
+                            val payload = AiProposalPayload(
+                                contractTitle = "빌리 거래 제안서",
+                                contractSeq = detail.contractSeq,
+                                originalInterestRate = originalInterest,
+                                proposedInterestRate = originalInterest,
+                                modifications = listOf("최초 차용증 생성"),
+                                isInitial = true
+                            )
+                            val contentJson = Json.encodeToString(AiProposalPayload.serializer(), payload)
+                            chatRepository.sendMessage(
+                                roomId = roomId,
+                                senderSeq = myUserSeq,
+                                content = contentJson,
+                                isContractMsg = true,
+                                msgType = "AI_PROPOSAL"
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send initial contract card", e)
+                }
+            } else {
+                // 이미 메시지가 있는 경우에도 상태 동기화는 필요
+                try {
+                    val targetSeq = contractSeq ?: run {
+                        val res = contractApi.getContracts()
+                        if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
+                    }
+                    if (targetSeq != null) {
+                        val detailRes = contractApi.getContractDetail(targetSeq)
+                        if (detailRes.status == 200) {
+                            applyContractDetail(detailRes.data)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync acceptance state", e)
+                }
+            }
+
+            // 3. STOMP 세션 관찰 및 구독
             chatRepository.session.collect { session ->
                 session?.let {
-                    Log.d(TAG, "Session ready, subscribing to /sub/chat/room/$roomId")
                     subscribeToRoom(it, roomId)
                 }
             }
@@ -100,6 +159,29 @@ class ChatRoomViewModel @Inject constructor(
                     try {
                         val json = Json { ignoreUnknownKeys = true }
                         val receivedMsg = json.decodeFromString<ChatMessageRes>(payload)
+
+                        // 수정 제안 메시지가 오면 수락 상태 초기화
+                        if (receivedMsg.msgType == "AI_PROPOSAL") {
+                             _chatRoomState.update {
+                                 it.copy(
+                                     isMeAccepted = false,
+                                     isOpponentAccepted = false,
+                                     isMeSigned = false,
+                                     isOpponentSigned = false
+                                 )
+                             }
+                        }
+
+                        // 서버에서 보낸 시스템 메시지(수락 알림 등) 처리
+                        if (receivedMsg.msgType == "SYSTEM" && shouldRefreshContractState(receivedMsg.content)) {
+                            // 모든 메시지 수신 시 상태 최신화 시도
+                            _chatRoomState.value.draftContractDetail?.contractSeq?.let { seq ->
+                                fetchContractDetail(seq)
+                            } ?: run {
+                                // 만약 현재 열린 상세가 없다면 첫번째 계약이라도 동기화 시도 (안전 장치)
+                                fetchContracts()
+                            }
+                        }
 
                         _messages.update { currentList ->
                             if (currentList.any { it.id == receivedMsg.id }) currentList
@@ -130,7 +212,11 @@ class ChatRoomViewModel @Inject constructor(
                 contractSeq = contract.contractSeq,
                 contractId = contract.contractId ?: "ID없음",
                 counterpartyName = contract.counterpartyName ?: "미상"
-            )
+            ),
+            isMeAccepted = false,
+            isOpponentAccepted = false,
+            isMeSigned = false,
+            isOpponentSigned = false
         )}
     }
 
@@ -158,7 +244,11 @@ class ChatRoomViewModel @Inject constructor(
                         _chatRoomState.update { it.copy(
                             draftProposal = updatedContract.aiDraftContent,
                             draftContractDetail = updatedContract,
-                            mode = ChatRoomMode.NORMAL
+                            mode = ChatRoomMode.NORMAL,
+                            isMeAccepted = false,
+                            isOpponentAccepted = false,
+                            isMeSigned = false,
+                            isOpponentSigned = false
                         )}
 
                         // 4. AI 제안 내용을 JSON 으로 직렬화해 STOMP 로 전송 (→ DB 저장 → 양측 수신)
@@ -171,7 +261,7 @@ class ChatRoomViewModel @Inject constructor(
 
                         // content = JSON 페이로드, msgType = AI_PROPOSAL
                         val payload = AiProposalPayload(
-                            contractTitle = "계약 #${updatedContract.contractId ?: contract.contractSeq}",
+                            contractTitle = "빌리지 거래 제안서",
                             contractSeq = contract.contractSeq,
                             originalInterestRate = originalInterest,
                             proposedInterestRate = proposedInterest,
@@ -196,25 +286,122 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun submitProposal() {
-        val draft = _chatRoomState.value.draftProposal ?: return
+        val currentContract = _chatRoomState.value.draftContractDetail ?: return
         val roomId = _chatRoomState.value.roomId
         
-        // 수락 알림을 SYSTEM 메시지로 전송 (가운데 정렬)
-        chatRepository.sendMessage(
-            roomId = roomId,
-            senderSeq = myUserSeq,
-            content = "계약 수정 제안이 수락되었습니다. 전자서명 단계로 이동합니다.",
-            isContractMsg = true,
-            msgType = "SYSTEM"
-        )
-        
-        // 전송 후 완료 처리
-        cancelProposal()
-        exitModificationMode()
+        viewModelScope.launch {
+            try {
+                // 1. 서버에 수락 요청 (서버가 DB 업데이트 + SYSTEM 메시지 발송)
+                val res = contractApi.acceptContract(currentContract.contractSeq, roomId)
+                if (res.status == 200) {
+                    // 2. 상태 동기화
+                    applyContractDetail(res.data)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to accept contract", e)
+            } finally {
+                exitModificationMode()
+            }
+        }
+    }
+
+    fun submitContractSignature(request: ContractSignatureRequest) {
+        val currentState = _chatRoomState.value
+        val contractSeq = currentState.draftContractDetail?.contractSeq ?: currentState.selectedContract?.contractSeq
+
+        if (contractSeq == null) {
+            _chatRoomState.update {
+                it.copy(signatureErrorMessage = "서명할 계약 정보를 찾을 수 없습니다.")
+            }
+            return
+        }
+
+        _chatRoomState.update {
+            it.copy(
+                isSubmittingSignature = true,
+                signatureErrorMessage = null,
+                signatureSuccessMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val response = contractApi.submitSignature(contractSeq, request)
+                if (response.status == 201) {
+                    runCatching { contractApi.getContractDetail(contractSeq) }
+                        .onSuccess { detailResponse ->
+                            if (detailResponse.status == 200) {
+                                applyContractDetail(detailResponse.data)
+                            }
+                        }
+
+                    val roomId = _chatRoomState.value.roomId
+                    if (roomId.isNotBlank()) {
+                        val notice = if (response.data.contractFullySigned) {
+                            "양측 전자서명이 완료되어 계약이 체결되었습니다."
+                        } else {
+                            "전자서명을 완료했습니다."
+                        }
+                        chatRepository.sendMessage(
+                            roomId = roomId,
+                            senderSeq = myUserSeq,
+                            content = notice,
+                            isContractMsg = true,
+                            msgType = "SYSTEM"
+                        )
+                    }
+
+                    _chatRoomState.update {
+                        it.copy(
+                            isSubmittingSignature = false,
+                            isMeSigned = true,
+                            signatureSuccessMessage = response.message
+                        )
+                    }
+                } else {
+                    _chatRoomState.update {
+                        it.copy(
+                            isSubmittingSignature = false,
+                            signatureErrorMessage = response.message
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to submit signature", e)
+                _chatRoomState.update {
+                    it.copy(
+                        isSubmittingSignature = false,
+                        signatureErrorMessage = extractApiErrorMessage(e, "전자서명 저장에 실패했습니다.")
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearSignatureFeedback() {
+        _chatRoomState.update {
+            it.copy(
+                signatureErrorMessage = null,
+                signatureSuccessMessage = null
+            )
+        }
     }
     
     fun cancelProposal() {
         _chatRoomState.update { it.copy(draftProposal = null) }
+    }
+
+    fun fetchContractDetail(contractSeq: Int) {
+        viewModelScope.launch {
+            try {
+                val res = contractApi.getContractDetail(contractSeq)
+                if (res.status == 200) {
+                    applyContractDetail(res.data)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch contract detail", e)
+            }
+        }
     }
 
     fun fetchContracts() {
@@ -227,6 +414,41 @@ class ChatRoomViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load contracts", e)
             }
+        }
+    }
+
+    private fun applyContractDetail(detail: ContractDetailResponse) {
+        _chatRoomState.update {
+            it.copy(
+                draftContractDetail = detail,
+                isMeAccepted = detail.isMeAccepted ?: false,
+                isOpponentAccepted = detail.isOpponentAccepted ?: false,
+                isMeSigned = detail.isMeSigned ?: false,
+                isOpponentSigned = detail.isOpponentSigned ?: false
+            )
+        }
+    }
+
+    private fun shouldRefreshContractState(content: String): Boolean {
+        return content.contains("수락") || content.contains("서명") || content.contains("체결")
+    }
+
+    private fun extractApiErrorMessage(throwable: Throwable, fallback: String): String {
+        return when (throwable) {
+            is HttpException -> {
+                val rawBody = throwable.response()?.errorBody()?.string()
+                if (rawBody.isNullOrBlank()) {
+                    fallback
+                } else {
+                    runCatching {
+                        Json.parseToJsonElement(rawBody)
+                            .jsonObject["message"]
+                            ?.jsonPrimitive
+                            ?.content
+                    }.getOrNull() ?: fallback
+                }
+            }
+            else -> throwable.message ?: fallback
         }
     }
 }

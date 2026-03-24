@@ -546,14 +546,14 @@ fun AiProposalCard(
                 modifier = androidx.compose.ui.Modifier.padding(vertical = 4.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = if (message.isInitial) Icons.Default.Assignment else Icons.Default.Edit,
                     contentDescription = null,
                     tint = BillagePrimary,
                     modifier = androidx.compose.ui.Modifier.size(18.dp)
                 )
                 Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
                 Text(
-                    text = "\uD83E\uDD16 AI 수정 제안 도착",
+                    text = if (message.isInitial) "😊 소중한 거래 제안이 도착했어요." else "\uD83E\uDD16 AI 수정 제안 도착",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = BillageTextPrimary
@@ -581,28 +581,30 @@ fun AiProposalCard(
                         color = BillageDivider.copy(alpha = 0.5f)
                     )
                     
-                    if (message.originalInterestRate != null && message.proposedInterestRate != null) {
+                    if (message.proposedInterestRate != null) {
                         Text(
-                            text = "이자율 조정됨",
+                            text = if (message.isInitial) "약정 이자율" else "이자율 조정됨",
                             style = MaterialTheme.typography.labelSmall,
                             color = BillageTextSecondary,
                             modifier = androidx.compose.ui.Modifier.padding(bottom = 4.dp)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "%.2f%%".format(message.originalInterestRate),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = BillageTextSecondary,
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                            )
-                            Text(
-                                text = " → ",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = BillagePrimary
-                            )
+                            if (!message.isInitial && message.originalInterestRate != null) {
+                                Text(
+                                    text = "%.2f%%".format(message.originalInterestRate),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = BillageTextSecondary,
+                                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                                )
+                                Text(
+                                    text = " → ",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = BillagePrimary
+                                )
+                            }
                             Text(
                                 text = "%.2f%%".format(message.proposedInterestRate),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = if (message.isInitial) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                                 color = BillagePrimary,
                                 fontWeight = FontWeight.Bold
                             )

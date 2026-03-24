@@ -184,7 +184,23 @@ fun ContractFlowPreview() {
         if (isDocumentSheetVisible) {
             ContractDocumentFullScreen(
                 contractTitle = "100만원 소액 대출 건",
-                contractDetail = null,
+                contractDetail = com.billage.app.data.remote.api.ContractDetailResponse(
+                    contractSeq = 1,
+                    contractId = "PREVIEW-001",
+                    family = false,
+                    myRole = "CREDITOR",
+                    counterpartyName = "김철수",
+                    principalAmount = 1000000.0,
+                    interestRate = 5.0,
+                    repaymentMethod = "일시상환",
+                    totalInstallments = null,
+                    status = "DRAFT",
+                    startDt = "2026.03-10",
+                    endDt = "2026.05.31",
+                    clauses = emptyList()
+                ),
+                isMeAccepted = false,
+                isOpponentAccepted = false,
                 onDismissRequest = { isDocumentSheetVisible = false },
                 onAccept = { isDocumentSheetVisible = false }
             )

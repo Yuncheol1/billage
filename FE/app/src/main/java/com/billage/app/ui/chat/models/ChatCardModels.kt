@@ -121,5 +121,6 @@ data class AiProposalMessage(
     val contractTitle: String,
     val originalInterestRate: Double?,
     val proposedInterestRate: Double?,
-    val modifications: List<String> = emptyList()
+    val modifications: List<String> = emptyList(),
+    val isInitial: Boolean = false
 ) : BaseChatMessage

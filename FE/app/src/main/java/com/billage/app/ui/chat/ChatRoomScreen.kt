@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -18,11 +19,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
+import com.billage.app.data.remote.api.ContractSignatureRequest
+import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.ui.chat.components.ChatBottomInputBar
 import com.billage.app.ui.chat.components.ChatTopBar
+import com.billage.app.ui.chat.components.ContractSignatureDialog
 import com.billage.app.ui.chat.components.PinnedContractBanner
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.ChatRoomMode
@@ -31,6 +38,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.font.FontWeight
 import com.billage.app.ui.chat.models.ContractSummary
+import com.billage.app.ui.chat.security.ContractSignatureUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,9 +54,13 @@ fun ChatRoomScreen(
     onContractSelectForModify: (ContractListResponse) -> Unit = {},
     onCommitProposal: () -> Unit = {},
     onCancelProposal: () -> Unit = {},
-    onDirectEditClick: (String) -> Unit = {},
+    onDirectEditClick: (Int) -> Unit = {},
+    onSubmitSignature: (ContractSignatureRequest) -> Unit = {},
+    onDismissSignatureFeedback: () -> Unit = {},
     messageListContent: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
     // 입력창 텍스트 관리
     var inputText by remember { mutableStateOf("") }
     // 액션 메뉴(바텀시트) 표시 여부 관리
@@ -59,6 +71,20 @@ fun ChatRoomScreen(
     var showProposalModal by remember { mutableStateOf(false) }
     // AI 차용증 선택 다이얼로그 표시 여부
     var showAiSelectDialog by remember { mutableStateOf(false) }
+    var showSignatureDialog by remember { mutableStateOf(false) }
+    var localSignatureMessage by remember { mutableStateOf<String?>(null) }
+
+    val shouldShowSignatureBanner = state.isMeAccepted &&
+        state.isOpponentAccepted &&
+        !state.isMeSigned &&
+        state.draftContractDetail?.status != "SIGNED"
+    val documentHash = state.draftContractDetail?.let(ContractSignatureUtils::buildDocumentHash)
+
+    LaunchedEffect(state.signatureSuccessMessage) {
+        if (state.signatureSuccessMessage != null) {
+            showSignatureDialog = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -104,6 +130,28 @@ fun ChatRoomScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
+            com.billage.app.ui.chat.components.SignatureBanner(
+                isVisible = shouldShowSignatureBanner,
+                onSignClick = {
+                    if (activity == null) {
+                        localSignatureMessage = "전자서명을 시작할 Activity 컨텍스트를 찾을 수 없습니다."
+                        return@SignatureBanner
+                    }
+
+                    BiometricLoginManager.prompt(
+                        activity = activity,
+                        onSuccess = { showSignatureDialog = true },
+                        onError = { message -> localSignatureMessage = message },
+                        onEnrollmentRequired = {
+                            localSignatureMessage = "기기에서 지문 인증을 사용할 수 없습니다. 화면 잠금과 지문을 먼저 등록해 주세요."
+                        },
+                        title = "전자서명",
+                        subtitle = "지문 인증 후 계약 서명을 진행합니다."
+                    )
+                }
+            )
+
             // 계약 모드일 경우 상단에 고정되는 핀 배너
             PinnedContractBanner(
                 selectedContract = state.selectedContract,
@@ -213,7 +261,7 @@ fun ChatRoomScreen(
                                         .clickable {
                                             showActionSheet = false
                                             actionSheetState = "MENU"
-                                            onDirectEditClick(contract.contractSeq.toString())
+                                            onDirectEditClick(contract.contractSeq)
                                         }
                                 ) {
                                     androidx.compose.foundation.layout.Row(
@@ -284,7 +332,9 @@ fun ChatRoomScreen(
     if (showProposalModal && state.draftContractDetail != null) {
         com.billage.app.ui.chat.components.ContractDocumentFullScreen(
             contractTitle = "계약 #${state.selectedContract?.contractId ?: ""} 수정 제안서",
-            contractDetail = state.draftContractDetail,
+            contractDetail = state.draftContractDetail!!,
+            isMeAccepted = state.isMeAccepted,
+            isOpponentAccepted = state.isOpponentAccepted,
             onDismissRequest = { showProposalModal = false },
             onAccept = {
                 showProposalModal = false
@@ -304,6 +354,66 @@ fun ChatRoomScreen(
             onContractSelect = { contract ->
                 showAiSelectDialog = false
                 onContractSelectForModify(contract)
+            }
+        )
+    }
+
+    ContractSignatureDialog(
+        isVisible = showSignatureDialog,
+        isSubmitting = state.isSubmittingSignature,
+        documentHash = documentHash,
+        onDismissRequest = { showSignatureDialog = false },
+        onSaveSignature = { canvasDataUrl ->
+            val contractDetail = state.draftContractDetail
+            if (contractDetail == null) {
+                localSignatureMessage = "서명 대상 문서를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+            } else {
+                onSubmitSignature(
+                    ContractSignatureUtils.buildRequest(
+                        context = context,
+                        contractDetail = contractDetail,
+                        canvasDataUrl = canvasDataUrl
+                    )
+                )
+            }
+        }
+    )
+
+    localSignatureMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { localSignatureMessage = null },
+            title = { androidx.compose.material3.Text("전자서명 안내") },
+            text = { androidx.compose.material3.Text(message) },
+            confirmButton = {
+                TextButton(onClick = { localSignatureMessage = null }) {
+                    androidx.compose.material3.Text("확인")
+                }
+            }
+        )
+    }
+
+    state.signatureErrorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = onDismissSignatureFeedback,
+            title = { androidx.compose.material3.Text("전자서명 실패") },
+            text = { androidx.compose.material3.Text(message) },
+            confirmButton = {
+                TextButton(onClick = onDismissSignatureFeedback) {
+                    androidx.compose.material3.Text("확인")
+                }
+            }
+        )
+    }
+
+    state.signatureSuccessMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = onDismissSignatureFeedback,
+            title = { androidx.compose.material3.Text("전자서명 완료") },
+            text = { androidx.compose.material3.Text(message) },
+            confirmButton = {
+                TextButton(onClick = onDismissSignatureFeedback) {
+                    androidx.compose.material3.Text("확인")
+                }
             }
         )
     }

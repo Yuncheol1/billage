@@ -57,7 +57,7 @@ import com.billage.app.ui.theme.BillageTextPrimary
 @Composable
 fun ContractCreateScreen(
     onNavigateBack: () -> Unit,
-    onContractComplete: (contractSeq: Int) -> Unit, // ← contractSeq 전달받도록 변경
+    onContractComplete: (contractSeq: Int, roomId: String, opponentName: String) -> Unit,
     role: ContractRole = ContractRole.CREDITOR,
     viewModel: ContractCreateViewModel = hiltViewModel()
 ) {
@@ -79,7 +79,7 @@ fun ContractCreateScreen(
             // 재진입 시 Success 상태로 LaunchedEffect가 재실행되는 것을 방지하기 위해
             // 화면 이동 전에 먼저 상태를 초기화
             viewModel.resetSubmitState()
-            onContractComplete(success.contractSeq)
+            onContractComplete(success.contractSeq, success.roomId, success.opponentName)
         }
     }
 

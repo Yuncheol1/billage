@@ -2,6 +2,7 @@ package com.billage.app.data.remote.api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -58,6 +59,18 @@ interface ContractApi {
     suspend fun deleteContract(
         @Path("contractSeq") contractSeq: Int
     ): DeleteContractResponse
+
+    @retrofit2.http.PUT("api/v1/contracts/{contractSeq}/accept")
+    suspend fun acceptContract(
+        @Path("contractSeq") contractSeq: Int,
+        @Query("roomId") roomId: String
+    ): ContractDetailBaseResponse
+
+    @POST("/api/v1/contracts/{contractSeq}/signatures")
+    suspend fun submitSignature(
+        @Path("contractSeq") contractSeq: Int,
+        @Body request: ContractSignatureRequest
+    ): ContractSignatureBaseResponse
 }
 
 @Serializable
@@ -192,6 +205,10 @@ data class ContractDetailResponse(
     val endDt: String?,
     val aiDraftContent: String? = null,
     val signedDttm: String? = null,
+    val isMeAccepted: Boolean? = false,
+    val isOpponentAccepted: Boolean? = false,
+    val isMeSigned: Boolean? = false,
+    val isOpponentSigned: Boolean? = false,
     val clauses: List<ClauseDetailDto> = emptyList()
 )
 
@@ -201,4 +218,29 @@ data class ClauseDetailDto(
     val title: String,
     val content: String,
     val orderNo: Int
+)
+
+@Serializable
+data class ContractSignatureRequest(
+    val method: String,
+    val deviceIdHash: String,
+    val biometricVerified: Boolean,
+    val userAgent: String,
+    val signaturePayload: JsonObject
+)
+
+@Serializable
+data class ContractSignatureBaseResponse(
+    val status: Int,
+    val message: String,
+    val data: ContractSignatureResponse
+)
+
+@Serializable
+data class ContractSignatureResponse(
+    val signatureSeq: Int,
+    val userSeq: Int,
+    val role: String,
+    val contractFullySigned: Boolean,
+    val generatedDocumentSeq: Int? = null
 )
