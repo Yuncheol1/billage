@@ -137,6 +137,8 @@ fun NavGraphBuilder.appNavGraph(
             onCommitProposal = { viewModel.submitProposal() },
             onCancelProposal = { viewModel.cancelProposal() },
             onDirectEditClick = { contractSeq -> appNavController.navigateToContractEdit(contractSeq) },
+            onSubmitSignature = { request -> viewModel.submitContractSignature(request) },
+            onDismissSignatureFeedback = { viewModel.clearSignatureFeedback() },
             messageListContent = {
                 var showProposalDialog by remember { mutableStateOf(false) }
 
