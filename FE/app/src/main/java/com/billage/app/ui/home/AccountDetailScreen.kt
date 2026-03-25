@@ -1,5 +1,6 @@
 package com.billage.app.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -65,8 +67,9 @@ fun AccountDetailScreen(
                 )
             }
         } else {
-            val amountColor = if (transaction.type == TransactionType.DEPOSIT) BillageSuccess else BillageDanger
-            val amountPrefix = if (transaction.type == TransactionType.DEPOSIT) "+" else "-"
+            val isDeposit = transaction.type == TransactionType.DEPOSIT
+            val amountColor = if (isDeposit) BillageSuccess else BillageDanger
+            val amountPrefix = if (isDeposit) "+" else "-"
 
             Column(
                 modifier = Modifier
@@ -75,6 +78,7 @@ fun AccountDetailScreen(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ── 거래 정보 카드 ──────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -85,19 +89,41 @@ fun AccountDetailScreen(
                         modifier = Modifier.padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        DetailRow(label = "상대방", value = transaction.description)
-                        DetailRow(label = "날짜", value = transaction.date)
+                        DetailRow(label = "거래처", value = transaction.description)
+                        DetailRow(
+                            label = "날짜",
+                            value = "${transaction.date} ${transaction.time}"
+                        )
                         DetailRow(
                             label = "금액",
                             value = "$amountPrefix${String.format("%,d", transaction.amount)}원",
                             valueColor = amountColor
                         )
+                        TypeBadgeRow(isDeposit = isDeposit)
                         DetailRow(
-                            label = "구분",
-                            value = if (transaction.type == TransactionType.DEPOSIT) "입금" else "출금"
+                            label = "메모",
+                            value = transaction.memo?.takeIf { it.isNotBlank() } ?: "메모 없음",
+                            valueColor = if (transaction.memo.isNullOrBlank()) BillageTextSecondary
+                                         else BillageTextPrimary
                         )
-                        // TODO: API 연동 후 TransactionDetail.memo 필드로 교체
-                        DetailRow(label = "메모", value = "-")
+                    }
+                }
+
+                // ── 계좌 정보 카드 ──────────────────────────
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = BillageSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        DetailRow(
+                            label = "계좌번호",
+                            value = transaction.accountNumber.ifEmpty { "-" }
+                        )
                     }
                 }
             }
@@ -113,9 +139,36 @@ private fun DetailRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, fontSize = 14.sp, color = BillageTextSecondary)
         Text(text = value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = valueColor)
+    }
+}
+
+@Composable
+private fun TypeBadgeRow(isDeposit: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "구분", fontSize = 14.sp, color = BillageTextSecondary)
+        Box(
+            modifier = Modifier
+                .background(
+                    color = if (isDeposit) BillageSuccess else BillageDanger,
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = if (isDeposit) "입금" else "출금",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+        }
     }
 }

@@ -31,10 +31,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
+import com.billage.app.ui.contract.detail.ContractDetailViewModel
+import com.billage.app.ui.contract.detail.PdfDownloadState
 import com.billage.app.ui.home.AccountDetailScreen
 import com.billage.app.ui.home.AccountScreen
 import com.billage.app.ui.home.InsightDetailScreen
@@ -43,7 +47,6 @@ import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -296,7 +299,8 @@ fun NavGraphBuilder.appNavGraph(
         val contractSeq = backStackEntry.arguments?.getString("contractSeq") ?: ""
         val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
         val opponentName = backStackEntry.arguments?.getString("opponentName") ?: ""
-        
+        val context = LocalContext.current
+
         val parentEntry = remember(backStackEntry) {
             try {
                 appNavController.navController
@@ -307,6 +311,23 @@ fun NavGraphBuilder.appNavGraph(
         }
         val viewModel: ContractCreateViewModel = viewModel(parentEntry)
         val formState by viewModel.formState.collectAsState()
+
+        val pdfViewModel: ContractDetailViewModel = hiltViewModel()
+        val pdfDownloadState by pdfViewModel.pdfDownloadState.collectAsState()
+
+        LaunchedEffect(pdfDownloadState) {
+            when (pdfDownloadState) {
+                is PdfDownloadState.Success -> {
+                    Toast.makeText(context, "Downloads 폴더에 저장되었어요", Toast.LENGTH_SHORT).show()
+                    pdfViewModel.clearPdfDownloadState()
+                }
+                is PdfDownloadState.Error -> {
+                    Toast.makeText(context, "다운로드에 실패했어요. 다시 시도해주세요", Toast.LENGTH_SHORT).show()
+                    pdfViewModel.clearPdfDownloadState()
+                }
+                else -> {}
+            }
+        }
 
         ContractCreateCompleteScreen(
             formState = formState,
@@ -322,6 +343,9 @@ fun NavGraphBuilder.appNavGraph(
                 } else {
                     appNavController.navigateToChatListFromContract()
                 }
+            },
+            onDownloadPdfClick = {
+                contractSeq.toIntOrNull()?.let { pdfViewModel.downloadPdf(it) }
             },
             role = formState.role
         )
@@ -377,7 +401,8 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(route = AppDestination.Account.route) {
         AccountScreen(
-            onBackClick = { appNavController.popBackStack() }
+            onBackClick = { appNavController.popBackStack() },
+            onTransactionClick = { transactionSeq -> appNavController.navigateToAccountDetail(transactionSeq) }
         )
     }
 
@@ -399,6 +424,27 @@ fun NavGraphBuilder.appNavGraph(
 
         com.billage.app.ui.contract.detail.ContractDetailScreen(
             contractSeq = contractId,
+            viewModel = viewModel,
+            onBackClick = { appNavController.popBackStack() },
+            onViewDocumentClick = {
+                contractId.toIntOrNull()?.let { appNavController.navigateToContractDocument(it) }
+            }
+        )
+    }
+
+    composable(route = AppDestination.ContractDocument.routeWithArg) { backStackEntry ->
+        val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
+        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel =
+            androidx.hilt.navigation.compose.hiltViewModel()
+
+        androidx.compose.runtime.LaunchedEffect(contractSeq) {
+            if (contractSeq != -1) {
+                viewModel.fetchContractDetail(contractSeq)
+                viewModel.fetchContractHtml(contractSeq)
+            }
+        }
+
+        com.billage.app.ui.contract.detail.ContractDocumentScreen(
             viewModel = viewModel,
             onBackClick = { appNavController.popBackStack() }
         )

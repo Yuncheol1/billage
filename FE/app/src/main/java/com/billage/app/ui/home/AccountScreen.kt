@@ -1,5 +1,6 @@
 package com.billage.app.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import com.billage.app.ui.theme.BillageTextSecondary
 @Composable
 fun AccountScreen(
     onBackClick: () -> Unit,
+    onTransactionClick: (Int) -> Unit = {},
     viewModel: AccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -84,6 +86,7 @@ fun AccountScreen(
                 AccountContent(
                     account = s.account,
                     transactions = s.transactions,
+                    onTransactionClick = onTransactionClick,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -110,6 +113,7 @@ fun AccountScreen(
 private fun AccountContent(
     account: BankAccountInfo,
     transactions: List<Transaction>,
+    onTransactionClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -137,7 +141,10 @@ private fun AccountContent(
             ) {
                 Column {
                     transactions.forEachIndexed { index, transaction ->
-                        TransactionItem(transaction = transaction)
+                        TransactionItem(
+                            transaction = transaction,
+                            onClick = { onTransactionClick(transaction.transactionSeq) }
+                        )
                         if (index < transactions.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -206,24 +213,25 @@ private fun BalanceCard(account: BankAccountInfo) {
 }
 
 @Composable
-private fun TransactionItem(transaction: Transaction) {
+private fun TransactionItem(transaction: Transaction, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
             Text(
-                text = transaction.description,
+                text = transaction.memo?.takeIf { it.isNotBlank() } ?: transaction.description,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = BillageTextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = transaction.date,
+                text = "${transaction.date} ${transaction.time}",
                 fontSize = 12.sp,
                 color = BillageTextSecondary
             )

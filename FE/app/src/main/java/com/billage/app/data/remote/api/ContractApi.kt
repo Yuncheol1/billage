@@ -3,6 +3,7 @@ package com.billage.app.data.remote.api
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -66,6 +67,12 @@ interface ContractApi {
         @Path("contractSeq") contractSeq: Int,
         @Query("roomId") roomId: String
     ): ContractDetailBaseResponse
+
+    // 차용증 HTML 미리보기
+    @GET("api/v1/contracts/{contractSeq}/document/html")
+    suspend fun getContractDocumentHtml(
+        @Path("contractSeq") contractSeq: Int
+    ): ResponseBody
 
     @POST("/api/v1/contracts/{contractSeq}/signatures")
     suspend fun submitSignature(

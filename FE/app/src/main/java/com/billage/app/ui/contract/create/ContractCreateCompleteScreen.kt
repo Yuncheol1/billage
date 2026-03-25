@@ -72,6 +72,7 @@ fun ContractCreateCompleteScreen(
     formState: ContractFormState,
     onHomeClick: () -> Unit,
     onChatClick: () -> Unit,
+    onDownloadPdfClick: () -> Unit = {},
     role: ContractRole = ContractRole.CREDITOR
 ) {
     Column(
@@ -264,9 +265,7 @@ fun ContractCreateCompleteScreen(
             fontSize = 13.sp,
             color = BillageTextSecondary,
             modifier = Modifier
-                .clickable {
-                    // TODO: 차용증 전문 보기 연동
-                }
+                .clickable { onDownloadPdfClick() }
                 .padding(vertical = 8.dp)
         )
     }

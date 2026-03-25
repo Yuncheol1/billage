@@ -80,6 +80,11 @@ sealed interface AppDestination {
         override val route: String = "account_detail"
         const val routeWithArg = "account_detail/{transactionSeq}"
     }
+
+    data object ContractDocument : AppDestination {
+        override val route: String = "contract_document"
+        const val routeWithArg = "contract_document/{contractSeq}"
+    }
 }
 
 class AppNavController(
@@ -255,6 +260,12 @@ class AppNavController(
 
     fun navigateToInsightDetail(insightIndex: Int) {
         navController.navigate("${AppDestination.InsightDetail.route}/$insightIndex") {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToContractDocument(contractSeq: Int) {
+        navController.navigate("${AppDestination.ContractDocument.route}/$contractSeq") {
             launchSingleTop = true
         }
     }

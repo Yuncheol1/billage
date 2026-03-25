@@ -43,15 +43,18 @@ data class BankAccountInfo(
 data class Transaction(
     val transactionSeq: Int,
     val date: String,
+    val time: String,
     val description: String,
     val amount: Long,
-    val type: TransactionType
+    val type: TransactionType,
+    val memo: String? = null,
+    val accountNumber: String = ""  // 거래 계좌번호 (마스킹 포함)
 )
 
 enum class TransactionType { DEPOSIT, WITHDRAW }
 
 val mockTransactions = listOf(
-    Transaction(1, "2026.03.24", "김철수 상환", 300000, TransactionType.DEPOSIT),
-    Transaction(2, "2026.03.23", "이영희 대출", 1000000, TransactionType.WITHDRAW),
-    Transaction(3, "2026.03.22", "박민수 상환", 500000, TransactionType.DEPOSIT)
+    Transaction(1, "2026.03.24", "14:32", "김철수 상환", 300000, TransactionType.DEPOSIT, "3월 상환금", "110-123-*****"),
+    Transaction(2, "2026.03.23", "09:15", "이영희 대출", 1000000, TransactionType.WITHDRAW, null, "220-456-*****"),
+    Transaction(3, "2026.03.22", "18:47", "박민수 상환", 500000, TransactionType.DEPOSIT, null, "330-789-*****")
 )

@@ -62,18 +62,8 @@ class AccountViewModel @Inject constructor(
 
     private suspend fun loadAccountInfo() {
         try {
-            val listResponse = bankAccountApi.getBankAccounts()
-            // isPrimary 계좌 우선, 없으면 첫 번째 계좌
-            val account = listResponse.data.firstOrNull { it.isPrimary }
-                ?: listResponse.data.firstOrNull()
-            if (account == null) {
-                _state.value = AccountScreenState.NoAccount
-                return
-            }
-            val balanceResponse = bankAccountApi.getAccountBalance()
-            _state.value = AccountScreenState.HasAccount(
-                account = account.copy(accountBalance = balanceResponse.data.accountBalance)
-            )
+            val response = bankAccountApi.getAccountDetail()
+            _state.value = AccountScreenState.HasAccount(account = response.data)
         } catch (e: Exception) {
             _state.value = AccountScreenState.Error(e.toKoreanMessage("계좌 조회"))
         }

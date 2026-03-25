@@ -3,6 +3,7 @@ package com.billage.app.di
 import android.content.Context
 import com.billage.app.BuildConfig
 import com.billage.app.data.local.AuthSessionStorage
+import com.billage.app.data.remote.PdfDownloader
 import com.billage.app.data.remote.api.BankAccountApi
 import com.billage.app.data.remote.api.ChatApi
 import com.billage.app.data.remote.api.ContractApi
@@ -88,4 +89,12 @@ object NetworkModule {
     fun provideBankAccountApi(retrofit: Retrofit): BankAccountApi {
         return retrofit.create(BankAccountApi::class.java)
     }
+
+    @Provides
+    @Singleton
+    fun providePdfDownloader(
+        @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient,
+        authSessionStorage: AuthSessionStorage
+    ): PdfDownloader = PdfDownloader(context, okHttpClient, authSessionStorage)
 }

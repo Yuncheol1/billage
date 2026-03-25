@@ -19,9 +19,9 @@ interface BankAccountApi {
     @GET("api/v1/bank/accounts")
     suspend fun getBankAccounts(): BankAccountListBaseResponse
 
-    // 잔액 조회
-    @GET("api/v1/bank/accounts/balance")
-    suspend fun getAccountBalance(): BankBalanceBaseResponse
+    // 계좌 단건 조회 + 잔액 조회
+    @GET("api/v1/bank/accounts/detail")
+    suspend fun getAccountDetail(): BankAccountDetailBaseResponse
 }
 
 @Serializable
@@ -51,13 +51,8 @@ data class BankAccountListBaseResponse(
 )
 
 @Serializable
-data class BankBalanceBaseResponse(
+data class BankAccountDetailBaseResponse(
     val status: Int,
     val message: String,
-    val data: BankBalanceData
-)
-
-@Serializable
-data class BankBalanceData(
-    val accountBalance: String = "0"    // BE가 String으로 반환
+    val data: BankAccountInfo
 )
