@@ -58,7 +58,7 @@ public class ContractController {
         @ApiResponse(responseCode = "400", description = "입력값 오류 또는 상태 불일치"),
         @ApiResponse(responseCode = "500", description = "AI 서버 통신 장애")
     })
-    @PostMapping("/{contractSeq}/clauses")
+    @PostMapping("/{contractSeq}/clausesAI")
     public ResponseEntity<Map<String, Object>> addAiClauses(
             @AuthenticationPrincipal AuthenticatedUser authUser,
             @Parameter(description = "계약 식별자(PK)") @PathVariable Integer contractSeq,
@@ -76,7 +76,24 @@ public class ContractController {
                         "content", clause.getContent()
                 )));
     }
+    @PostMapping("/{contractSeq}/clauses")
+    public ResponseEntity<Map<String, Object>> addClauses(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @Parameter(description = "계약 식별자(PK)") @PathVariable Integer contractSeq,
+            @Parameter(description = "사용자의 자연어 요구사항(user_intent 전달용)") @Valid @RequestBody ClauseRequestDto requestDto) {
 
+        Integer userSeq = authUser.userSeq();
+        ContractClause clause = contractService.addClauses(contractSeq, requestDto.getClauseContent(), userSeq);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "status", HttpStatus.CREATED.value(),
+                "message", "특약사항이 성공적으로 저장되었습니다.",
+                "data", Map.of(
+                        "clauseSeq", clause.getClauseSeq(),
+                        "title", clause.getTitle(),
+                        "content", clause.getContent()
+                )));
+    }
     @PatchMapping("/{contractSeq}/clauses/{clauseSeq}")
     public ResponseEntity<Map<String, Object>> updateClause(
             @AuthenticationPrincipal AuthenticatedUser authUser,
