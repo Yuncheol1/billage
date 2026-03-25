@@ -118,6 +118,7 @@ public class AutoTransferBatchConfig {
             String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
             String depositAccountNo = registration.getCreditorAccount().getAccountNo();
             BigDecimal amount = schedule.getTotalDue();
+            String contractId = schedule.getContract().getContractId();
 
             // 2. SSAFY 계좌이체 API 호출 (실패 시 TransferFailException → Skip)
             // userKey는 채무자(출금자)의 키를 사용
@@ -126,7 +127,7 @@ public class AutoTransferBatchConfig {
                     withdrawalAccountNo,
                     depositAccountNo,
                     amount,
-                    "빌려줘 자동이체",
+                    contractId,
                     debtorUserKey
             );
 

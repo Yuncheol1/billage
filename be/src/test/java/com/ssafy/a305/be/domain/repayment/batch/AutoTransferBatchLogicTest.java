@@ -75,8 +75,9 @@ class AutoTransferBatchLogicTest {
             String depositAccountNo = registration.getCreditorAccount().getAccountNo();
             BigDecimal amount = schedule.getTotalDue();
 
+            String contractId = schedule.getContract().getContractId();
             String debtorUserKey = schedule.getContract().getDebtor().getSsafyUserKey();
-            ssafyTransferApiClient.transfer(withdrawalAccountNo, depositAccountNo, amount, "빌려줘 자동이체", debtorUserKey);
+            ssafyTransferApiClient.transfer(withdrawalAccountNo, depositAccountNo, amount, contractId, debtorUserKey);
 
             LocalDateTime now = LocalDateTime.now();
             schedule.markPaid(now);
@@ -224,7 +225,7 @@ class AutoTransferBatchLogicTest {
                     eq("0012345678901234"),   // 채무자 출금 계좌
                     eq("0098765432109876"),   // 채권자 입금 계좌
                     eq(new BigDecimal("500000")),
-                    eq("빌려줘 자동이체"),
+                    eq("C-20260325-TEST01"),
                     eq("debtor-ssafy-key-001")
             );
 
