@@ -29,7 +29,7 @@ public class NotificationLog {
     private String eventKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_seq")
+    @JoinColumn(name = "schedule_seq", nullable = false)
     private RepaymentSchedule repaymentSchedule;
 
     @Column(name = "title")

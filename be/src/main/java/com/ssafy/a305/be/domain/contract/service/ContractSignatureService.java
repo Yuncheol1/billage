@@ -22,6 +22,7 @@ import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ContractSignatureService {
 
@@ -103,7 +105,11 @@ public class ContractSignatureService {
         Integer generatedDocumentSeq = null;
         if (contractFullySigned) {
             contract.markSigned(now);
-            notificationCommandService.sendContractSignedNotifications(contract);
+            try {
+                notificationCommandService.sendContractSignedNotifications(contract);
+            } catch (Exception e) {
+                log.error("Failed to send contract signed notifications. contractSeq={}", contractSeq, e);
+            }
             generatedDocumentSeq = document.getDocumentSeq();
         }
 

@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.temporal.ChronoUnit;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +39,7 @@ public class NotificationCommandService {
 
     @Transactional
     public void sendContractSignedNotifications(Contract contract) {
+        RepaymentSchedule representativeSchedule = resolveRepresentativeSchedule(contract);
         String counterpartyNameForCreditor = resolveDisplayName(contract.getDebtor());
         String counterpartyNameForDebtor = resolveDisplayName(contract.getCreditor());
 
@@ -47,7 +49,7 @@ public class NotificationCommandService {
                 "계약이 체결되었어요",
                 counterpartyNameForCreditor + "님과의 대여 계약이 체결되었어요.",
                 contract,
-                null,
+                representativeSchedule,
                 Map.of(
                         "type", "CONTRACT",
                         "eventKey", "CONTRACT_SIGNED_CREDITOR",
@@ -61,7 +63,7 @@ public class NotificationCommandService {
                 "계약이 체결되었어요",
                 counterpartyNameForDebtor + "님에게 빌린 계약이 체결되었어요.",
                 contract,
-                null,
+                representativeSchedule,
                 Map.of(
                         "type", "CONTRACT",
                         "eventKey", "CONTRACT_SIGNED_DEBTOR",
@@ -259,6 +261,16 @@ public class NotificationCommandService {
                 start,
                 end
         ) > 0;
+    }
+
+    private RepaymentSchedule resolveRepresentativeSchedule(Contract contract) {
+        return contract.getRepaymentSchedules().stream()
+                .min(Comparator
+                        .comparing(RepaymentSchedule::getDueDt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(RepaymentSchedule::getInstallmentNo, Comparator.nullsLast(Integer::compareTo)))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Contract signed notification requires at least one repayment schedule. contractSeq="
+                                + contract.getContractSeq()));
     }
 
     private void sendNotification(
