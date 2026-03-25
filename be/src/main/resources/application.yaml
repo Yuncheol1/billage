@@ -59,6 +59,7 @@ ssafy:
     inquire-demand-deposit-account-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccount}
     inquire-transaction-history-list-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_LIST_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistoryList}
     inquire-transaction-history-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistory}
+    update-demand-deposit-account-deposit-path: ${SSAFY_UPDATE_DEMAND_DEPOSIT_ACCOUNT_DEPOSIT_PATH:/ssafy/api/v1/edu/demandDeposit/updateDemandDepositAccountDeposit}
     demand-deposit-account-type-unique-no: ${SSAFY_DEMAND_DEPOSIT_ACCOUNT_TYPE_UNIQUE_NO:001-1-f8b3869eff034c}
 
 ai:

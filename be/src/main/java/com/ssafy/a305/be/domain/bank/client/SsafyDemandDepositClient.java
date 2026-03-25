@@ -6,6 +6,7 @@ import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDeposi
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireTransactionHistoryListRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireTransactionHistoryRequestDto;
+import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyUpdateDemandDepositAccountDepositRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositTransactionRecDto;
@@ -14,6 +15,7 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepos
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListRecDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryResponseDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyUpdateDemandDepositAccountDepositResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class SsafyDemandDepositClient {
     private static final String INQUIRE_ACCOUNT_API_NAME = "inquireDemandDepositAccount";
     private static final String INQUIRE_TRANSACTION_HISTORY_LIST_API_NAME = "inquireTransactionHistoryList";
     private static final String INQUIRE_TRANSACTION_HISTORY_API_NAME = "inquireTransactionHistory";
+    private static final String UPDATE_ACCOUNT_DEPOSIT_API_NAME = "updateDemandDepositAccountDeposit";
 
     private final RestClient.Builder restClientBuilder;
     private final SsafyApiProperties ssafyApiProperties;
@@ -142,6 +145,31 @@ public class SsafyDemandDepositClient {
         return response.rec();
     }
 
+    public SsafyUpdateDemandDepositAccountDepositResponseDto.Rec updateDemandDepositAccountDeposit(
+            String userKey,
+            String accountNo,
+            String transactionBalance,
+            String transactionSummary
+    ) {
+        SsafyUpdateDemandDepositAccountDepositRequestDto request = new SsafyUpdateDemandDepositAccountDepositRequestDto(
+                ssafyApiHeaderFactory.create(UPDATE_ACCOUNT_DEPOSIT_API_NAME, userKey),
+                accountNo,
+                transactionBalance,
+                transactionSummary
+        );
+        SsafyUpdateDemandDepositAccountDepositResponseDto response = post(
+                request,
+                ssafyApiProperties.getUpdateDemandDepositAccountDepositPath(),
+                SsafyUpdateDemandDepositAccountDepositResponseDto.class,
+                "계좌 입금",
+                "ssafy.api.update-demand-deposit-account-deposit-path"
+        );
+        if (response.rec() == null) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 입금 응답이 비어 있습니다.");
+        }
+        return response.rec();
+    }
+
     private <T> T post(
             Object requestBody,
             String path,
@@ -196,6 +224,9 @@ public class SsafyDemandDepositClient {
             responseCode = dto.header() == null ? null : dto.header().responseCode();
             responseMessage = dto.header() == null ? null : dto.header().responseMessage();
         } else if (response instanceof SsafyInquireTransactionHistoryResponseDto dto) {
+            responseCode = dto.header() == null ? null : dto.header().responseCode();
+            responseMessage = dto.header() == null ? null : dto.header().responseMessage();
+        } else if (response instanceof SsafyUpdateDemandDepositAccountDepositResponseDto dto) {
             responseCode = dto.header() == null ? null : dto.header().responseCode();
             responseMessage = dto.header() == null ? null : dto.header().responseMessage();
         } else {
