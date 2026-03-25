@@ -49,7 +49,8 @@ import com.billage.app.ui.theme.BillageTextSecondary
 fun ContractDetailScreen(
     contractSeq: String,
     viewModel: ContractDetailViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onViewDocumentClick: () -> Unit = {}
 ) {
     val detail by viewModel.contractDetail.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -275,7 +276,7 @@ fun ContractDetailScreen(
                                 fontSize = 13.sp,
                                 color = BillagePrimary,
                                 textDecoration = TextDecoration.Underline,
-                                modifier = Modifier.clickable { /* TODO */ }
+                                modifier = Modifier.clickable { onViewDocumentClick() }
                             )
                         }
                     }

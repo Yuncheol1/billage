@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lightbulb
@@ -56,6 +57,7 @@ fun HomeSideMenu(
     isLoggingOut: Boolean,
     onClose: () -> Unit,
     onProfileClick: () -> Unit,
+    onAccountClick: () -> Unit,
     onInsightListClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onSupportClick: () -> Unit,
@@ -157,6 +159,16 @@ fun HomeSideMenu(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(14.dp))
+                MenuCardItem(
+                    icon = Icons.Default.AccountBalance,
+                    iconTint = BillagePrimary,
+                    iconBackground = BillagePrimaryLight,
+                    title = "내 계좌 확인",
+                    subtitle = "잔액 및 입출금 내역 조회",
+                    onClick = onAccountClick
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
                 MenuCardItem(
                     icon = Icons.Default.Lightbulb,
                     iconTint = BillagePrimary,

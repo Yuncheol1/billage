@@ -2,6 +2,7 @@ package com.billage.app.ui.contract.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.billage.app.data.remote.PdfDownloader
 import com.billage.app.data.remote.api.ClauseUpdateDto
 import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractUpdateRequest
@@ -16,10 +17,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+sealed class PdfDownloadState {
+    object Idle : PdfDownloadState()
+    object Loading : PdfDownloadState()
+    object Success : PdfDownloadState()
+    object Error : PdfDownloadState()
+}
+
 @HiltViewModel
 class ContractDetailViewModel @Inject constructor(
     private val contractRepository: ContractRepository,
-    private val userApi: UserApi
+    private val userApi: UserApi,
+    private val pdfDownloader: PdfDownloader
 ) : ViewModel() {
 
     private val _contractDetail = MutableStateFlow<ContractDetailResponse?>(null)
@@ -61,6 +70,40 @@ class ContractDetailViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    private val _contractHtml = MutableStateFlow<String?>(null)
+    val contractHtml: StateFlow<String?> = _contractHtml.asStateFlow()
+
+    fun fetchContractHtml(contractSeq: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                _contractHtml.value = contractRepository.getContractHtml(contractSeq)
+            } catch (e: Exception) {
+                _errorMessage.value = "차용증 문서를 불러오지 못했습니다"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private val _pdfDownloadState = MutableStateFlow<PdfDownloadState>(PdfDownloadState.Idle)
+    val pdfDownloadState: StateFlow<PdfDownloadState> = _pdfDownloadState.asStateFlow()
+
+    fun downloadPdf(contractSeq: Int) {
+        viewModelScope.launch {
+            _pdfDownloadState.value = PdfDownloadState.Loading
+            _pdfDownloadState.value = pdfDownloader.download(contractSeq).fold(
+                onSuccess = { PdfDownloadState.Success },
+                onFailure = { PdfDownloadState.Error }
+            )
+        }
+    }
+
+    fun clearPdfDownloadState() {
+        _pdfDownloadState.value = PdfDownloadState.Idle
     }
 
     private val _updateSuccess = MutableSharedFlow<Boolean>()

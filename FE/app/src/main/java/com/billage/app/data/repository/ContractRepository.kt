@@ -27,4 +27,8 @@ class ContractRepository @Inject constructor(
     suspend fun createAiProposalMock(contractSeq: Int): com.billage.app.data.remote.api.ContractupdateBaseResponse {
         return contractApi.createAiProposalMock(contractSeq)
     }
+
+    suspend fun getContractHtml(contractSeq: Int): String {
+        return contractApi.getContractDocumentHtml(contractSeq).string()
+    }
 }
