@@ -42,6 +42,24 @@ public class ContractDocumentService {
     private final UserProfileRepository userProfileRepository;
     private final TemplateEngine templateEngine;
 
+    private String fontAbsolutePath;
+
+    @jakarta.annotation.PostConstruct
+    public void initFont() {
+        try {
+            java.io.File fontFile = java.io.File.createTempFile("NanumGothic", ".ttf");
+            fontFile.deleteOnExit();
+            try (java.io.InputStream is = new ClassPathResource("static/fonts/NanumGothic.ttf").getInputStream();
+                 java.io.FileOutputStream fos = new java.io.FileOutputStream(fontFile)) {
+                org.springframework.util.StreamUtils.copy(is, fos);
+            }
+            this.fontAbsolutePath = fontFile.getAbsolutePath();
+            log.info("폰트가 임시 디렉토리에 복사되었습니다: {}", this.fontAbsolutePath);
+        } catch (Exception e) {
+            log.error("폰트 임시 파일 복사 실패", e);
+        }
+    }
+
     /**
      * 차용증 HTML 문자열을 생성합니다 (WebView 전문보기용).
      */
@@ -63,9 +81,11 @@ public class ContractDocumentService {
             ITextRenderer renderer = new ITextRenderer();
 
             // 한글 폰트 등록 (Flying Saucer는 CSS @font-face만으로는 한글을 렌더링하지 못함)
-            String fontPath = new ClassPathResource("static/fonts/NanumGothic.ttf")
-                    .getFile().getAbsolutePath();
-            renderer.getFontResolver().addFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            if (this.fontAbsolutePath != null) {
+                renderer.getFontResolver().addFont(fontAbsolutePath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            } else {
+                log.warn("폰트 경로가 null입니다. 한글 렌더링이 깨질 수 있습니다.");
+            }
 
             renderer.setDocumentFromString(html);
             renderer.layout();
