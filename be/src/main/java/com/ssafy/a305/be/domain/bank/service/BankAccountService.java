@@ -8,7 +8,10 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDeposi
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositTransactionRecDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListRecDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyUpdateDemandDepositAccountDepositResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.request.BankAccountDepositRequestDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankAccountDepositResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionHistoryListResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
@@ -36,6 +39,8 @@ public class BankAccountService {
 
     private static final String PROVIDER_SSAFY = "SSAFY";
     private static final Pattern YYYYMMDD_PATTERN = Pattern.compile("\\d{8}");
+    private static final Pattern MONEY_PATTERN = Pattern.compile("\\d+");
+    private static final String DEPOSIT_SUMMARY = "(수시입출금) : 입금";
 
     private final UserRepository userRepository;
     private final BankAccountRepository bankAccountRepository;
@@ -148,6 +153,29 @@ public class BankAccountService {
         }
 
         return toTransactionItem(rec);
+    }
+
+    @Transactional
+    public BankAccountDepositResponseDto depositToLinkedAccount(
+            Integer userSeq,
+            BankAccountDepositRequestDto request
+    ) {
+        String transactionBalance = request == null ? null : request.transactionBalance();
+        validateDepositAmount(transactionBalance);
+
+        SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
+        SsafyUpdateDemandDepositAccountDepositResponseDto.Rec rec =
+                ssafyDemandDepositClient.updateDemandDepositAccountDeposit(
+                        ctx.user().getSsafyUserKey(),
+                        ctx.bankAccount().getAccountNo(),
+                        transactionBalance,
+                        DEPOSIT_SUMMARY
+                );
+
+        return new BankAccountDepositResponseDto(
+                rec.transactionUniqueNo(),
+                rec.transactionDate()
+        );
     }
 
     @Transactional
@@ -311,6 +339,19 @@ public class BankAccountService {
             );
         }
         return normalized;
+    }
+
+    private void validateDepositAmount(String value) {
+        if (!hasText(value)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "입금 금액(transactionBalance)은 필수입니다.");
+        }
+        String normalized = value.trim();
+        if (!MONEY_PATTERN.matcher(normalized).matches()) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "입금 금액은 숫자만 입력할 수 있습니다.");
+        }
+        if ("0".equals(normalized)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "입금 금액은 0보다 커야 합니다.");
+        }
     }
 
     private record SsafyLinkedAccount(User user, BankAccount bankAccount) {
