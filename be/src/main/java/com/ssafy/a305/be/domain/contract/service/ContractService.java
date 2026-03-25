@@ -26,6 +26,7 @@ import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
@@ -61,6 +62,7 @@ public class ContractService {
     private final SimpMessageSendingOperations messagingTemplate;
     private final BankAccountRepository bankAccountRepository;
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
+    private final EntityManager entityManager;
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
@@ -725,11 +727,49 @@ public class ContractService {
         }
 
         String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)&&!"CLOSED".equals(status)) {
-
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status) && !"CLOSED".equals(status)) {
             throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "이미 서명이 완료되었거나 진행중인 계약은 파기할 수 없습니다.");
         }
 
+        // 계약에 종속된 하위 엔티티 벌크 삭제 (외래키 제약조건 위배 방지)
+        
+        // 0. BankTransaction 연결 해제 (repayment_schedule 삭제 시 외래키 제약 방지)
+        entityManager.createNativeQuery("UPDATE bank_transaction bt JOIN repayment_schedule rs ON bt.matched_schedule_seq = rs.schedule_seq SET bt.matched_schedule_seq = NULL WHERE rs.contract_seq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+
+        // 1. Signature -> Document 삭제 시 자식 삭제 (DocumentSeq 기반)
+        entityManager.createNativeQuery("DELETE s FROM signature s JOIN document d ON s.document_seq = d.document_seq WHERE d.contract_seq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+        
+        // 2. Document
+        entityManager.createQuery("DELETE FROM Document d WHERE d.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+        
+        // 3. AutoTransferRegistration
+        entityManager.createQuery("DELETE FROM AutoTransferRegistration a WHERE a.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+
+        // 기타 하위 엔티티가 있다면 bulk delete 필요
+        // NotificationLog, RepaymentEvent, TaxCalculation, EarlySettlement
+        // 하지만 JPARepository를 즉시 도입하기 어려우므로 EntityManager 활용.
+        entityManager.createQuery("DELETE FROM NotificationLog n WHERE n.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+                
+        entityManager.createQuery("DELETE FROM TaxCalculation t WHERE t.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+                
+        entityManager.createQuery("DELETE FROM EarlySettlement e WHERE e.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+                
+        // RepaymentEvent는 contractSeq를 가지고 있음
+        entityManager.createQuery("DELETE FROM RepaymentEvent r WHERE r.contract.contractSeq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+
+        // ClauseNegotiation (contract_clause의 자식)
+        entityManager.createNativeQuery("DELETE cn FROM clause_negotiation cn JOIN contract_clause cc ON cn.clause_seq = cc.clause_seq WHERE cc.contract_seq = :contractSeq")
+                .setParameter("contractSeq", contractSeq).executeUpdate();
+
+        // Contract 자체 삭제 (Cascade.ALL 에 의해 contract_clause, repayment_schedule 자동 삭제)
         contractRepository.delete(contract);
     }
 
