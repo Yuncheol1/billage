@@ -1,5 +1,7 @@
 package com.ssafy.a305.be.domain.contract.service;
 
+import com.ssafy.a305.be.domain.account.entity.BankAccount;
+import com.ssafy.a305.be.domain.account.repository.BankAccountRepository;
 import com.ssafy.a305.be.domain.chat.service.ChatService;
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
@@ -12,7 +14,9 @@ import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.document.entity.Document;
 import com.ssafy.a305.be.domain.document.repository.DocumentRepository;
 import com.ssafy.a305.be.domain.document.repository.SignatureRepository;
+import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.entity.UserProfile;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
@@ -54,6 +58,8 @@ public class ContractService {
     private final UserProfileRepository userProfileRepository;
     private final ChatService chatService;
     private final SimpMessageSendingOperations messagingTemplate;
+    private final BankAccountRepository bankAccountRepository;
+    private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
@@ -118,7 +124,10 @@ public class ContractService {
         // 8. DB 일괄 저장 (Cascade.ALL 이므로 contract만 저장해줌)
         Contract savedContract = contractRepository.save(contract);
 
-        // 9. DTO 매핑 후 리턴
+        // 9. 자동이체 등록 (채무자/채권자 주 계좌 기반)
+        registerAutoTransfer(savedContract, creditor, debtor, requestDto);
+
+        // 10. DTO 매핑 후 리턴
         return ContractDraftResponseDto.builder()
                 .contractSeq(savedContract.getContractSeq())
                 .contractId(savedContract.getContractId())
@@ -526,6 +535,41 @@ public class ContractService {
                 contract.addRepaymentSchedule(schedule);
             }
         }
+    }
+
+    /**
+     * 자동이체 등록: 채무자/채권자의 주 계좌를 조회하여 AutoTransferRegistration을 생성·저장한다.
+     */
+    private void registerAutoTransfer(Contract contract, User creditor, User debtor, ContractDraftRequestDto request) {
+        BankAccount debtorAccount = bankAccountRepository.findByUserUserSeqAndIsPrimaryTrue(debtor.getUserSeq())
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "채무자의 주 계좌가 등록되어 있지 않습니다. 자동이체를 설정할 수 없습니다."));
+
+        BankAccount creditorAccount = bankAccountRepository.findByUserUserSeqAndIsPrimaryTrue(creditor.getUserSeq())
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "채권자의 주 계좌가 등록되어 있지 않습니다. 자동이체를 설정할 수 없습니다."));
+
+        // transferDay: 할부 → repaymentDay, 일시불 → 만기일의 day
+        int transferDay;
+        if ("LUMP_SUM".equals(request.getRepaymentMethod())) {
+            transferDay = request.getEndDt().getDayOfMonth();
+        } else {
+            transferDay = request.getRepaymentDay();
+        }
+
+        AutoTransferRegistration registration = AutoTransferRegistration.builder()
+                .contract(contract)
+                .debtorAccount(debtorAccount)
+                .creditorAccount(creditorAccount)
+                .amount(request.getPrincipalAmount())
+                .transferDay(transferDay)
+                .isActive(true)
+                .registeredDttm(LocalDateTime.now())
+                .build();
+
+        autoTransferRegistrationRepository.save(registration);
+        log.info("[자동이체 등록] contractSeq={}, 채무자계좌={}, 채권자계좌={}, transferDay={}",
+                contract.getContractSeq(), debtorAccount.getAccountNo(), creditorAccount.getAccountNo(), transferDay);
     }
 
     private BigDecimal calculateTotalInterest(BigDecimal principal, BigDecimal rate, LocalDate start, LocalDate end) {
