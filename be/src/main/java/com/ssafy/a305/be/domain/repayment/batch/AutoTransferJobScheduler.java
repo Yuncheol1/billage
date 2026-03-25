@@ -27,19 +27,19 @@ public class AutoTransferJobScheduler {
     private final Job autoTransferJob;
 
     /** 1차 이체: 매일 오전 10시 */
-    @Scheduled(cron = "0 14 11 * * *")
+    @Scheduled(cron = "0 21 11 * * *")
     public void runSlot10() {
         runJob("SLOT_10");
     }
 
     /** 2차 재시도: 매일 오후 2시 */
-    @Scheduled(cron = "0 15 11 * * *")
+    @Scheduled(cron = "0 22 11 * * *")
     public void runSlot14() {
         runJob("SLOT_14");
     }
 
     /** 3차 재시도: 매일 오후 6시 */
-    @Scheduled(cron = "0 16 11 * * *")
+    @Scheduled(cron = "0 23 11 * * *")
     public void runSlot18() {
         runJob("SLOT_18");
     }
@@ -49,6 +49,7 @@ public class AutoTransferJobScheduler {
             JobParameters params = new JobParametersBuilder()
                     .addString("runDate", LocalDate.now().toString())
                     .addString("slot", slot)
+                    .addLong("timestamp",System.currentTimeMillis())
                     .toJobParameters();
 
             log.info("[자동이체 스케줄러] Job 실행 - runDate={}, slot={}", LocalDate.now(), slot);
