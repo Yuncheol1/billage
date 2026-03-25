@@ -33,6 +33,9 @@ public class UserProfile {
     @Column(name = "phone_verified")
     private Boolean phoneVerified;
 
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
     @Column(name = "profile_completed_dt")
     private LocalDate profileCompletedDt;
 
