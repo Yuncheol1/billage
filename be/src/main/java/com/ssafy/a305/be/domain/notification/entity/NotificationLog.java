@@ -29,7 +29,7 @@ public class NotificationLog {
     private String eventKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_seq", nullable = false)
+    @JoinColumn(name = "schedule_seq")
     private RepaymentSchedule repaymentSchedule;
 
     @Column(name = "title")
@@ -57,5 +57,11 @@ public class NotificationLog {
 
     public void markAsRead() {
         this.isRead = true;
+    }
+
+    public void markDispatchResult(String status, String fcmMessageId, LocalDateTime sentDttm) {
+        this.status = status;
+        this.fcmMessageId = fcmMessageId;
+        this.sentDttm = sentDttm;
     }
 }

@@ -108,6 +108,11 @@ public class Contract {
         this.updatedDttm = signedAt;
     }
 
+    public void markClosed(LocalDateTime closedAt) {
+        this.status = "CLOSED";
+        this.updatedDttm = closedAt;
+    }
+
     public void updateContractTerms(BigDecimal principalAmount, BigDecimal interestRate) {
         if (principalAmount != null) {
             this.principalAmount = principalAmount;

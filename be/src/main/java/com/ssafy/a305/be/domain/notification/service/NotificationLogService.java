@@ -1,6 +1,7 @@
 package com.ssafy.a305.be.domain.notification.service;
 
 import com.ssafy.a305.be.domain.notification.dto.response.NotificationLogResponseDto;
+import com.ssafy.a305.be.domain.notification.dto.response.UnreadCountResponseDto;
 import com.ssafy.a305.be.domain.notification.entity.NotificationLog;
 import com.ssafy.a305.be.domain.notification.repository.NotificationLogRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,10 @@ public class NotificationLogService {
                 .collect(Collectors.toList());
     }
 
+    public UnreadCountResponseDto getUnreadCount(Integer userSeq) {
+        return new UnreadCountResponseDto(notificationLogRepository.countByUserUserSeqAndIsReadFalse(userSeq));
+    }
+
     @Transactional
     public void markAsRead(Long notificationSeq, Integer userSeq) {
         NotificationLog log = notificationLogRepository.findById(notificationSeq)
@@ -34,5 +39,11 @@ public class NotificationLogService {
         }
 
         log.markAsRead();
+    }
+
+    @Transactional
+    public void markAllAsRead(Integer userSeq) {
+        notificationLogRepository.findByUserUserSeqOrderBySentDttmDesc(userSeq)
+                .forEach(NotificationLog::markAsRead);
     }
 }

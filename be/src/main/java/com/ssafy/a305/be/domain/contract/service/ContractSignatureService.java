@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractSignatureRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractSignatureResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.document.entity.Document;
@@ -48,6 +49,7 @@ public class ContractSignatureService {
     private final SignatureRepository signatureRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserDeviceKeyRepository userDeviceKeyRepository;
+    private final NotificationCommandService notificationCommandService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -101,6 +103,7 @@ public class ContractSignatureService {
         Integer generatedDocumentSeq = null;
         if (contractFullySigned) {
             contract.markSigned(now);
+            notificationCommandService.sendContractSignedNotifications(contract);
             generatedDocumentSeq = document.getDocumentSeq();
         }
 
