@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.common.ProfileAvatar
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
@@ -52,6 +53,7 @@ import com.billage.app.ui.theme.BillageTextSecondary
 fun HomeSideMenu(
     userName: String,
     email: String,
+    profileImageUrl: String?,
     isLoggingOut: Boolean,
     onClose: () -> Unit,
     onProfileClick: () -> Unit,
@@ -99,20 +101,17 @@ fun HomeSideMenu(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
+                    ProfileAvatar(
+                        name = userName,
+                        imageUrl = profileImageUrl,
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PersonOutline,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                        fallbackBackgroundColor = Color.White.copy(alpha = 0.2f),
+                        fallbackContentColor = Color.White,
+                        textSize = 20.sp
+                    )
                     Spacer(modifier = Modifier.size(12.dp))
                     Column {
                         Text(

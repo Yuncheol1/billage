@@ -56,6 +56,7 @@ fun ContractDetailScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val myName by viewModel.myName.collectAsState()
+    val myProfileImageUrl by viewModel.myProfileImageUrl.collectAsState()
 
     Scaffold(
         topBar = {
@@ -150,6 +151,8 @@ fun ContractDetailScreen(
             detail != null -> {
                 val d = detail!!
                 val iAmCreditor = d.myRole == "CREDITOR"
+                val creditorProfileImageUrl = if (iAmCreditor) myProfileImageUrl else d.counterpartyProfileImageUrl
+                val debtorProfileImageUrl = if (iAmCreditor) d.counterpartyProfileImageUrl else myProfileImageUrl
                 val creditorName = if (iAmCreditor) myName else (d.counterpartyName ?: "상대방")
                 val debtorName = if (iAmCreditor) (d.counterpartyName ?: "상대방") else myName
                 val counterparty = d.counterpartyName ?: "상대방"
@@ -181,6 +184,8 @@ fun ContractDetailScreen(
                         ContractPartiesCard(
                             creditorName = creditorName,
                             debtorName = debtorName,
+                            creditorProfileImageUrl = creditorProfileImageUrl,
+                            debtorProfileImageUrl = debtorProfileImageUrl,
                             isFamily = d.family,
                             startDt = d.startDt,
                             endDt = d.endDt,

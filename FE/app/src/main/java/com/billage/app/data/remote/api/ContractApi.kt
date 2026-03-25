@@ -79,7 +79,19 @@ interface ContractApi {
         @Path("contractSeq") contractSeq: Int,
         @Body request: ContractSignatureRequest
     ): ContractSignatureBaseResponse
+
+    @GET("/api/v1/contracts/{contractSeq}/ai-analysis")
+    suspend fun getAiAnalysis(
+        @Path("contractSeq") contractSeq: Int
+    ): AiAnalysisResponse
 }
+
+@Serializable
+data class AiAnalysisResponse(
+    val status: Int,
+    val message: String,
+    val data: String
+)
 
 @Serializable
 data class DeleteContractResponse(
@@ -204,6 +216,7 @@ data class ContractDetailResponse(
     val family: Boolean?,
     val myRole: String?,
     val counterpartyName: String?,
+    val counterpartyProfileImageUrl: String? = null,
     val principalAmount: Double?,
     val interestRate: Double?,
     val repaymentMethod: String?,

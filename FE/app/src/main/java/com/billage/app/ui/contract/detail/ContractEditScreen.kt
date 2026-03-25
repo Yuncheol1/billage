@@ -42,7 +42,7 @@ fun ContractEditScreen(
                 principalAmount = it.principalAmount?.toInt()?.toString() ?: ""
             }
             if (interestRate.isBlank()) {
-                interestRate = it.interestRate?.toString() ?: ""
+                interestRate = ((it.interestRate ?: 0.0) * 100.0).toString()
             }
             if (clauseList.isEmpty()) {
                 clauseList = it.clauses.sortedBy { clause -> clause.orderNo }
@@ -77,7 +77,7 @@ fun ContractEditScreen(
                     viewModel.updateContract(
                         contractSeq = contractSeq.toInt(),
                         principalAmount = principalAmount.toDoubleOrNull(),
-                        interestRate = interestRate.toDoubleOrNull(),
+                        interestRate = (interestRate.toDoubleOrNull() ?: 0.0) / 100.0,
                         clauses = clauseList.map { com.billage.app.data.remote.api.ClauseUpdateDto(it.clauseSeq, it.content) },
                         roomId = roomId
                     )

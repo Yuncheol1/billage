@@ -3,8 +3,10 @@ package com.billage.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.remote.api.ContractApi
+import com.billage.app.data.repository.NotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +44,8 @@ data class ActivityItem(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val contractApi: ContractApi
+    private val contractApi: ContractApi,
+    private val notificationRepository: NotificationRepository
 ) : ViewModel() {
     // StateFlow — 데이터가 바뀌면 Compose UI가 자동으로 다시 그려지게 해주는 객체
     // _uiState는 내부에서만 수정 가능 (private)
@@ -53,6 +56,8 @@ class HomeViewModel @Inject constructor(
     init {
         loadDummyData()
         fetchContracts()
+        observeUnreadCount()
+        refreshUnreadCount()
     }
 
     fun fetchContracts() {
@@ -84,18 +89,37 @@ class HomeViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 userName = "빌리지",
-                hasNotification = true,
-            notificationMessage = "김철수님의 상환 예정일이 내일입니다",
-            upcomingSchedules = listOf(
-                ScheduleItem("2026.6.23", "김철수", "받을", "30만원"),
-                ScheduleItem("2026.6.24", "이영희", "드릴", "500만원"),
-                ScheduleItem("2026.6.25", "박민수", "받을", "10만원")
-            ),
-            recentActivities = listOf(
-                ActivityItem("김철수님이 돈을 보냈어요", "10분 전", "transfer"),
-                ActivityItem("이영희님과 조율 중이에요", "1시간 전", "chat")
+                hasNotification = false,
+                notificationMessage = "",
+                upcomingSchedules = listOf(
+                    ScheduleItem("2026.6.23", "김철수", "받을", "30만원"),
+                    ScheduleItem("2026.6.24", "이영희", "드릴", "500만원"),
+                    ScheduleItem("2026.6.25", "박민수", "받을", "10만원")
+                ),
+                recentActivities = listOf(
+                    ActivityItem("김철수님이 돈을 보냈어요", "10분 전", "transfer"),
+                    ActivityItem("이영희님과 조율 중이에요", "1시간 전", "chat")
+                )
             )
-            )
+        }
+    }
+
+    private fun observeUnreadCount() {
+        viewModelScope.launch {
+            notificationRepository.unreadCount.collectLatest { unreadCount ->
+                _uiState.update {
+                    it.copy(
+                        hasNotification = unreadCount > 0,
+                        notificationMessage = if (unreadCount > 0) "새로운 알림이 도착했어요." else ""
+                    )
+                }
+            }
+        }
+    }
+
+    fun refreshUnreadCount() {
+        viewModelScope.launch {
+            runCatching { notificationRepository.refreshUnreadCount() }
         }
     }
 

@@ -70,6 +70,9 @@ fun ContractListScreen(
     viewModel: ContractListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        viewModel.refreshUnreadCount()
+    }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
     var showMenu by remember { mutableStateOf(false) }
     val dismissInteraction = remember { MutableInteractionSource() }
@@ -111,9 +114,10 @@ fun ContractListScreen(
             topBar = {
                 TopBar(
                     userName = "빌리지",
-                    hasNotification = true,
+                    hasNotification = uiState.hasNotification,
                     onNotificationClick = onNotificationClick,
-                    onMenuClick = { showMenu = true }
+                    onMenuClick = { showMenu = true },
+                    showBrandLogo = true
                 )
             },
             bottomBar = {
@@ -239,6 +243,7 @@ fun ContractListScreen(
                 HomeSideMenu(
                     userName = menuProfileState.realName.ifBlank { "빌리지" },
                     email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },

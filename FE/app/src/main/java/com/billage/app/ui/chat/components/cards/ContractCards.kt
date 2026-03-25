@@ -71,7 +71,8 @@ fun DraftRequestCard(
     message: DraftRequestMessage,
     onAcceptClick: () -> Unit,
     onProposeClick: () -> Unit,
-    onViewDetailsClick: () -> Unit = {} // 상세 문서 보기 클릭
+    onViewDetailsClick: () -> Unit = {},
+    isEnabled: Boolean = true
 ) {
 
     BaseChatCard(sender = message.sender) {
@@ -127,7 +128,7 @@ fun DraftRequestCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable { onViewDetailsClick() }
+                            .clickable(enabled = isEnabled) { onViewDetailsClick() }
                             .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -160,14 +161,16 @@ fun DraftRequestCard(
                         ) {
                             OutlinedButton(
                                 onClick = onProposeClick,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                enabled = isEnabled
                             ) {
                                 Text("수정 제안", style = MaterialTheme.typography.labelLarge)
                             }
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
+                                enabled = isEnabled
                             ) {
                                 Text("동의", style = MaterialTheme.typography.labelLarge)
                             }
@@ -185,7 +188,8 @@ fun DraftRequestCard(
 fun ConditionProposalCard(
     message: ConditionProposalMessage,
     onAcceptClick: () -> Unit,
-    onRejectClick: () -> Unit
+    onRejectClick: () -> Unit,
+    isEnabled: Boolean = true
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
@@ -251,14 +255,16 @@ fun ConditionProposalCard(
                         ) {
                             OutlinedButton(
                                 onClick = onRejectClick,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                enabled = isEnabled
                             ) {
                                 Text("거절", style = MaterialTheme.typography.labelLarge)
                             }
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = BillageInfo)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillageInfo),
+                                enabled = isEnabled
                             ) {
                                 Text("수락하기", style = MaterialTheme.typography.labelLarge)
                             }
@@ -275,7 +281,8 @@ fun ConditionProposalCard(
 @Composable
 fun SignatureRequestCard(
     message: SignatureRequestMessage,
-    onSignClick: () -> Unit
+    onSignClick: () -> Unit,
+    isEnabled: Boolean = true
 ) {
     BaseChatCard(sender = message.sender) {
         Column(modifier = Modifier.width(260.dp)) {
@@ -343,7 +350,8 @@ fun SignatureRequestCard(
                 Button(
                     onClick = onSignClick,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = BillageDanger)
+                    colors = ButtonDefaults.buttonColors(containerColor = BillageDanger),
+                    enabled = isEnabled
                 ) {
                     Text("전자 서명 진행하기", style = MaterialTheme.typography.labelLarge)
                 }
@@ -455,7 +463,8 @@ fun SystemNoticeCard(message: SystemNoticeMessage) {
 fun ProposalRequestCard(
     message: ProposalRequestMessage,
     onAcceptClick: () -> Unit,
-    onRejectClick: () -> Unit
+    onRejectClick: () -> Unit,
+    isEnabled: Boolean = true
 ) {
     BaseChatCard(sender = message.sender) {
         val contentColor = if (message.sender == MessageSender.ME) {
@@ -512,14 +521,16 @@ fun ProposalRequestCard(
                         ) {
                             OutlinedButton(
                                 onClick = onRejectClick,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                enabled = isEnabled
                             ) {
                                 Text("거절", style = MaterialTheme.typography.labelLarge)
                             }
                             Button(
                                 onClick = onAcceptClick,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
+                                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
+                                enabled = isEnabled
                             ) {
                                 Text("수락", style = MaterialTheme.typography.labelLarge)
                             }
@@ -536,7 +547,8 @@ fun ProposalRequestCard(
 @Composable
 fun AiProposalCard(
     message: AiProposalMessage,
-    onViewDetailsClick: () -> Unit
+    onViewDetailsClick: () -> Unit,
+    isEnabled: Boolean = true
 ) {
     BaseChatCard(sender = message.sender) {
         Column(modifier = androidx.compose.ui.Modifier.width(260.dp)) {
@@ -649,6 +661,7 @@ fun AiProposalCard(
                     .fillMaxWidth()
                     .height(44.dp),
                 shape = RoundedCornerShape(22.dp),
+                enabled = isEnabled,
                 colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
             ) {

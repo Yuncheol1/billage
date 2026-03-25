@@ -41,5 +41,6 @@ data class UserMeResponse(
     val userSeq: Int,
     val realName: String? = null,
     val email: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
+    val profileImageUrl: String? = null
 )

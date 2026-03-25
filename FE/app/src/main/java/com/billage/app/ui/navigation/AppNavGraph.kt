@@ -43,6 +43,7 @@ import com.billage.app.ui.home.AccountDetailScreen
 import com.billage.app.ui.home.AccountScreen
 import com.billage.app.ui.home.InsightDetailScreen
 import com.billage.app.ui.home.InsightListScreen
+import com.billage.app.ui.notification.NotificationScreen
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
@@ -79,7 +80,7 @@ fun NavGraphBuilder.appNavGraph(
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
             onAccountClick = { appNavController.navigateToAccount() },
-            onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
+            onNotificationClick = { appNavController.navigateToNotifications() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
@@ -135,6 +136,46 @@ fun NavGraphBuilder.appNavGraph(
         val contracts by viewModel.contracts.collectAsState()
         val chatRoomState by viewModel.chatRoomState.collectAsState()
 
+        var showProposalDialog by remember { mutableStateOf(false) }
+        var currentOriginalPrincipal by remember { mutableStateOf<Double?>(null) }
+        var currentOriginalInterest by remember { mutableStateOf<Double?>(null) }
+        var currentProposedPrincipal by remember { mutableStateOf<Double?>(null) }
+        var currentProposedInterest by remember { mutableStateOf<Double?>(null) }
+        var isInitialDialog by remember { mutableStateOf(false) }
+
+        // 차용증 전문/제안서 다이얼로그
+        if (showProposalDialog && chatRoomState.draftContractDetail != null) {
+            com.billage.app.ui.chat.components.ContractDocumentFullScreen(
+                contractTitle = chatRoomState.draftContractDetail?.contractId ?: "ID없음",
+                contractDetail = chatRoomState.draftContractDetail!!,
+                isMeAccepted = chatRoomState.isMeAccepted,
+                isOpponentAccepted = chatRoomState.isOpponentAccepted,
+                originalPrincipal = currentOriginalPrincipal,
+                originalInterestRate = currentOriginalInterest,
+                proposedPrincipal = currentProposedPrincipal,
+                proposedInterestRate = currentProposedInterest,
+                isInitial = isInitialDialog,
+                onDismissRequest = { showProposalDialog = false },
+                onAccept = {
+                    showProposalDialog = false
+                    viewModel.submitProposal()
+                },
+                onEdit = {
+                    if (chatRoomState.isMeAccepted && chatRoomState.isOpponentAccepted) {
+                        // ViewModel에서 에러 상태를 처리하거나 
+                    } else {
+                        showProposalDialog = false
+                        chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
+                            appNavController.navigateToContractEdit(seq, roomId)
+                        }
+                    }
+                },
+                contractAiAnalysis = chatRoomState.aiAnalysisResult,
+                rawAiAnalysisJson = chatRoomState.rawAiAnalysisJson,
+                isAiAnalyzing = chatRoomState.isAiAnalyzing
+            )
+        }
+
         com.billage.app.ui.chat.ChatRoomScreen(
             state = chatRoomState,
             contracts = contracts,
@@ -151,38 +192,17 @@ fun NavGraphBuilder.appNavGraph(
             onDismissSignatureFeedback = { viewModel.clearSignatureFeedback() },
             onDirectEditClick = { seq -> appNavController.navigateToContractEdit(seq, roomId) },
             messageListContent = {
-                var showProposalDialog by remember { mutableStateOf(false) }
-                var currentOriginalPrincipal by remember { mutableStateOf<Double?>(null) }
-                var currentOriginalInterest by remember { mutableStateOf<Double?>(null) }
-                var isInitialDialog by remember { mutableStateOf(false) }
 
-                // 차용증 전문/제안서 다이얼로그
-                if (showProposalDialog && chatRoomState.draftContractDetail != null) {
-                    com.billage.app.ui.chat.components.ContractDocumentFullScreen(
-                        contractTitle = chatRoomState.draftContractDetail?.contractId ?: "ID없음",
-                        contractDetail = chatRoomState.draftContractDetail!!,
-                        isMeAccepted = chatRoomState.isMeAccepted,
-                        isOpponentAccepted = chatRoomState.isOpponentAccepted,
-                        originalPrincipal = currentOriginalPrincipal,
-                        originalInterestRate = currentOriginalInterest,
-                        isInitial = isInitialDialog,
-                        onDismissRequest = { showProposalDialog = false },
-                        onAccept = {
-                            showProposalDialog = false
-                            viewModel.submitProposal()
-                        },
-                        onEdit = {
-                            if (chatRoomState.isMeAccepted && chatRoomState.isOpponentAccepted) {
-                                // ViewModel에서 에러 상태를 처리하거나 
-                                // Dialog 내부의 showEditLockAlert로 이미 처리됨
-                            } else {
-                                showProposalDialog = false
-                                chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
-                                    appNavController.navigateToContractEdit(seq, roomId)
-                                }
-                            }
-                        }
-                    )
+                val lastAiProposalIds = remember(messages) {
+                    val map = mutableMapOf<Int, String>()
+                    messages.filter { it.msgType == "AI_PROPOSAL" }.forEach { msg ->
+                        try {
+                            val payload = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                .decodeFromString<com.billage.app.ui.chat.models.AiProposalPayload>(msg.content)
+                            map[payload.contractSeq] = msg.id
+                        } catch (e: Exception) {}
+                    }
+                    map
                 }
 
                 LazyColumn(
@@ -213,18 +233,21 @@ fun NavGraphBuilder.appNavGraph(
                                          sender = if (isMe) MessageSender.ME else MessageSender.OTHER,
                                          timestamp = java.time.LocalDateTime.now(),
                                          contractTitle = payload.contractTitle,
-                                         originalInterestRate = payload.originalInterestRate,
-                                         proposedInterestRate = payload.proposedInterestRate,
+                                         originalInterestRate = payload.originalInterestRate ?: 0.0,
+                                         proposedInterestRate = payload.proposedInterestRate ?: (payload.originalInterestRate ?: 0.0),
                                          modifications = payload.modifications,
                                          isInitial = payload.isInitial
                                      ),
-                                     onViewDetailsClick = {
-                                         currentOriginalPrincipal = payload.originalPrincipal
-                                         currentOriginalInterest = payload.originalInterestRate
-                                         isInitialDialog = payload.isInitial
-                                         viewModel.fetchContractDetail(payload.contractSeq)
-                                         showProposalDialog = true
-                                     }
+                                      onViewDetailsClick = {
+                                          currentOriginalPrincipal = payload.originalPrincipal
+                                          currentOriginalInterest = payload.originalInterestRate
+                                          currentProposedPrincipal = payload.proposedPrincipal
+                                          currentProposedInterest = payload.proposedInterestRate
+                                          isInitialDialog = payload.isInitial
+                                          viewModel.fetchContractDetail(payload.contractSeq)
+                                          showProposalDialog = true
+                                      },
+                                     isEnabled = lastAiProposalIds[payload.contractSeq] == msg.id
                                  )
                              }
                         } else {
@@ -264,7 +287,7 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         ContractListScreen(
             onNavigateHome = { appNavController.navigateToHome() },
-            onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
+            onNotificationClick = { appNavController.navigateToNotifications() },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
             onSettingsClick = { appNavController.navigateToSettings() },
@@ -279,6 +302,17 @@ fun NavGraphBuilder.appNavGraph(
         WithdrawalSettingsScreen(
             onBackClick = { appNavController.popBackStack() },
             onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) }
+        )
+    }
+
+    composable(route = AppDestination.Notification.route) {
+        NotificationScreen(
+            onBackClick = { appNavController.popBackStack() },
+            onNotificationClick = { notification ->
+                notification.contractSeq?.let { contractSeq ->
+                    appNavController.navigateToContractDetail(contractSeq.toString())
+                }
+            }
         )
     }
 
@@ -338,7 +372,8 @@ fun NavGraphBuilder.appNavGraph(
                         roomId = roomId,
                         opponentName = opponentName,
                         isNewContract = true,
-                        contractSeq = contractSeq.toIntOrNull() ?: -1
+                        contractSeq = contractSeq.toIntOrNull() ?: -1,
+                        clearContractFlow = true
                     )
                 } else {
                     appNavController.navigateToChatListFromContract()

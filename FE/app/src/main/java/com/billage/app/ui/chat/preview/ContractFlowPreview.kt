@@ -201,7 +201,19 @@ fun ContractFlowPreview() {
                 isMeAccepted = false,
                 isOpponentAccepted = false,
                 onDismissRequest = { isDocumentSheetVisible = false },
-                onAccept = { isDocumentSheetVisible = false }
+                onAccept = { isDocumentSheetVisible = false },
+                contractAiAnalysis = com.billage.app.domain.model.AiAnalysisResult(
+                    is_safe = true,
+                    summary = "본 계약은 표준 계약 형식을 잘 따르고 있으며, 특이한 독소 조항이 발견되지 않았습니다.",
+                    warnings = listOf(
+                        com.billage.app.domain.model.AiWarning(
+                            risk_level = "LOW",
+                            category = "표준성",
+                            reason = "표준 서식을 준수하고 있습니다.",
+                            suggestion = "특이사항 없습니다."
+                        )
+                    )
+                )
             )
         }
     }

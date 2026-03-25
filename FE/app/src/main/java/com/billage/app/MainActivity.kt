@@ -18,11 +18,13 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.billage.app.data.local.AuthSessionStorage
+import com.billage.app.data.repository.NotificationRepository
 import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.data.remote.api.FcmTokenRequest
 import com.billage.app.data.remote.api.NotificationApi
 import com.billage.app.ui.navigation.AppDestination
 import com.billage.app.ui.navigation.AppNavHost
+import com.billage.app.ui.navigation.NotificationNavigationTarget
 import com.billage.app.ui.theme.BillageTheme
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,8 +37,12 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var notificationApi: NotificationApi
 
+    @Inject
+    lateinit var notificationRepository: NotificationRepository
+
     private lateinit var authSessionStorage: AuthSessionStorage
     private var startDestination by mutableStateOf(AppDestination.Login.route)
+    private var pendingNotificationTarget by mutableStateOf<NotificationNavigationTarget?>(null)
 
     // 알림 권한 런처
     private val requestPermissionLauncher = registerForActivityResult(
@@ -54,11 +60,16 @@ class MainActivity : FragmentActivity() {
         authSessionStorage = AuthSessionStorage(applicationContext)
         startDestination = resolveStartDestination()
         handleAuthCallback(intent)
+        handleNotificationNavigation(intent)
 
         enableEdgeToEdge()
         setContent {
             BillageTheme {
-                AppNavHost(startDestination = startDestination)
+                AppNavHost(
+                    startDestination = startDestination,
+                    pendingNotificationTarget = pendingNotificationTarget,
+                    onNotificationTargetConsumed = { pendingNotificationTarget = null }
+                )
             }
         }
     }
@@ -67,6 +78,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAuthCallback(intent)
+        handleNotificationNavigation(intent)
     }
 
     private fun handleAuthCallback(intent: Intent?) {
@@ -163,17 +175,52 @@ class MainActivity : FragmentActivity() {
 
             val token = task.result
             Log.d("FCM", "FCM Token: $token")
+            authSessionStorage.saveFcmToken(token)
 
             // 토큰을 백엔드로 비동기 전송
             lifecycleScope.launch {
                 try {
                     notificationApi.registerToken(FcmTokenRequest(token))
                     Log.d("FCM", "Token successfully registered to backend")
+                    notificationRepository.refreshUnreadCount()
                 } catch (e: Exception) {
                     Log.e("FCM", "Failed to register backend token", e)
                 }
             }
         }
+    }
+
+    private fun handleNotificationNavigation(intent: Intent?) {
+        if (!authSessionStorage.hasSession()) {
+            return
+        }
+
+        val contractSeq = intent
+            ?.takeIf { it.hasExtra(EXTRA_CONTRACT_SEQ) }
+            ?.getIntExtra(EXTRA_CONTRACT_SEQ, -1)
+            ?.takeIf { it > 0 }
+        val notificationSeq = intent
+            ?.takeIf { it.hasExtra(EXTRA_NOTIFICATION_SEQ) }
+            ?.getLongExtra(EXTRA_NOTIFICATION_SEQ, -1L)
+            ?.takeIf { it > 0L }
+
+        if (notificationSeq != null) {
+            lifecycleScope.launch {
+                runCatching { notificationRepository.markAsRead(notificationSeq) }
+            }
+        }
+
+        if (contractSeq != null) {
+            pendingNotificationTarget = NotificationNavigationTarget(contractSeq = contractSeq)
+        } else if (intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true) {
+            pendingNotificationTarget = NotificationNavigationTarget(openNotifications = true)
+        }
+    }
+
+    companion object {
+        const val EXTRA_CONTRACT_SEQ = "extra_contract_seq"
+        const val EXTRA_NOTIFICATION_SEQ = "extra_notification_seq"
+        const val EXTRA_OPEN_NOTIFICATIONS = "extra_open_notifications"
     }
 }
 

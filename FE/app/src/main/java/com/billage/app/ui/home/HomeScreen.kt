@@ -58,6 +58,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.refreshUnreadCount()
+    }
     var showContractTypeSheet by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
@@ -71,7 +74,8 @@ fun HomeScreen(
                     userName = uiState.userName,
                     hasNotification = uiState.hasNotification,
                     onNotificationClick = onNotificationClick,
-                    onMenuClick = { showMenu = true }
+                    onMenuClick = { showMenu = true },
+                    showBrandLogo = true
                 )
             },
             bottomBar = {
@@ -157,6 +161,7 @@ fun HomeScreen(
                 HomeSideMenu(
                     userName = menuProfileState.realName.ifBlank { uiState.userName },
                     email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },

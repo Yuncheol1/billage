@@ -1,14 +1,14 @@
 package com.billage.app.ui.chat.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -31,6 +31,8 @@ import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractUpdateRequest
 import kotlinx.serialization.json.Json
 
+import com.billage.app.domain.model.AiAnalysisResult
+
 @Composable
 fun ContractDocumentFullScreen(
     contractTitle: String,
@@ -42,7 +44,12 @@ fun ContractDocumentFullScreen(
     isOpponentAccepted: Boolean = false,
     originalPrincipal: Double? = null,
     originalInterestRate: Double? = null,
-    isInitial: Boolean = false
+    proposedPrincipal: Double? = null,
+    proposedInterestRate: Double? = null,
+    isInitial: Boolean = false,
+    contractAiAnalysis: AiAnalysisResult? = null,
+    rawAiAnalysisJson: String? = null,
+    isAiAnalyzing: Boolean = false
 ) {
     var showModificationWarning by remember { mutableStateOf(false) }
 
@@ -103,8 +110,16 @@ fun ContractDocumentFullScreen(
                 HorizontalDivider(color = BillageDivider)
 
                 // Tabs
-                var selectedTab by remember { mutableIntStateOf(0) }
-                val tabs = if (isInitial) listOf("반영된 원문 보기") else listOf("반영된 원문 보기", "변경사항(Diff) 보기")
+                var selectedTab by remember { 
+                    mutableIntStateOf(if (!isInitial && (originalPrincipal != null || originalInterestRate != null)) 1 else 0) 
+                }
+                
+                // 제안서(AI 수정안 등)가 있는 경우 무조건 Diff 탭 표시를 허용 (사용자 요구)
+                val tabs = if (isInitial && originalPrincipal == null && originalInterestRate == null) {
+                    listOf("반영된 원문 보기")
+                } else {
+                    listOf("반영된 원문 보기", "변경사항 보기")
+                }
 
                 TabRow(
                     selectedTabIndex = selectedTab,
@@ -138,9 +153,19 @@ fun ContractDocumentFullScreen(
                 // Content
                 Box(modifier = Modifier.weight(1f).background(Color.White)) {
                     if (selectedTab == 1) { // Diff View
-                        DocumentDiffView(contractTitle, contractDetail, originalPrincipal, originalInterestRate)
+                        DocumentDiffView(
+                            title = contractTitle, 
+                            detail = contractDetail, 
+                            providedOriginalPrincipal = originalPrincipal, 
+                            providedOriginalInterest = originalInterestRate,
+                            providedProposedPrincipal = proposedPrincipal,
+                            providedProposedInterest = proposedInterestRate,
+                            aiAnalysis = contractAiAnalysis, 
+                            rawAiAnalysisJson = rawAiAnalysisJson, 
+                            isAiAnalyzing = isAiAnalyzing
+                        )
                     } else { // Original View
-                        DocumentOriginalView(contractTitle, contractDetail)
+                        DocumentOriginalView(contractTitle, contractDetail, contractAiAnalysis, rawAiAnalysisJson, isAiAnalyzing)
                     }
                 }
 
@@ -247,13 +272,316 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: 
     }
 }
 
+// Summary Header Component
+@Composable
+fun ContractSummaryHeader(detail: ContractDetailResponse) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp),
+        colors = CardDefaults.cardColors(containerColor = BillageBackground),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, BillageDivider)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("계약 요약 정보", fontWeight = FontWeight.Bold, color = BillagePrimary, fontSize = 13.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            SummaryRow("채권자", "나")
+            SummaryRow("채무자", detail.counterpartyName ?: "-")
+            SummaryRow("차용 원금", "%,d원".format(detail.principalAmount?.toLong() ?: 0L))
+            SummaryRow("이자율", "연 %.2f%%".format((detail.interestRate ?: 0.0) * 100))
+            SummaryRow("차용 기간", "${detail.startDt ?: "-"} ~ ${detail.endDt ?: "-"}")
+            SummaryRow("상환 방식", when(detail.repaymentMethod) {
+                "BULLET" -> "만기 일시 상환"
+                "INSTALLMENT" -> "균등 분할 상환"
+                else -> detail.repaymentMethod ?: "-"
+            })
+        }
+    }
+}
+
+// Unified Diff Summary Header (Maintains Original Structure)
+@Composable
+fun DiffContractSummaryHeader(
+    detail: ContractDetailResponse,
+    originalPrincipal: Long,
+    proposedPrincipal: Long,
+    originalInterest: Double,
+    proposedInterest: Double
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp),
+        colors = CardDefaults.cardColors(containerColor = BillageBackground),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, BillageDivider)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("계약 요약 정보 (변경사항)", fontWeight = FontWeight.Bold, color = BillagePrimary, fontSize = 13.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            SummaryRow("채권자", "나")
+            SummaryRow("채무자", detail.counterpartyName ?: "-")
+
+            // Principal Diff
+            val isPrincipalChanged = originalPrincipal != proposedPrincipal
+            if (isPrincipalChanged) {
+                DiffSummaryRow(
+                    label = "차용 원금",
+                    original = "%,d원".format(originalPrincipal),
+                    proposed = "%,d원".format(proposedPrincipal),
+                    isChanged = true
+                )
+            } else {
+                SummaryRow("차용 원금", "%,d원".format(proposedPrincipal))
+            }
+
+            // Interest Diff
+            val isInterestChanged = Math.abs(originalInterest - proposedInterest) > 0.0001
+            if (isInterestChanged) {
+                DiffSummaryRow(
+                    label = "이자율",
+                    original = "연 %.2f%%".format(originalInterest * 100),
+                    proposed = "연 %.2f%%".format(proposedInterest * 100),
+                    isChanged = true
+                )
+            } else {
+                SummaryRow("이자율", "연 %.2f%%".format(proposedInterest * 100))
+            }
+
+            SummaryRow("차용 기간", "${detail.startDt ?: "-"} ~ ${detail.endDt ?: "-"}")
+            SummaryRow("상환 방식", when(detail.repaymentMethod) {
+                "BULLET" -> "만기 일시 상환"
+                "INSTALLMENT" -> "균등 분할 상환"
+                else -> detail.repaymentMethod ?: "-"
+            })
+        }
+    }
+}
+
+@Composable
+fun DiffSummaryRow(label: String, original: String, proposed: String, isChanged: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = BillageTextSecondary, fontSize = 14.sp)
+        if (isChanged) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(original, color = BillageTextSecondary, textDecoration = TextDecoration.LineThrough, fontSize = 13.sp)
+                Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = BillagePrimary, modifier = Modifier.size(16.dp))
+                Text(proposed, color = BillagePrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        } else {
+            Text(proposed, color = BillageTextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+fun SummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = BillageTextSecondary, fontSize = 14.sp)
+        Text(value, color = BillageTextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+    }
+}
+
+// AI Analysis Section Component
+@Composable
+fun AiAnalysisSection(
+    analysisJson: AiAnalysisResult?,
+    rawJson: String? = null,
+    isLoading: Boolean = false
+) {
+    if (!isLoading && analysisJson == null && rawJson == null) return
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 32.dp),
+        colors = CardDefaults.cardColors(containerColor = BillagePrimary.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BillagePrimary.copy(alpha = 0.2f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("✨ AI 차용증 안심 검토", fontWeight = FontWeight.ExtraBold, color = BillagePrimary, fontSize = 16.sp)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (isLoading) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = BillagePrimary, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("AI가 차용증을 꼼꼼하게 분석하고 있어요...", fontSize = 13.sp, color = BillageTextSecondary)
+                }
+            } else if (analysisJson != null) {
+                // 안전 상태 표시
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (analysisJson.is_safe) BillagePrimary.copy(alpha = 0.1f) else BillageDanger.copy(alpha = 0.1f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (analysisJson.is_safe) "✅ 이 계약은 안전해 보여요" else "⚠️ 주의가 필요한 항목이 있어요",
+                        fontWeight = FontWeight.Bold,
+                        color = if (analysisJson.is_safe) BillagePrimary else BillageDanger,
+                        fontSize = 14.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 요약 텍스트
+                Text(
+                    text = analysisJson.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BillageTextPrimary,
+                    lineHeight = 22.sp
+                )
+
+                if (analysisJson.warnings.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text("검토 의견", fontWeight = FontWeight.Bold, color = BillageTextPrimary, fontSize = 15.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    analysisJson.warnings.forEach { warning ->
+                        AiWarningItem(warning)
+                    }
+                }
+
+                if (analysisJson.tax_summary != null) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text("세무 리스크 및 가이드", fontWeight = FontWeight.Bold, color = BillageTextPrimary, fontSize = 15.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    AiTaxSummaryCard(analysisJson.tax_summary)
+                }
+            } else if (rawJson != null) {
+                // 파싱 실패 시 원문이라도 표시 (기존 유저 요구사항 대응)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(BillageDanger.copy(alpha = 0.05f))
+                        .border(1.dp, BillageDanger.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Text("⚠️ 정밀 분석 리포트 생성 중 오류", color = BillageDanger, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(rawJson, fontSize = 12.sp, color = BillageTextPrimary, lineHeight = 18.sp)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "* AI 검토 결과는 법적 효력을 보장하지 않으며 참고용으로만 활용해 주세요.",
+                color = BillageTextSecondary,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun AiWarningItem(warning: com.billage.app.domain.model.AiWarning) {
+    val riskColor = when(warning.risk_level) {
+        "HIGH" -> BillageDanger
+        "MEDIUM" -> Color(0xFFF2994A)
+        else -> BillagePrimary
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .border(1.dp, BillageDivider, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(riskColor.copy(alpha = 0.1f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(warning.risk_level, color = riskColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(warning.category, fontWeight = FontWeight.Bold, color = BillageTextPrimary, fontSize = 14.sp)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(warning.reason, fontSize = 13.sp, color = BillageTextPrimary, lineHeight = 20.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "💡 제안: ${warning.suggestion}",
+            fontSize = 13.sp,
+            color = BillagePrimary,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+fun AiTaxSummaryCard(tax: com.billage.app.domain.model.AiTaxSummary) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .border(1.dp, BillageDivider, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("증여세 리스크", color = BillageTextSecondary, fontSize = 13.sp)
+            Text(
+                text = if (tax.gift_tax_risk) "⚠️ 발생 가능성 있음" else "✅ 낮음",
+                color = if (tax.gift_tax_risk) BillageDanger else BillagePrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("원천징수 세율", color = BillageTextSecondary, fontSize = 13.sp)
+            Text(tax.withholding_tax_rate ?: "-", color = BillageTextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+    }
+}
+
 // Diff View
 @Composable
 fun DocumentDiffView(
     title: String, 
     detail: ContractDetailResponse?,
     providedOriginalPrincipal: Double? = null,
-    providedOriginalInterest: Double? = null
+    providedOriginalInterest: Double? = null,
+    providedProposedPrincipal: Double? = null,
+    providedProposedInterest: Double? = null,
+    aiAnalysis: com.billage.app.domain.model.AiAnalysisResult? = null,
+    rawAiAnalysisJson: String? = null,
+    isAiAnalyzing: Boolean = false
 ) {
     val delStyle = SpanStyle(
         color = Color(0xFFCB2431),
@@ -276,11 +604,25 @@ fun DocumentDiffView(
     }
 
     val counterparty = detail?.counterpartyName ?: "김철수"
+    
+    // 1. Original (Baseline): payload에서 명시적으로 넘어온 값을 우선하고, 없으면 detail(현재 상태)을 사용
     val originalPrincipal = providedOriginalPrincipal?.toLong() ?: detail?.principalAmount?.toLong() ?: 0L
     val originalInterest = providedOriginalInterest ?: detail?.interestRate ?: 0.0
     
-    val propPrincipal = proposal?.principalAmount?.toLong() ?: detail?.principalAmount?.toLong() ?: originalPrincipal
-    val propInterest = proposal?.interestRate ?: detail?.interestRate ?: originalInterest
+    // 2. Proposed (Target): payload에서 명시적으로 넘어온 "제안값"을 최우선함. (이게 있어야 DB가 바뀌어도 Diff가 유지됨)
+    // payload에도 없으면 detail.aiDraftContent(수정 제안본)을 파싱해서 사용
+    val propPrincipal = providedProposedPrincipal?.toLong() 
+        ?: proposal?.principalAmount?.toLong() 
+        ?: detail?.principalAmount?.toLong() 
+        ?: originalPrincipal
+        
+    val propInterest = providedProposedInterest 
+        ?: proposal?.interestRate 
+        ?: detail?.interestRate 
+        ?: originalInterest
+
+    // 강제 확인: 만약 providedOriginalInterest가 있고(예: 4.6), propInterest가 다르면(예: 4.5), 
+    // detail.interestRate이 무엇이든 간에 originalInterest != propInterest는 참이어야 함.
 
     Column(
         modifier = Modifier
@@ -288,61 +630,65 @@ fun DocumentDiffView(
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text("금전소비대차계약서", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text("금전소비대차계약서 (변경사항)", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = BillageTextPrimary)
         if (title.isNotBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text("No. $title", fontSize = 11.sp, color = Color(0xFF999999), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Text("No. $title", fontSize = 11.sp, color = BillageTextSecondary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Text("채권자와 채무자 '$counterparty'는 빌리지(Billage) 서비스를 통하여 다음과 같이 금전소비대차계약을 체결한다.", fontSize = 14.sp, lineHeight = 22.sp)
+        // 1. 변경사항 요약 헤더 (원문 요약과 동일한 스타일 유지)
+        if (detail != null) {
+            DiffContractSummaryHeader(
+                detail = detail,
+                originalPrincipal = originalPrincipal,
+                proposedPrincipal = propPrincipal,
+                originalInterest = originalInterest,
+                proposedInterest = propInterest
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (proposal?.clauses.isNullOrEmpty()) {
+            Text("설정된 특약사항이 없습니다.", fontSize = 14.sp, color = BillageTextSecondary, modifier = Modifier.padding(vertical = 16.dp))
+        } else {
+            Text("본 계약의 각 조항은 다음과 같이 구성되며, 채권자와 채무자 '$counterparty'는 상기 요약 정보와 아래 조항에 동의한다.", fontSize = 14.sp, color = BillageTextPrimary, lineHeight = 22.sp)
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text("제1조 (차용 원금)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        Text(buildAnnotatedString {
-            append("원금은 일금 ")
-            if (originalPrincipal != propPrincipal) {
-                withStyle(delStyle) { append("%,d원".format(originalPrincipal)) }
-                append(" ")
-                withStyle(addStyle) { append("%,d원".format(propPrincipal)) }
-            } else {
-                append("%,d원".format(originalPrincipal))
-            }
-            append("으로 정한다.")
-        }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("제2조 (기본 이자율)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        Text(buildAnnotatedString {
-            append("본 계약의 기본 이자율은 ")
-            if (originalInterest != propInterest) {
-                withStyle(delStyle) { append("연 %.2f%%".format(originalInterest)) }
-                append(" ")
-                withStyle(addStyle) { append("연 %.2f%%".format(propInterest)) }
-            } else {
-                append("연 %.2f%%".format(originalInterest))
-            }
-            append("로 정한다.")
-        }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
-
-        Spacer(modifier = Modifier.height(16.dp))
-
+        // 특약사항들 (번호는 1조부터 다시 매김)
         proposal?.clauses?.forEachIndexed { index, propClause ->
             val origClause = detail?.clauses?.find { it.clauseSeq == propClause.clauseSeq }
-            Text("제${index + 3}조 (특약)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            if (origClause != null && origClause.content != propClause.content) {
+            val isModified = origClause != null && origClause.content.trim() != propClause.content.trim()
+            val isNew = origClause == null
+
+            Text(
+                text = "제${index + 1}조 (특약)${if (isNew) " [신규]" else if (isModified) " [수정됨]" else ""}", 
+                fontWeight = FontWeight.Bold, 
+                fontSize = 16.sp, 
+                color = if (isNew) BillagePrimary else if (isModified) Color(0xFFCB2431) else BillageTextPrimary
+            )
+            
+            if (isModified) {
                 Text(buildAnnotatedString {
-                    withStyle(delStyle) { append(origClause.content) }
+                    withStyle(delStyle) { append(origClause!!.content) }
                     append("\n")
                     withStyle(addStyle) { append(propClause.content) }
-                }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
+                }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp))
+            } else if (isNew) {
+                Text(buildAnnotatedString {
+                    withStyle(addStyle) { append(propClause.content) }
+                }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp))
             } else {
-                Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
+
+        // 2. AI 분석 리포트 제거 (사용자 요청)
+        // AiAnalysisSection(aiAnalysis, rawAiAnalysisJson, isAiAnalyzing)
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -350,7 +696,13 @@ fun DocumentDiffView(
 
 // Original Content View
 @Composable
-fun DocumentOriginalView(title: String, detail: ContractDetailResponse?) {
+fun DocumentOriginalView(
+    title: String, 
+    detail: ContractDetailResponse?, 
+    aiAnalysis: com.billage.app.domain.model.AiAnalysisResult? = null, 
+    rawAiAnalysisJson: String? = null,
+    isAiAnalyzing: Boolean = false
+) {
     val proposal = remember(detail) {
         detail?.aiDraftContent?.let {
             try {
@@ -359,8 +711,6 @@ fun DocumentOriginalView(title: String, detail: ContractDetailResponse?) {
         }
     }
 
-    val propPrincipal = proposal?.principalAmount?.toLong() ?: detail?.principalAmount?.toLong() ?: 0L
-    val propInterest = proposal?.interestRate ?: detail?.interestRate ?: 0.0
     val counterparty = detail?.counterpartyName ?: "김철수"
 
     Column(
@@ -369,31 +719,29 @@ fun DocumentOriginalView(title: String, detail: ContractDetailResponse?) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text("금전소비대차계약서", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text("금전소비대차계약서", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = BillageTextPrimary)
         if (title.isNotBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text("No. $title", fontSize = 11.sp, color = Color(0xFF999999), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Text("No. $title", fontSize = 11.sp, color = BillageTextSecondary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }
-        Spacer(modifier = Modifier.height(20.dp))
-        Text("채권자와 채무자 '$counterparty'는 빌리지(Billage) 서비스를 통하여 다음과 같이 금전소비대차계약을 체결한다.", fontSize = 14.sp, lineHeight = 22.sp)
-        
         Spacer(modifier = Modifier.height(24.dp))
+
+        // 1. 요약 정보 카드
+        detail?.let { ContractSummaryHeader(it) }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Text("본 계약의 각 조항은 다음과 같이 구성되며, 채권자와 채무자 '$counterparty'는 상기 요약 정보와 아래 조항에 동의한다.", fontSize = 14.sp, color = BillageTextPrimary, lineHeight = 22.sp)
         
-        Text("제1조 (차용 원금)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        Text("원금은 일금 %,d원으로 정한다.".format(propPrincipal), fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("제2조 (기본 이자율)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        Text("본 계약의 기본 이자율은 연 %.2f%%로 정한다.".format(propInterest), fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
         proposal?.clauses?.forEachIndexed { index, propClause ->
-            Text("제${index + 3}조 (특약)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 4.dp))
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("제${index + 1}조 (특약)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BillageTextPrimary)
+            Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
+            Spacer(modifier = Modifier.height(20.dp))
         }
+
+        // 2. AI 분석 리포트
+        AiAnalysisSection(aiAnalysis, rawAiAnalysisJson, isAiAnalyzing)
 
         Spacer(modifier = Modifier.height(32.dp))
     }
