@@ -6,12 +6,18 @@ import com.ssafy.a305.be.domain.auth.client.dto.KakaoUserInfoResponse;
 import com.ssafy.a305.be.domain.auth.dto.request.KakaoLoginRequestDto;
 import com.ssafy.a305.be.domain.auth.dto.response.KakaoLoginResponseDto;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
+import com.ssafy.a305.be.domain.notification.service.RepaymentNotificationScheduler;
 import com.ssafy.a305.be.domain.notification.repository.FcmTokenRepository;
+import com.ssafy.a305.be.domain.notification.repository.NotificationLogRepository;
+import com.ssafy.a305.be.domain.repayment.batch.AutoTransferJobScheduler;
+import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.repository.SocialAuthRepository;
 import com.ssafy.a305.be.domain.user.repository.TermsMasterRepository;
 import com.ssafy.a305.be.domain.user.repository.UserConsentRepository;
+import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
+import com.ssafy.a305.be.global.config.TestDataInit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +41,7 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest(
         properties = {
+                "spring.main.lazy-initialization=true",
                 "spring.data.redis.host=localhost",
                 "spring.data.redis.port=6379"
         },
@@ -74,10 +81,31 @@ class AuthServiceRedisIntegrationTest {
     private FcmTokenRepository fcmTokenRepository;
 
     @MockBean
+    private NotificationLogRepository notificationLogRepository;
+
+    @MockBean
+    private RepaymentScheduleRepository repaymentScheduleRepository;
+
+    @MockBean
+    private RepaymentNotificationScheduler repaymentNotificationScheduler;
+
+    @MockBean
+    private AutoTransferJobScheduler autoTransferJobScheduler;
+
+    @MockBean
+    private TestDataInit testDataInit;
+
+    @MockBean
     private TermsMasterRepository termsMasterRepository;
 
     @MockBean
     private UserConsentRepository userConsentRepository;
+
+    @MockBean
+    private UserProfileRepository userProfileRepository;
+
+    @MockBean
+    private SsafyMemberService ssafyMemberService;
 
     @AfterEach
     void tearDown() {
@@ -123,6 +151,8 @@ class AuthServiceRedisIntegrationTest {
                             .deletedDttm(user.getDeletedDttm())
                             .build();
                 });
+        when(ssafyMemberService.getOrCreateUserKey(anyString()))
+                .thenReturn("test-user-key");
 
         KakaoLoginResponseDto response = authService.loginWithKakao(
                 new KakaoLoginRequestDto("auth-code", "http://localhost/callback")

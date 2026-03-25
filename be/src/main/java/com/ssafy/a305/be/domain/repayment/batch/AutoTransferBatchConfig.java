@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.repayment.batch;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.global.exception.TransferFailException;
@@ -50,6 +51,7 @@ public class AutoTransferBatchConfig {
     private final SsafyTransferApiClient ssafyTransferApiClient;
     private final AutoTransferRegistrationRepository registrationRepository;
     private final RepaymentEventRepository repaymentEventRepository;
+    private final NotificationCommandService notificationCommandService;
 
     // ──────────────── Job ────────────────
 
@@ -91,7 +93,7 @@ public class AutoTransferBatchConfig {
                         "JOIN FETCH c.creditor " +
                         "WHERE rs.dueDt <= :today " +
                         "AND rs.status = 'NONPAID' " +
-                        "AND c.status = 'ACTIVE'")
+                        "AND c.status in ('SIGNED', 'ACTIVE', 'OVERDUE')")
                 .parameterValues(Map.of("today", LocalDate.now()))
                 .build();
     }
@@ -146,6 +148,15 @@ public class AutoTransferBatchConfig {
                     .confirmedDttm(now)
                     .build();
             repaymentEventRepository.save(event);
+
+            notificationCommandService.sendRepaymentPaidNotifications(schedule);
+
+            boolean allSchedulesCompleted = schedule.getContract().getRepaymentSchedules().stream()
+                    .allMatch(item -> "PAID".equals(item.getStatus()) || "WAIVED".equals(item.getStatus()));
+            if (allSchedulesCompleted) {
+                schedule.getContract().markClosed(now);
+                notificationCommandService.sendContractClosedNotifications(schedule.getContract());
+            }
 
             log.info("[자동이체] 성공 - scheduleSeq={}, contractSeq={}, amount={}",
                     schedule.getScheduleSeq(), contractSeq, amount);

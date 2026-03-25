@@ -10,7 +10,8 @@ public record NotificationLogResponseDto(
         String message,
         Boolean isRead,
         LocalDateTime sentDttm,
-        Integer contractSeq
+        Integer contractSeq,
+        Integer scheduleSeq
 ) {
     public static NotificationLogResponseDto from(NotificationLog log) {
         return new NotificationLogResponseDto(
@@ -20,7 +21,8 @@ public record NotificationLogResponseDto(
                 log.getMessage(),
                 log.getIsRead() != null ? log.getIsRead() : false,
                 log.getSentDttm(),
-                log.getContract() != null ? log.getContract().getContractSeq() : null
+                log.getContract() != null ? log.getContract().getContractSeq() : null,
+                log.getRepaymentSchedule() != null ? log.getRepaymentSchedule().getScheduleSeq() : null
         );
     }
 }
