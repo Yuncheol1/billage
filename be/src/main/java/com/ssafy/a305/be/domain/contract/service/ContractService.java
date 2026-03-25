@@ -209,13 +209,20 @@ public class ContractService {
 
         AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
+        // AI가 유효한 법률 특약을 생성하지 못하고 거절한 경우
+        if (aiResponse.getLegalClause() == null || aiResponse.getLegalClause().trim().isEmpty()) {
+            String reason = (aiResponse.getExplanation() != null && !aiResponse.getExplanation().isBlank())
+                    ? aiResponse.getExplanation()
+                    : "입력하신 내용으로 유효한 법률 특약을 생성할 수 없습니다.";
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "특약 생성 거절: " + reason);
+        }
+
         // 5. ContractClause 엔티티 생성 및 추가
         int nextOrderNo = contract.getClauses().size() + 1;
-        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isEmpty())
+        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isBlank())
                 ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
-        String newContent = (aiResponse.getLegalClause() != null && !aiResponse.getLegalClause().isEmpty())
-                ? aiResponse.getLegalClause() : clauseContent;
-        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isEmpty())
+        String newContent = aiResponse.getLegalClause();
+        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isBlank())
                 ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
         ContractClause clause = ContractClause.builder()
@@ -718,9 +725,9 @@ public class ContractService {
         }
 
         String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
+        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)&&!"CLOSED".equals(status)) {
 
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "이미 서명이 완료되었거나 활성화된 계약은 파기할 수 없습니다.");
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "이미 서명이 완료되었거나 진행중인 계약은 파기할 수 없습니다.");
         }
 
         contractRepository.delete(contract);
