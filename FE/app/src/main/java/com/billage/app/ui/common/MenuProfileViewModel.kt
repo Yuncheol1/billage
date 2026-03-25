@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 data class MenuProfileState(
     val realName: String = "",
     val email: String = "",
+    val profileImageUrl: String? = null,
     val isLoading: Boolean = false
 )
 
@@ -37,6 +38,7 @@ class MenuProfileViewModel @Inject constructor(
                     _uiState.value = MenuProfileState(
                         realName = user.realName.orEmpty(),
                         email = user.email.orEmpty(),
+                        profileImageUrl = user.profileImageUrl,
                         isLoading = false
                     )
                 }

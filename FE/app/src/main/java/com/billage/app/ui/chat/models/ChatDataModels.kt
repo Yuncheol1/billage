@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ChatParticipant(
     val userSeq: Int,
-    val name: String
+    val name: String,
+    val profileImageUrl: String? = null
 )
 
 @Serializable
@@ -41,5 +42,6 @@ data class ChatMessageRes(
 data class UserSearchResponse(
     val userSeq: Int,
     val email: String,
-    val realName: String
+    val realName: String,
+    val profileImageUrl: String? = null
 )

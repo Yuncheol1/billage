@@ -156,6 +156,7 @@ fun HomeScreen(
                 HomeSideMenu(
                     userName = menuProfileState.realName.ifBlank { uiState.userName },
                     email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },

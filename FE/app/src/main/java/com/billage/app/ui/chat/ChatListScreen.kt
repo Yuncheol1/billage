@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.MenuProfileState
+import com.billage.app.ui.common.ProfileAvatar
 import com.billage.app.ui.home.HomeSideMenu
 import com.billage.app.ui.theme.*
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -49,7 +50,7 @@ import kotlin.collections.isNotEmpty
 data class ChatPreviewItem(
     val id: String,
     val name: String,
-    val avatar: String, // Emoji string for now
+    val avatar: String?,
     val lastMessage: String,
     val timestamp: String,
     val unread: Int,
@@ -242,6 +243,7 @@ fun ChatListScreen(
                 // Map ChatRoomRes to ChatPreviewItem for UI
                 // 내 UserSeq가 아닌 참여자의 이름을 찾아서 표시 (없으면 알 수 없음)
                 val opponentName = room.participants.firstOrNull { it.userSeq != myUserSeq }?.name ?: "알 수 없음"
+                val opponent = room.participants.firstOrNull { it.userSeq != myUserSeq }
                 val chat = ChatPreviewItem(
                     id = room.id,
                     name = opponentName,
@@ -278,6 +280,7 @@ fun ChatListScreen(
 
                     ChatListItem(
                         chat = chat,
+                        profileImageUrl = opponent?.profileImageUrl,
                         onClick = { onChatRoomClick(chat.id, opponentName) },
                         onLeaveClick = { showLeaveDialog = true }
                     )
@@ -338,6 +341,7 @@ fun ChatListScreen(
                 HomeSideMenu(
                     userName = menuProfileState.realName.ifBlank { "빌리지" },
                     email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
@@ -365,6 +369,7 @@ fun ChatListScreen(
 @Composable
 fun ChatListItem(
     chat: ChatPreviewItem,
+    profileImageUrl: String?,
     onClick: () -> Unit,
     onLeaveClick: () -> Unit
 ) {
@@ -377,15 +382,15 @@ fun ChatListItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Avatar
-        Box(
+        ProfileAvatar(
+            name = chat.name,
+            imageUrl = profileImageUrl,
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
                 .background(BillagePrimaryLight),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = chat.avatar, fontSize = 24.sp)
-        }
+            textSize = 20.sp
+        )
         
         Spacer(modifier = Modifier.width(16.dp))
         
