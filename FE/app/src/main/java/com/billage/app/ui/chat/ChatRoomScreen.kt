@@ -352,7 +352,10 @@ fun ChatRoomScreen(
             onAccept = {
                 showProposalModal = false
                 onCommitProposal()
-            }
+            },
+            contractAiAnalysis = state.aiAnalysisResult,
+            rawAiAnalysisJson = state.rawAiAnalysisJson,
+            isAiAnalyzing = state.isAiAnalyzing
         )
     }
 

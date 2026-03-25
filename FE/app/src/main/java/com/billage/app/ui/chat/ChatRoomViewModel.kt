@@ -281,17 +281,24 @@ class ChatRoomViewModel @Inject constructor(
                         )}
 
                         // 4. AI 제안 내용을 JSON 으로 직렬화해 STOMP 로 전송 (→ DB 저장 → 양측 수신)
+                        val originalPrincipal = updatedContract.principalAmount ?: 0.0
                         val originalInterest = updatedContract.interestRate ?: 0.0
-                        val proposedInterest = try {
-                            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                        
+                        val (proposedPrincipal, proposedInterest) = try {
+                            val req = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
                                 .decodeFromString<com.billage.app.data.remote.api.ContractUpdateRequest>(updatedContract.aiDraftContent)
-                                .interestRate ?: originalInterest
-                        } catch (e: Exception) { originalInterest }
+                            (req.principalAmount ?: originalPrincipal) to (req.interestRate ?: originalInterest)
+                        } catch (e: Exception) { originalPrincipal to originalInterest }
 
                         val modifications = mutableListOf<String>()
-                        if (originalInterest != proposedInterest) {
-                            modifications.add(String.format("이자율 조정 제안: %.2f%% → %.2f%%", originalInterest, proposedInterest))
-                        } else {
+                        if (originalPrincipal != proposedPrincipal) {
+                            modifications.add(String.format("차용 원금 조정 제안: %,.0f원 → %,.0f원", originalPrincipal, proposedPrincipal))
+                        }
+                        if (Math.abs(originalInterest - proposedInterest) > 0.0001) {
+                            modifications.add(String.format("이자율 조정 제안: %.2f%% → %.2f%%", originalInterest * 100, proposedInterest * 100))
+                        }
+                        
+                        if (modifications.isEmpty()) {
                             modifications.add("계약 조건 검토 제안")
                         }
 
@@ -299,9 +306,12 @@ class ChatRoomViewModel @Inject constructor(
                         val payload = AiProposalPayload(
                             contractTitle = "빌리지 거래 제안서",
                             contractSeq = contract.contractSeq,
+                            originalPrincipal = originalPrincipal,
+                            proposedPrincipal = proposedPrincipal,
                             originalInterestRate = originalInterest,
                             proposedInterestRate = proposedInterest,
-                            modifications = modifications
+                            modifications = modifications,
+                            isInitial = false
                         )
                         val contentJson = kotlinx.serialization.json.Json.encodeToString(
                             AiProposalPayload.serializer(), payload
@@ -462,6 +472,37 @@ class ChatRoomViewModel @Inject constructor(
                 isMeSigned = detail.isMeSigned ?: false,
                 isOpponentSigned = detail.isOpponentSigned ?: false
             )
+        }
+        // AI 분석 결과 가져오기
+        fetchAiAnalysis(detail.contractSeq)
+    }
+
+    fun fetchAiAnalysis(contractSeq: Int) {
+        viewModelScope.launch {
+            _chatRoomState.update { it.copy(isAiAnalyzing = true, aiAnalysisResult = null) }
+            try {
+                val response = contractApi.getAiAnalysis(contractSeq)
+                if (response.status == 200) {
+                    val parsedResult = try {
+                        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                            .decodeFromString<com.billage.app.domain.model.AiAnalysisResult>(response.data)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse AI analysis JSON: ${response.data}", e)
+                        null
+                    }
+                    
+                    _chatRoomState.update {
+                        it.copy(
+                            aiAnalysisResult = parsedResult,
+                            rawAiAnalysisJson = response.data
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch AI analysis", e)
+            } finally {
+                _chatRoomState.update { it.copy(isAiAnalyzing = false) }
+            }
         }
     }
 
