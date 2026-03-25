@@ -153,10 +153,19 @@ class AppNavController(
         roomId: String,
         opponentName: String,
         isNewContract: Boolean = false,
-        contractSeq: Int = -1
+        contractSeq: Int = -1,
+        clearContractFlow: Boolean = false
     ) {
         navController.navigate("${AppDestination.ChatRoom.route}/$roomId/$opponentName/$isNewContract/$contractSeq") {
             launchSingleTop = true
+            if (clearContractFlow) {
+                // 계약 생성 플로우(Contract, SpecialTerms, Complete)를 모두 스택에서 제거
+                // ChatList가 있으면 거기서 멈추고, 없으면 Home까지 정리
+                popUpTo(AppDestination.Home.route) { 
+                    inclusive = false
+                    saveState = false 
+                }
+            }
         }
     }
 

@@ -61,10 +61,12 @@ class ChatRoomViewModel @Inject constructor(
     private val _localCards = MutableStateFlow<List<BaseChatMessage>>(emptyList())
     val localCards: StateFlow<List<BaseChatMessage>> = _localCards.asStateFlow()
 
+    private var isInitialProposalSent = false
+
     fun joinRoom(roomId: String, roomName: String, isNewContract: Boolean = false, contractSeq: Int? = null) {
-        if (_chatRoomState.value.roomId == roomId && _messages.value.isNotEmpty()) return 
+        if (_chatRoomState.value.roomId == roomId && _messages.value.isNotEmpty() && !isNewContract) return 
         _chatRoomState.update { it.copy(roomId = roomId, roomName = roomName) }
-        Log.d(TAG, "Joining room: $roomId (isNewContract: $isNewContract)")
+        Log.d(TAG, "Joining room: $roomId (isNewContract: $isNewContract, contractSeq: $contractSeq)")
 
         viewModelScope.launch {
             // 0. 읽음 처리
@@ -78,29 +80,39 @@ class ChatRoomViewModel @Inject constructor(
             try {
                 val history = chatApi.getChatHistory(roomId)
                 _messages.value = history
+                
+                // 만약 히스토리가 비어있고 신규 계약이라면 잠시 후 다시 확인 (백엔드 처리 시간 고려)
+                if (isNewContract && history.isEmpty()) {
+                    kotlinx.coroutines.delay(500)
+                    val retryHistory = chatApi.getChatHistory(roomId)
+                    if (retryHistory.isNotEmpty()) {
+                        _messages.value = retryHistory
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load history", e)
             }
 
             // 2. 만약 새 계약이라면, 최초 카드 제안 전송
+            // -1 과 같은 유효하지 않은 ID 무시
+            val validContractSeq = if (contractSeq != null && contractSeq > 0) contractSeq else null
+
             if (isNewContract && _messages.value.none { it.msgType == "AI_PROPOSAL" }) {
                 try {
-                    val targetSeq = contractSeq ?: run {
-                        // 만약 contractSeq 가 없으면 이전처럼 목록에서 첫번째 시도
+                    val targetSeq = validContractSeq ?: run {
                         val res = contractApi.getContracts()
                         if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
                     }
 
-                    if (targetSeq != null) {
-                        // 상세조회로 데이터 확보
+                    if (targetSeq != null && targetSeq > 0) {
                         val detailRes = contractApi.getContractDetail(targetSeq)
                         if (detailRes.status == 200) {
                             val detail = detailRes.data
                             applyContractDetail(detail)
 
-                            // 1. (제거됨: 온보딩 가이드 메시지)
+                            // STOMP 세션이 준비될 때까지 대기 (메시지 유실 방지)
+                            val session = chatRepository.session.filterNotNull().first()
                             
-                            // 2. 최초 AI 제안 카드 전송
                             val originalInterest = detail.interestRate ?: 0.0
                             val payload = AiProposalPayload(
                                 contractTitle = "빌리지 거래 제안서",
@@ -111,6 +123,13 @@ class ChatRoomViewModel @Inject constructor(
                                 isInitial = true
                             )
                             val contentJson = Json.encodeToString(AiProposalPayload.serializer(), payload)
+                            
+                            // 중복 발송 방지를 위한 최종 체크 (상태값 및 플래그 활용)
+                            if (isInitialProposalSent || _messages.value.any { it.msgType == "AI_PROPOSAL" }) {
+                                return@launch
+                            }
+                            isInitialProposalSent = true
+
                             chatRepository.sendMessage(
                                 roomId = roomId,
                                 senderSeq = myUserSeq,
@@ -118,6 +137,9 @@ class ChatRoomViewModel @Inject constructor(
                                 isContractMsg = true,
                                 msgType = "AI_PROPOSAL"
                             )
+                            
+                            // 로컬 목록에 즉시 추가하는 대신 STOMP 리턴을 기다림 (중복 표시 방지)
+                            // AI 제안서는 시스템에 의해 자동 발송되므로 0.5~1초 뒤에 보여도 무방함
                         }
                     }
                 } catch (e: Exception) {
@@ -126,11 +148,11 @@ class ChatRoomViewModel @Inject constructor(
             } else {
                 // 이미 메시지가 있는 경우에도 상태 동기화는 필요
                 try {
-                    val targetSeq = contractSeq ?: run {
+                    val targetSeq = validContractSeq ?: run {
                         val res = contractApi.getContracts()
                         if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
                     }
-                    if (targetSeq != null) {
+                    if (targetSeq != null && targetSeq > 0) {
                         val detailRes = contractApi.getContractDetail(targetSeq)
                         if (detailRes.status == 200) {
                             applyContractDetail(detailRes.data)
