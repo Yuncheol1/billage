@@ -50,7 +50,7 @@ import com.billage.app.ui.theme.BillageTextSecondary
 @Composable
 fun AccountScreen(
     onBackClick: () -> Unit,
-    onTransactionClick: (Int) -> Unit = {},
+    onTransactionClick: (Long) -> Unit = {},
     viewModel: AccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -111,9 +111,9 @@ fun AccountScreen(
 
 @Composable
 private fun AccountContent(
-    account: BankAccountInfo,
-    transactions: List<Transaction>,
-    onTransactionClick: (Int) -> Unit,
+    account: BankAccountDto,
+    transactions: List<TransactionDto>,
+    onTransactionClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -143,7 +143,7 @@ private fun AccountContent(
                     transactions.forEachIndexed { index, transaction ->
                         TransactionItem(
                             transaction = transaction,
-                            onClick = { onTransactionClick(transaction.transactionSeq) }
+                            onClick = { onTransactionClick(transaction.transactionUniqueNo) }
                         )
                         if (index < transactions.lastIndex) {
                             HorizontalDivider(
@@ -159,7 +159,7 @@ private fun AccountContent(
 }
 
 @Composable
-private fun BalanceCard(account: BankAccountInfo) {
+private fun BalanceCard(account: BankAccountDto) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -167,22 +167,13 @@ private fun BalanceCard(account: BankAccountInfo) {
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            // 은행명 · 계좌 종류
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = account.bankName.ifEmpty { account.bankCode },
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (account.accountTypeName.isNotEmpty()) {
-                    Text(
-                        text = "  ·  ${account.accountTypeName}",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 13.sp
-                    )
-                }
-            }
+            // 은행명
+            Text(
+                text = account.bankName.ifEmpty { account.bankCode },
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
             // 계좌번호
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -190,7 +181,7 @@ private fun BalanceCard(account: BankAccountInfo) {
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 13.sp
             )
-            // 구분선 (계좌번호 바로 아래)
+            // 구분선
             Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(14.dp))
@@ -201,9 +192,9 @@ private fun BalanceCard(account: BankAccountInfo) {
                 fontSize = 12.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
-            // 잔액 (숫자 + 원)
+            // 잔액
             Text(
-                text = "${String.format("%,d", account.accountBalanceLong)}원",
+                text = "${String.format("%,d", account.accountBalance)}원",
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold
@@ -213,7 +204,11 @@ private fun BalanceCard(account: BankAccountInfo) {
 }
 
 @Composable
-private fun TransactionItem(transaction: Transaction, onClick: () -> Unit) {
+private fun TransactionItem(transaction: TransactionDto, onClick: () -> Unit) {
+    val isDeposit = transaction.transactionTypeName.contains("입금")
+    val amountColor = if (isDeposit) BillageSuccess else BillageDanger
+    val amountPrefix = if (isDeposit) "+" else "-"
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -224,22 +219,20 @@ private fun TransactionItem(transaction: Transaction, onClick: () -> Unit) {
     ) {
         Column {
             Text(
-                text = transaction.memo?.takeIf { it.isNotBlank() } ?: transaction.description,
+                text = transaction.transactionSummary.ifBlank { "-" },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = BillageTextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${transaction.date} ${transaction.time}",
+                text = "${transaction.transactionDate} ${transaction.transactionTime}",
                 fontSize = 12.sp,
                 color = BillageTextSecondary
             )
         }
-        val amountColor = if (transaction.type == TransactionType.DEPOSIT) BillageSuccess else BillageDanger
-        val amountPrefix = if (transaction.type == TransactionType.DEPOSIT) "+" else "-"
         Text(
-            text = "$amountPrefix${String.format("%,d", transaction.amount)}원",
+            text = "$amountPrefix${String.format("%,d", transaction.transactionBalance)}원",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = amountColor

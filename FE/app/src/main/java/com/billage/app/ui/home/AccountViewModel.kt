@@ -4,17 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.remote.api.BankAccountApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 sealed class AccountScreenState {
     object Loading : AccountScreenState()
     data class HasAccount(
-        val account: BankAccountInfo,
-        val transactions: List<Transaction> = mockTransactions
+        val account: BankAccountDto,
+        val transactions: List<TransactionDto> = mockTransactions
     ) : AccountScreenState()
     object NoAccount : AccountScreenState()
     data class Error(val message: String) : AccountScreenState()
@@ -27,6 +30,12 @@ class AccountViewModel @Inject constructor(
 
     private val _state = MutableStateFlow<AccountScreenState>(AccountScreenState.Loading)
     val state: StateFlow<AccountScreenState> = _state.asStateFlow()
+
+    private val _transactionDetail = MutableStateFlow<TransactionDto?>(null)
+    val transactionDetail: StateFlow<TransactionDto?> = _transactionDetail.asStateFlow()
+
+    private val _transactionDetailLoading = MutableStateFlow(false)
+    val transactionDetailLoading: StateFlow<Boolean> = _transactionDetailLoading.asStateFlow()
 
     init {
         checkAccount()
@@ -41,6 +50,12 @@ class AccountViewModel @Inject constructor(
                     loadAccountInfo()
                 } else {
                     _state.value = AccountScreenState.NoAccount
+                }
+            } catch (e: HttpException) {
+                if (e.code() == 404) {
+                    _state.value = AccountScreenState.NoAccount
+                } else {
+                    _state.value = AccountScreenState.Error(e.toKoreanMessage("계좌 확인"))
                 }
             } catch (e: Exception) {
                 _state.value = AccountScreenState.Error(e.toKoreanMessage("계좌 확인"))
@@ -60,10 +75,35 @@ class AccountViewModel @Inject constructor(
         }
     }
 
+    fun loadTransactionDetail(transactionUniqueNo: Long) {
+        viewModelScope.launch {
+            _transactionDetailLoading.value = true
+            _transactionDetail.value = null
+            try {
+                val response = bankAccountApi.getTransactionDetail(transactionUniqueNo)
+                _transactionDetail.value = response.data
+            } catch (e: Exception) {
+                // API 실패 시 목데이터에서 fallback
+                _transactionDetail.value = mockTransactions.find { it.transactionUniqueNo == transactionUniqueNo }
+            } finally {
+                _transactionDetailLoading.value = false
+            }
+        }
+    }
+
     private suspend fun loadAccountInfo() {
         try {
-            val response = bankAccountApi.getAccountDetail()
-            _state.value = AccountScreenState.HasAccount(account = response.data)
+            val fmt = DateTimeFormatter.ofPattern("yyyyMMdd")
+            val today = LocalDate.now()
+            val startDate = today.minusYears(1).format(fmt)
+            val endDate = today.format(fmt)
+
+            val detailResponse = bankAccountApi.getAccountDetail()
+            val txResponse = bankAccountApi.getTransactions(startDate, endDate)
+            _state.value = AccountScreenState.HasAccount(
+                account = detailResponse.data,
+                transactions = txResponse.data.list.ifEmpty { mockTransactions }
+            )
         } catch (e: Exception) {
             _state.value = AccountScreenState.Error(e.toKoreanMessage("계좌 조회"))
         }

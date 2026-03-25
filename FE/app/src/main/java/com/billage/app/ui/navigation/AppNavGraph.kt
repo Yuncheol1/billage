@@ -402,14 +402,14 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Account.route) {
         AccountScreen(
             onBackClick = { appNavController.popBackStack() },
-            onTransactionClick = { transactionSeq -> appNavController.navigateToAccountDetail(transactionSeq) }
+            onTransactionClick = { transactionUniqueNo -> appNavController.navigateToAccountDetail(transactionUniqueNo) }
         )
     }
 
     composable(route = AppDestination.AccountDetail.routeWithArg) { backStackEntry ->
-        val transactionSeq = backStackEntry.arguments?.getString("transactionSeq")?.toIntOrNull() ?: -1
+        val transactionUniqueNo = backStackEntry.arguments?.getString("transactionUniqueNo")?.toLongOrNull() ?: -1L
         AccountDetailScreen(
-            transactionSeq = transactionSeq,
+            transactionUniqueNo = transactionUniqueNo,
             onBackClick = { appNavController.popBackStack() }
         )
     }

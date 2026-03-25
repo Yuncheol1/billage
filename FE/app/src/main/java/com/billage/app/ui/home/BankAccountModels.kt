@@ -1,60 +1,117 @@
 package com.billage.app.ui.home
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
-// ─────────────────────────────────────────
-// BE API 응답 모델
-// ─────────────────────────────────────────
-
-@Serializable
-data class BankAccountResponse(
-    val accountSeq: Int,
-    val bankCode: String,
-    val accountNo: String,
-    val isPrimary: Boolean,
-    val linkedDttm: String,
-    val status: String
-)
-
-@Serializable
-data class BankAccountInfo(
-    val accountSeq: Int? = null,
-    val bankCode: String = "",
-    val bankName: String = "",
-    val accountName: String = "",           // 계좌명 (예: "빌리지 수시입출금")
-    val accountTypeName: String = "",       // 계좌 종류 (예: "수시입출금")
-    val accountNo: String = "",              // "0014982189036058" 형태
-    val accountBalance: String = "0",       // BE가 String으로 반환
-    val currency: String = "KRW",
-    val accountCreatedDate: String = "",    // "20260325" 형태
-    val accountExpiryDate: String = "",     // "20310325" 형태
-    val dailyTransferLimit: String = "",    // 일 이체 한도
-    val oneTimeTransferLimit: String = "",  // 1회 이체 한도
-    val isPrimary: Boolean = false,
-    val status: String = ""
-) {
-    val accountBalanceLong: Long get() = accountBalance.toLongOrNull() ?: 0L
+// BE가 Long 필드를 String으로 내려주는 경우를 함께 처리
+private object FlexibleLongSerializer : KSerializer<Long> {
+    override val descriptor = PrimitiveSerialDescriptor("FlexibleLong", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Long) = encoder.encodeLong(value)
+    override fun deserialize(decoder: Decoder): Long {
+        if (decoder is JsonDecoder) {
+            val element = decoder.decodeJsonElement()
+            if (element is JsonPrimitive) {
+                return element.longOrNull ?: element.content.toLongOrNull() ?: 0L
+            }
+        }
+        return try { decoder.decodeLong() } catch (_: Exception) { 0L }
+    }
 }
 
 // ─────────────────────────────────────────
-// 거래 내역 — BE 미구현, 목데이터용 모델
+// BE API 응답 DTO
 // ─────────────────────────────────────────
 
-data class Transaction(
-    val transactionSeq: Int,
-    val date: String,
-    val time: String,
-    val description: String,
-    val amount: Long,
-    val type: TransactionType,
-    val memo: String? = null,
-    val accountNumber: String = ""  // 거래 계좌번호 (마스킹 포함)
+@Serializable
+data class BankAccountDto(
+    val accountNo: String = "",
+    val bankCode: String = "",
+    val bankName: String = "",
+    val userName: String = "",
+    val accountName: String = "",
+    val accountType: String = "",
+    val accountDescription: String = "",
+    val accountCreatedDate: String = "",
+    val accountExpiryDate: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    val dailyTransferLimit: Long = 0L,
+    @Serializable(with = FlexibleLongSerializer::class)
+    val oneTimeTransferLimit: Long = 0L,
+    @Serializable(with = FlexibleLongSerializer::class)
+    val accountBalance: Long = 0L,
+    val lastTransactionDate: String = "",
+    val currency: String = "KRW"
 )
 
-enum class TransactionType { DEPOSIT, WITHDRAW }
+@Serializable
+data class TransactionDto(
+    @Serializable(with = FlexibleLongSerializer::class)
+    val transactionUniqueNo: Long = 0L,
+    val transactionDate: String = "",
+    val transactionTime: String = "",
+    val transactionType: String = "",
+    val transactionTypeName: String = "",
+    val transactionAccountNo: String = "",
+    @Serializable(with = FlexibleLongSerializer::class)
+    val transactionBalance: Long = 0L,
+    @Serializable(with = FlexibleLongSerializer::class)
+    val transactionAfterBalance: Long = 0L,
+    val transactionSummary: String = "",
+    val transactionMemo: String = ""
+)
+
+@Serializable
+data class TransactionListDto(
+    val totalCount: String = "0",
+    val list: List<TransactionDto> = emptyList()
+)
+
+// ─────────────────────────────────────────
+// 목데이터 (API 연동 완료 시 제거)
+// ─────────────────────────────────────────
 
 val mockTransactions = listOf(
-    Transaction(1, "2026.03.24", "14:32", "김철수 상환", 300000, TransactionType.DEPOSIT, "3월 상환금", "110-123-*****"),
-    Transaction(2, "2026.03.23", "09:15", "이영희 대출", 1000000, TransactionType.WITHDRAW, null, "220-456-*****"),
-    Transaction(3, "2026.03.22", "18:47", "박민수 상환", 500000, TransactionType.DEPOSIT, null, "330-789-*****")
+    TransactionDto(
+        transactionUniqueNo = 1L,
+        transactionDate = "20260324",
+        transactionTime = "143200",
+        transactionType = "1",
+        transactionTypeName = "입금",
+        transactionAccountNo = "110-123-*****",
+        transactionBalance = 300000L,
+        transactionAfterBalance = 1300000L,
+        transactionSummary = "김철수 상환",
+        transactionMemo = "3월 상환금"
+    ),
+    TransactionDto(
+        transactionUniqueNo = 2L,
+        transactionDate = "20260323",
+        transactionTime = "091500",
+        transactionType = "2",
+        transactionTypeName = "출금",
+        transactionAccountNo = "220-456-*****",
+        transactionBalance = 1000000L,
+        transactionAfterBalance = 300000L,
+        transactionSummary = "이영희 대출",
+        transactionMemo = ""
+    ),
+    TransactionDto(
+        transactionUniqueNo = 3L,
+        transactionDate = "20260322",
+        transactionTime = "184700",
+        transactionType = "1",
+        transactionTypeName = "입금",
+        transactionAccountNo = "330-789-*****",
+        transactionBalance = 500000L,
+        transactionAfterBalance = 1000000L,
+        transactionSummary = "박민수 상환",
+        transactionMemo = ""
+    )
 )

@@ -78,7 +78,7 @@ sealed interface AppDestination {
 
     data object AccountDetail : AppDestination {
         override val route: String = "account_detail"
-        const val routeWithArg = "account_detail/{transactionSeq}"
+        const val routeWithArg = "account_detail/{transactionUniqueNo}"
     }
 
     data object ContractDocument : AppDestination {
@@ -276,8 +276,8 @@ class AppNavController(
         }
     }
 
-    fun navigateToAccountDetail(transactionSeq: Int) {
-        navController.navigate("${AppDestination.AccountDetail.route}/$transactionSeq") {
+    fun navigateToAccountDetail(transactionUniqueNo: Long) {
+        navController.navigate("${AppDestination.AccountDetail.route}/$transactionUniqueNo") {
             launchSingleTop = true
         }
     }
