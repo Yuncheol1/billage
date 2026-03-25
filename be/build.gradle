@@ -37,6 +37,10 @@ dependencies {
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	implementation 'com.google.firebase:firebase-admin:9.3.0'
 
+	// Thymeleaf (HTML 템플릿 엔진) + Flying Saucer (HTML → PDF 변환)
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	implementation 'org.xhtmlrenderer:flying-saucer-pdf-openpdf:9.4.0'
+
 	// QueryDSL for Jakarta
 	implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
 	annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'

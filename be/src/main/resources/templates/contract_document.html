@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>차 용 증</title>
+    <style type="text/css">
+        @font-face {
+            font-family: 'NanumGothic';
+            src: url('/static/fonts/NanumGothic.ttf');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'NanumGothic', sans-serif;
+            font-size: 11pt;
+            color: #222;
+            line-height: 1.8;
+            padding: 40px;
+        }
+
+        @page {
+            size: A4;
+            margin: 25mm 20mm 25mm 20mm;
+        }
+
+        .document-wrapper {
+            max-width: 700px;
+            margin: 0 auto;
+            border: 2px solid #333;
+            padding: 40px 35px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 28pt;
+            font-weight: bold;
+            letter-spacing: 20px;
+            margin-bottom: 30px;
+            color: #111;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #999;
+            padding-bottom: 4px;
+        }
+
+        .amount-box {
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            padding: 15px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14pt;
+        }
+
+        .amount-number {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #c0392b;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .info-table th,
+        .info-table td {
+            border: 1px solid #bbb;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 10.5pt;
+        }
+
+        .info-table th {
+            background-color: #eee;
+            width: 30%;
+            font-weight: bold;
+        }
+
+        .body-text {
+            text-indent: 10px;
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        .clause-list {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .clause-item {
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background-color: #fafafa;
+            border-left: 3px solid #3498db;
+        }
+
+        .clause-title {
+            font-weight: bold;
+            font-size: 10.5pt;
+        }
+
+        .clause-content {
+            font-size: 10pt;
+            color: #444;
+            margin-top: 2px;
+        }
+
+        .date-section {
+            text-align: center;
+            margin: 30px 0 20px 0;
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        .party-section {
+            margin-top: 20px;
+        }
+
+        .party-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .party-table th,
+        .party-table td {
+            border: 1px solid #bbb;
+            padding: 8px 12px;
+            font-size: 10.5pt;
+        }
+
+        .party-table th {
+            background-color: #eee;
+            width: 25%;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .party-label {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 9pt;
+            color: #888;
+        }
+
+        .seal {
+            display: inline-block;
+            border: 1px solid #c0392b;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            line-height: 30px;
+            color: #c0392b;
+            font-size: 8pt;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="document-wrapper">
+
+    <!-- 제목 -->
+    <div class="title">차 용 증</div>
+
+    <!-- 금액 -->
+    <div class="amount-box">
+        일금 : <span class="amount-number" th:text="${amountText}">오백만</span> 원정
+        (<span th:text="${amountNumber}">5,000,000</span>원)
+    </div>
+
+    <!-- 계약 정보 테이블 -->
+    <div class="section">
+        <div class="section-title">계약 정보</div>
+        <table class="info-table">
+            <tr>
+                <th>계약 번호</th>
+                <td th:text="${contractId}">C-20260325-ABC123</td>
+            </tr>
+            <tr>
+                <th>차용 기간</th>
+                <td>
+                    <span th:text="${startYear}">2026</span>년
+                    <span th:text="${startMonth}">03</span>월
+                    <span th:text="${startDay}">25</span>일 ~
+                    <span th:text="${endYear}">2027</span>년
+                    <span th:text="${endMonth}">03</span>월
+                    <span th:text="${endDay}">24</span>일
+                </td>
+            </tr>
+            <tr>
+                <th>이자율</th>
+                <td>연 <span th:text="${interestRate}">5.00</span>%</td>
+            </tr>
+            <tr>
+                <th>상환 방식</th>
+                <td th:text="${repaymentMethodText}">원리금 균등 분할 상환</td>
+            </tr>
+            <tr th:if="${repaymentDay != null}">
+                <th>매월 상환일</th>
+                <td>매월 <span th:text="${repaymentDay}">15</span>일</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- 본문 -->
+    <div class="section">
+        <div class="section-title">차용 내용</div>
+        <p class="body-text">
+            위 금액을 채무자 <strong th:text="${debtorName}">김OO</strong>은(는)
+            채권자 <strong th:text="${creditorName}">최OO</strong>로부터 틀림없이 빌렸으며,
+            변제 기일인
+            <span th:text="${endYear}">2027</span>년
+            <span th:text="${endMonth}">03</span>월
+            <span th:text="${endDay}">24</span>일까지
+            위 조건에 따라 성실히 상환할 것을 확약합니다.
+        </p>
+        <p class="body-text">
+            만일 기일 내에 변제하지 아니할 때에는 강제집행을 당하여도
+            이의가 없음을 인정하며, 이에 차용증서를 작성하여 채권자에게 교부합니다.
+        </p>
+    </div>
+
+    <!-- 특약사항 -->
+    <div class="section" th:if="${clauses != null and !clauses.isEmpty()}">
+        <div class="section-title">특약사항</div>
+        <div class="clause-list">
+            <div class="clause-item" th:each="clause : ${clauses}">
+                <div class="clause-title" th:text="${clause.title}">특약 제목</div>
+                <div class="clause-content" th:text="${clause.content}">특약 내용</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 작성일자 -->
+    <div class="date-section">
+        <span th:text="${createdYear}">2026</span>년
+        <span th:text="${createdMonth}">03</span>월
+        <span th:text="${createdDay}">25</span>일
+    </div>
+
+    <!-- 당사자 정보 -->
+    <div class="section party-section">
+        <div class="section-title">당사자 정보</div>
+
+        <!-- 채권자 -->
+        <p class="party-label">채권자 (貸主)</p>
+        <table class="party-table">
+            <tr>
+                <th>성 명</th>
+                <td>
+                    <span th:text="${creditorName}">최OO</span>
+                    <span class="seal">인</span>
+                </td>
+            </tr>
+            <tr>
+                <th>주민등록번호</th>
+                <td th:text="${creditorRrn}">900101-1******</td>
+            </tr>
+        </table>
+
+        <br />
+
+        <!-- 채무자 -->
+        <p class="party-label">채무자 (借主)</p>
+        <table class="party-table">
+            <tr>
+                <th>성 명</th>
+                <td>
+                    <span th:text="${debtorName}">김OO</span>
+                    <span class="seal">인</span>
+                </td>
+            </tr>
+            <tr>
+                <th>주민등록번호</th>
+                <td th:text="${debtorRrn}">901231-2******</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="footer-text">
+        본 차용증은 「빌려줘」 서비스를 통해 전자적으로 작성되었습니다.
+    </div>
+
+</div>
+</body>
+</html>
