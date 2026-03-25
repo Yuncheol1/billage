@@ -12,7 +12,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -53,7 +54,7 @@ public class SsafyTransferApiClient {
                                           BigDecimal amount,
                                           String memo,
                                           String userKey) {
-        LocalDateTime now = LocalDateTime.now();
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
 
         SsafyApiHeader header = SsafyApiHeader.builder()
                 .apiName(API_NAME)
@@ -113,7 +114,7 @@ public class SsafyTransferApiClient {
     /**
      * 기관거래고유번호 생성 (YYYYMMDD + HHMMSS + 난수 6자리 = 20자리)
      */
-    private String generateUniqueNo(LocalDateTime now) {
+    private String generateUniqueNo(ZonedDateTime now) {
         String datePart = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"));
         int random = ThreadLocalRandom.current().nextInt(100_000, 1_000_000);
