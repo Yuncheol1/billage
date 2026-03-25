@@ -74,9 +74,16 @@ class AnalyzeService:
         - interest_rate가 0.20(20%)을 초과하면 이자제한법 위반 경고 필수
         - 신체 포기, 인격권 침해 등 반사회적 조항은 민법 제103조에 의거 무효 경고
         
+        [review_result 분류 기준] — 반드시 아래 4개 값 중 하나로 설정:
+        - "SAFE": 위험 항목이 전혀 없는 안전한 계약
+        - "TAX_RISK_ONLY": 증여세·상속세·원천징수 등 세무 이슈만 존재 (계약 자체는 법적으로 유효하므로 서명 가능)
+        - "LEGAL_VIOLATION": 이자제한법 위반, 반사회적 조항(신체포기 등), 무효 조항 등 법적 위반만 존재 (서명 불가)
+        - "BOTH": 세무 이슈와 법적 위반이 모두 존재 (서명 불가)
+        
         다음 JSON 형식으로만 정확히 응답하세요. Markdown 백틱을 포함하지 마세요.
         {{
             "is_safe": false,
+            "review_result": "SAFE/TAX_RISK_ONLY/LEGAL_VIOLATION/BOTH",
             "summary": "총평",
             "warnings": [
                 {{

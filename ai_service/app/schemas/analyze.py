@@ -39,6 +39,7 @@ class TaxSummary(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     is_safe: bool = Field(..., description="서명해도 안전한지 여부")
+    review_result: str = Field(..., description="분석 결과 분류: SAFE / TAX_RISK_ONLY / LEGAL_VIOLATION / BOTH")
     warnings: List[WarningItem] = Field(default_factory=list, description="탐지된 위험 항목 리스트")
     tax_summary: Optional[TaxSummary] = Field(None, description="세금 관련 요약 (tax_calculation 테이블 저장용)")
     summary: str = Field(..., description="분석 결과 총평")

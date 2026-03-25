@@ -70,6 +70,7 @@
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `is_safe` | `bool` | 전체적으로 서명해도 안전한지 여부 |
+| `review_result` | `string` | 분석 결과 분류: `SAFE` / `TAX_RISK_ONLY` / `LEGAL_VIOLATION` / `BOTH` |
 | `warnings` | `array` | 탐지된 위험 항목 리스트 |
 | `warnings[].risk_level` | `string` | `HIGH` / `MEDIUM` / `LOW` |
 | `warnings[].category` | `string` | `TOXIC_CLAUSE` / `TAX_ISSUE` / `MISSING_INFO` |
@@ -82,10 +83,20 @@
 | `tax_summary.withholding_tax_rate` | `string` | 원천징수 세율 안내 (예: `"27.5%"`) |
 | `summary` | `string` | 분석 결과 총평 |
 
+> **`review_result` 분류 기준 (Spring 서명 버튼 제어용)**
+>
+> | 값 | 의미 | 서명 가능 |
+> |:---|:---|:---|
+> | `SAFE` | 위험 항목 없음 | ✅ |
+> | `TAX_RISK_ONLY` | 세무 리스크만 존재 | ✅ (경고 표시) |
+> | `LEGAL_VIOLATION` | 법적 위반 조항 존재 | ❌ |
+> | `BOTH` | 세무 리스크 + 법적 위반 | ❌ |
+
 #### [Response Example]
 ```json
 {
   "is_safe": false,
+  "review_result": "BOTH",
   "warnings": [
     {
       "risk_level": "HIGH",
