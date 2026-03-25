@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.bank.service;
 import com.ssafy.a305.be.domain.account.entity.BankAccount;
 import com.ssafy.a305.be.domain.account.repository.BankAccountRepository;
 import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
+import com.ssafy.a305.be.domain.bank.config.BankDepositAllowlistProperties;
 import com.ssafy.a305.be.domain.bank.client.SsafyDemandDepositClient;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
@@ -26,9 +27,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -46,6 +50,7 @@ public class BankAccountService {
     private final BankAccountRepository bankAccountRepository;
     private final SsafyDemandDepositClient ssafyDemandDepositClient;
     private final SsafyApiProperties ssafyApiProperties;
+    private final BankDepositAllowlistProperties bankDepositAllowlistProperties;
 
     @Transactional(readOnly = true)
     public BankMeResponseDto getBankMe(Integer userSeq) {
@@ -161,13 +166,33 @@ public class BankAccountService {
             BankAccountDepositRequestDto request
     ) {
         String transactionBalance = request == null ? null : request.transactionBalance();
+        String requestAccountNo = request == null ? null : request.accountNo();
         validateDepositAmount(transactionBalance);
 
-        SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
+        String targetAccountNo = hasText(requestAccountNo)
+                ? requestAccountNo
+                : requireSsafyLinkedActiveAccount(userSeq).bankAccount().getAccountNo();
+
+        // allowlist에 포함된 계좌만 "지정 입금"을 허용한다.
+        if (hasText(requestAccountNo) && !isDepositAllowlisted(targetAccountNo)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "허용되지 않은 입금 대상 계좌입니다.");
+        }
+
+        BankAccount targetBankAccount = bankAccountRepository
+                .findByAccountNo(targetAccountNo)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
+
+        if (targetBankAccount.getStatus() != BankAccountStatus.ACTIVE) {
+            throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND);
+        }
+        if (targetBankAccount.getUser() == null || !hasText(targetBankAccount.getUser().getSsafyUserKey())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY userKey가 없어 입금할 수 없습니다.");
+        }
+
         SsafyUpdateDemandDepositAccountDepositResponseDto.Rec rec =
                 ssafyDemandDepositClient.updateDemandDepositAccountDeposit(
-                        ctx.user().getSsafyUserKey(),
-                        ctx.bankAccount().getAccountNo(),
+                        targetBankAccount.getUser().getSsafyUserKey(),
+                        targetBankAccount.getAccountNo(),
                         transactionBalance,
                         DEPOSIT_SUMMARY
                 );
@@ -352,6 +377,22 @@ public class BankAccountService {
         if ("0".equals(normalized)) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "입금 금액은 0보다 커야 합니다.");
         }
+    }
+
+    private boolean isDepositAllowlisted(String accountNo) {
+        Set<String> allowlist = resolveDepositAllowlistAccountNos();
+        return allowlist.contains(accountNo);
+    }
+
+    private Set<String> resolveDepositAllowlistAccountNos() {
+        String raw = bankDepositAllowlistProperties.getDepositAllowlistAccountNos();
+        if (!hasText(raw)) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(this::hasText)
+                .collect(Collectors.toSet());
     }
 
     private record SsafyLinkedAccount(User user, BankAccount bankAccount) {
