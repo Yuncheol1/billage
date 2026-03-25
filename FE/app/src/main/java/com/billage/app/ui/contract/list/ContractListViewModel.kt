@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.ContractListResponse
+import com.billage.app.data.repository.NotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -23,7 +25,8 @@ data class ContractListUiState(
     val isLoading: Boolean = false,
     val contracts: List<ContractCardModel> = emptyList(),
     val error: String? = null,
-    val deleteError: String? = null
+    val deleteError: String? = null,
+    val hasNotification: Boolean = false
 )
 
 // ─────────────────────────────────────────────────────────
@@ -32,13 +35,16 @@ data class ContractListUiState(
 
 @HiltViewModel
 class ContractListViewModel @Inject constructor(
-    private val contractApi: ContractApi
+    private val contractApi: ContractApi,
+    private val notificationRepository: NotificationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContractListUiState())
     val uiState: StateFlow<ContractListUiState> = _uiState.asStateFlow()
 
     init {
+        observeUnreadCount()
+        refreshUnreadCount()
         fetchContracts()
     }
 
@@ -83,6 +89,20 @@ class ContractListViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(isLoading = false, error = "계약 목록을 불러오지 못했습니다.")
                 }
+            }
+        }
+    }
+
+    fun refreshUnreadCount() {
+        viewModelScope.launch {
+            runCatching { notificationRepository.refreshUnreadCount() }
+        }
+    }
+
+    private fun observeUnreadCount() {
+        viewModelScope.launch {
+            notificationRepository.unreadCount.collectLatest { unreadCount ->
+                _uiState.update { it.copy(hasNotification = unreadCount > 0) }
             }
         }
     }

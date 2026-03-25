@@ -10,10 +10,11 @@ class LogoutManager(
 
     suspend fun logout(): LogoutResult {
         val refreshToken = authSessionStorage.getRefreshToken()
+        val fcmToken = authSessionStorage.getStoredFcmToken()
         val apiResult = if (refreshToken.isNullOrBlank()) {
             Result.success(Unit)
         } else {
-            authApi.logout(refreshToken = refreshToken)
+            authApi.logout(refreshToken = refreshToken, fcmToken = fcmToken)
         }
 
         authSessionStorage.clear()
