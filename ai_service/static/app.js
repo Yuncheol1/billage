@@ -88,6 +88,7 @@ async function testClause() {
     const resultBox = document.getElementById("clauseResult");
 
     resultBox.innerText = "법률 문장 생성 중...";
+    resultBox.className = "result-box";
 
     try {
         const response = await fetch(`${API_BASE}/clauses/generate`, {
@@ -103,7 +104,14 @@ async function testClause() {
         });
 
         const data = await response.json();
-        resultBox.innerText = JSON.stringify(data, null, 2);
+        // 거부 응답 시 경고 스타일 적용
+        if (data.rejected) {
+            resultBox.className = "result-box result-rejected";
+            resultBox.innerText = `⛔ 요청이 거부되었습니다.\n\n사유: ${data.rejection_reason}`;
+        } else {
+            resultBox.className = "result-box";
+            resultBox.innerText = JSON.stringify(data, null, 2);
+        }
     } catch (e) {
         resultBox.innerText = `Error: ${e.message}`;
     }
@@ -200,6 +208,8 @@ async function testClauseFromChat() {
     };
     if (templateType) payload.template_type = templateType;
 
+    resultBox.className = "result-box";
+
     try {
         const response = await fetch(`${API_BASE}/clauses/from-chat`, {
             method: "POST",
@@ -211,7 +221,14 @@ async function testClauseFromChat() {
         });
 
         const data = await response.json();
-        resultBox.innerText = JSON.stringify(data, null, 2);
+        // 거부 응답 시 경고 스타일 적용
+        if (data.rejected) {
+            resultBox.className = "result-box result-rejected";
+            resultBox.innerText = `⛔ 요청이 거부되었습니다.\n\n사유: ${data.rejection_reason}`;
+        } else {
+            resultBox.className = "result-box";
+            resultBox.innerText = JSON.stringify(data, null, 2);
+        }
     } catch (e) {
         resultBox.innerText = `Error: ${e.message}\n(서버가 켜져 있는지, 포트가 8000인지 확인하세요)`;
     }

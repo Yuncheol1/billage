@@ -10,7 +10,9 @@ class ClauseGenerateRequest(BaseModel):
 
 # --- Response: contract_clause 테이블에 바로 INSERT 가능한 구조 ---
 class ClauseGenerateResponse(BaseModel):
+    rejected: bool = Field(default=False, description="비정상 입력으로 거부된 경우 True")
+    rejection_reason: Optional[str] = Field(None, description="거부 사유 (rejected=True일 때만 존재)")
     clause_id: Optional[str] = Field(None, description="생성된 조항 유형 식별자 (contract_clause.clause_id)")
     title: Optional[str] = Field(None, description="조항 제목 (contract_clause.title)")
-    legal_clause: str = Field(..., description="법적으로 다듬어진 특약사항 본문 (contract_clause.content)")
-    explanation: str = Field(..., description="해당 특약의 법적 효력 설명")
+    legal_clause: str = Field(default="", description="법적으로 다듬어진 특약사항 본문 (contract_clause.content)")
+    explanation: str = Field(default="", description="해당 특약의 법적 효력 설명")

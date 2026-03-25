@@ -29,5 +29,7 @@ class ClauseItem(BaseModel):
 
 
 class ClauseChatResponse(BaseModel):
+    rejected: bool = Field(default=False, description="비정상 입력으로 거부된 경우 True")
+    rejection_reason: Optional[str] = Field(None, description="거부 사유 (rejected=True일 때만 존재)")
     clauses: List[ClauseItem] = Field(default_factory=list, description="생성된 특약사항 배열")
     summary: str = Field(default="", description="대화 분석 요약")

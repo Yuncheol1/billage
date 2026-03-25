@@ -53,14 +53,29 @@ class ClauseChatService:
 두 사용자(채권자/채무자) 간의 채팅 대화 내역을 분석하여,
 대화에서 합의되거나 요구된 조건을 법적으로 유효한 '특약사항'으로 변환하세요.
 
-### 핵심 규칙
+### 거부 조건 (반드시 준수)
+아래에 해당하면 특약을 생성하지 말고 거부 응답을 반환하세요:
+1. 대화 전체가 차용증·계약·금전 거래와 전혀 무관한 내용인 경우
+2. 대화가 욕설, 무의미한 문자열, 장난으로만 구성된 경우
+3. 어떤 합의나 계약 조건도 추출할 수 없는 경우
+
+거부 시 아래 JSON을 반환하세요:
+{
+    "rejected": true,
+    "rejection_reason": "거부 사유를 사용자가 이해할 수 있게 설명",
+    "clauses": [],
+    "summary": ""
+}
+
+### 핵심 규칙 (거부가 아닌 경우)
 1. 대화에 나타난 모든 계약 관련 합의/요구 사항을 빠짐없이 추출하세요.
 2. 반사회적이거나 불법적인 내용은 적법한 범위 내에서 순화하세요.
 3. 일상적인 인사나 계약과 무관한 잡담은 무시하세요.
 4. 대화에 특약으로 만들 내용이 없으면 빈 배열을 반환하세요.
 
-### 응답 형식 (반드시 아래 JSON만 반환하세요. Markdown 백틱 금지.)
+### 정상 응답 형식 (반드시 아래 JSON만 반환하세요. Markdown 백틱 금지.)
 {
+    "rejected": false,
     "clauses": [
         {
             "clause_id": "조항 유형 코드 (PENALTY/COLLATERAL/EARLY_REPAYMENT/INTEREST/GUARANTEE/OTHER 중 택 1)",
@@ -118,6 +133,9 @@ class ClauseChatService:
             clean_json = ai_response.replace("```json", "").replace("```", "").strip()
             result = json.loads(clean_json)
 
+            # rejected 필드가 없으면 기본값 False 보장
+            if "rejected" not in result:
+                result["rejected"] = False
             # clauses 배열이 없으면 빈 배열 보장
             if "clauses" not in result:
                 result["clauses"] = []
@@ -128,6 +146,8 @@ class ClauseChatService:
         except json.JSONDecodeError:
             logger.warning(f"⚠️ AI 응답 JSON 파싱 실패. 원본: {ai_response[:300]}")
             return {
+                "rejected": False,
                 "clauses": [],
                 "summary": "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요.",
             }
+

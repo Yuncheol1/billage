@@ -26,8 +26,21 @@ class ClauseMakerService:
         사용자가 자연어로 입력한 계약 조건(의도)을 법적으로 유효한 '특약사항' 문장으로 변환하세요.
         너무 길지 않게 핵심만 간결하게 작성하며, 반사회적 내용은 적법 범위 내에서 순화하세요.
         
-        응답은 다음 JSON 형식으로만 정확히 반환하세요. Markdown 백틱을 포함하지 마세요.
+        ### 거부 조건 (반드시 준수)
+        아래에 해당하는 입력은 특약사항으로 변환하지 말고, 거부 응답을 반환하세요:
+        1. 차용증·계약·금전 거래와 전혀 무관한 내용 (일상 대화, 장난, 자기소개 등)
+        2. 의미를 알 수 없는 문장 (욕설, 무작위 문자열, 비속어 등)
+        3. 구체적인 계약 조건이 전혀 포함되지 않은 입력
+        
+        거부 시 아래 JSON을 반환하세요:
         {{
+            "rejected": true,
+            "rejection_reason": "거부 사유를 사용자가 이해할 수 있게 설명"
+        }}
+        
+        정상 변환 시 아래 JSON 형식으로 반환하세요. Markdown 백틱을 포함하지 마세요.
+        {{
+            "rejected": false,
             "clause_id": "조항 유형 코드 (PENALTY/COLLATERAL/EARLY_REPAYMENT/GUARANTEE/OTHER 중 택 1)",
             "title": "특약 조항 제목 (예: 차량 양도담보 설정)",
             "legal_clause": "법률 용어로 정제된 특약사항 본문",
@@ -50,9 +63,14 @@ class ClauseMakerService:
         
         try:
             clean_json = ai_response.replace('```json', '').replace('```', '').strip()
-            return json.loads(clean_json)
+            result = json.loads(clean_json)
+            # rejected 필드가 없으면 기본값 False 보장
+            if "rejected" not in result:
+                result["rejected"] = False
+            return result
         except json.JSONDecodeError:
             return {
+                "rejected": False,
                 "clause_id": "OTHER",
                 "title": "특약사항",
                 "legal_clause": "AI 변환 실패. 다시 시도해 주세요.",

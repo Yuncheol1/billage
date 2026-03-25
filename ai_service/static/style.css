@@ -123,6 +123,16 @@ button:hover {
     min-height: 50px;
     max-height: 300px;
     overflow-y: auto;
+    transition: background 0.3s, border-color 0.3s;
+}
+
+/* 거부 응답 경고 스타일 */
+.result-rejected {
+    background: #450a0a;
+    color: #fca5a5;
+    border: 2px solid #ef4444;
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    font-size: 1em;
 }
 
 /* ─── 4. 채팅 기반 특약 생성 전용 스타일 ─── */
