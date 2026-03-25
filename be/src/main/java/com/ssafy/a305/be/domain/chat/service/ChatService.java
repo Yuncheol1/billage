@@ -205,6 +205,9 @@ public class ChatService {
         String name = userProfileRepository.findByUserUserSeq(seq)
                 .map(UserProfile::getRealName)
                 .orElse("알 수 없음");
-        return ParticipantDto.of(seq, name);
+        String profileImageUrl = userProfileRepository.findByUserUserSeq(seq)
+                .map(UserProfile::getProfileImageUrl)
+                .orElse(null);
+        return ParticipantDto.of(seq, name, profileImageUrl);
     }
 }

@@ -17,6 +17,7 @@ public class ContractDetailResponseDto {
     private final Boolean family;
     private final String myRole;
     private final String counterpartyName;
+    private final String counterpartyProfileImageUrl;
     private final BigDecimal principalAmount;
     private final BigDecimal interestRate;
     private final String repaymentMethod;
@@ -36,14 +37,16 @@ public class ContractDetailResponseDto {
             Contract contract,
             Integer myUserSeq,
             String counterpartyName,
+            String counterpartyProfileImageUrl,
             Boolean isMeSigned,
             Boolean isOpponentSigned
-    ){
-        this.contractSeq=contract.getContractSeq();
-        this.contractId=contract.getContractId();
-        this.family=contract.getFamily();
-        this.myRole=contract.getCreditor().getUserSeq().equals(myUserSeq)?"CREDITOR":"DEBTOR";
-        this.counterpartyName=counterpartyName;
+    ) {
+        this.contractSeq = contract.getContractSeq();
+        this.contractId = contract.getContractId();
+        this.family = contract.getFamily();
+        this.myRole = contract.getCreditor().getUserSeq().equals(myUserSeq) ? "CREDITOR" : "DEBTOR";
+        this.counterpartyName = counterpartyName;
+        this.counterpartyProfileImageUrl = counterpartyProfileImageUrl;
         this.principalAmount = contract.getPrincipalAmount();
         this.interestRate = contract.getInterestRate();
         this.repaymentMethod = contract.getRepaymentMethod();
@@ -64,16 +67,18 @@ public class ContractDetailResponseDto {
         this.isMeSigned = isMeSigned;
         this.isOpponentSigned = isOpponentSigned;
 
-        this.clauses=contract.getClauses().stream()
+        this.clauses = contract.getClauses().stream()
                 .map(ClauseDetailDto::new)
                 .collect(Collectors.toList());
     }
+
     @Getter
-    public static class ClauseDetailDto{
+    public static class ClauseDetailDto {
         private final Integer clauseSeq;
         private final String title;
         private final String content;
         private final Integer orderNo;
+
         public ClauseDetailDto(ContractClause clause) {
             this.clauseSeq = clause.getClauseSeq();
             this.title = clause.getTitle();
