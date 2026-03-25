@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.common.ProfileAvatar
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
@@ -32,6 +33,8 @@ import com.billage.app.ui.theme.BillageWarning
 internal fun ContractPartiesCard(
     creditorName: String,
     debtorName: String,
+    creditorProfileImageUrl: String?,
+    debtorProfileImageUrl: String?,
     isFamily: Boolean?,
     startDt: String?,
     endDt: String?,
@@ -57,20 +60,15 @@ internal fun ContractPartiesCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
+                ProfileAvatar(
+                    name = creditorName,
+                    imageUrl = creditorProfileImageUrl,
                     modifier = Modifier
                         .size(52.dp)
                         .background(BillagePrimaryLight, CircleShape)
                         .border(2.dp, BillagePrimary, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = creditorName.firstOrNull()?.toString() ?: "?",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BillagePrimary
-                    )
-                }
+                    textSize = 20.sp
+                )
                 Text(
                     text = creditorName,
                     fontSize = 14.sp,
@@ -108,20 +106,17 @@ internal fun ContractPartiesCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
+                ProfileAvatar(
+                    name = debtorName,
+                    imageUrl = debtorProfileImageUrl,
                     modifier = Modifier
                         .size(52.dp)
                         .background(BillageBackground, CircleShape)
                         .border(2.dp, BillageCardBorder, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = debtorName.firstOrNull()?.toString() ?: "?",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BillageTextSecondary
-                    )
-                }
+                    fallbackBackgroundColor = BillageBackground,
+                    fallbackContentColor = BillageTextSecondary,
+                    textSize = 20.sp
+                )
                 Text(
                     text = debtorName,
                     fontSize = 14.sp,

@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.coil.compose)
     implementation("androidx.biometric:biometric:1.1.0")
     
     // STOMP & WebSocket

@@ -34,10 +34,21 @@ class ContractDetailViewModel @Inject constructor(
     private val _myName = MutableStateFlow("나")
     val myName: StateFlow<String> = _myName.asStateFlow()
 
+    private val _myProfileImageUrl = MutableStateFlow<String?>(null)
+    val myProfileImageUrl: StateFlow<String?> = _myProfileImageUrl.asStateFlow()
+
+    private val _updateSuccess = MutableSharedFlow<Boolean>()
+    val updateSuccess: SharedFlow<Boolean> = _updateSuccess
+
     init {
         viewModelScope.launch {
-            runCatching { userApi.getMyInfo().data.realName }
-                .onSuccess { name -> if (!name.isNullOrBlank()) _myName.value = name }
+            runCatching { userApi.getMyInfo().data }
+                .onSuccess { user ->
+                    if (!user.realName.isNullOrBlank()) {
+                        _myName.value = user.realName
+                    }
+                    _myProfileImageUrl.value = user.profileImageUrl
+                }
         }
     }
 

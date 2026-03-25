@@ -239,6 +239,7 @@ fun ContractListScreen(
                 HomeSideMenu(
                     userName = menuProfileState.realName.ifBlank { "빌리지" },
                     email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },

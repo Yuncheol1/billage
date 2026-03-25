@@ -23,6 +23,8 @@ data class UserLookupResponse(
 
 @Serializable
 data class UserLookupData(
-    val userSeq: Int?,     // 미등록이면 null일 수 있음
-    val registered: Boolean
+    val userSeq: Int?,
+    val registered: Boolean,
+    val realName: String? = null,
+    val profileImageUrl: String? = null
 )

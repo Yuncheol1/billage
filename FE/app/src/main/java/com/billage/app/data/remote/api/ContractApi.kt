@@ -197,6 +197,7 @@ data class ContractDetailResponse(
     val family: Boolean?,
     val myRole: String?,
     val counterpartyName: String?,
+    val counterpartyProfileImageUrl: String? = null,
     val principalAmount: Double?,
     val interestRate: Double?,
     val repaymentMethod: String?,

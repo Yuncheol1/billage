@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.UserSearchState
+import com.billage.app.ui.common.ProfileAvatar
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageCardBorder
 import com.billage.app.ui.theme.BillageDanger
@@ -252,19 +253,14 @@ fun Step1CounterpartyScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // 이름 첫 글자 프로필 아이콘
-                        Box(
+                        ProfileAvatar(
+                            name = searchState.name,
+                            imageUrl = searchState.profileImageUrl,
                             modifier = Modifier
                                 .size(44.dp)
                                 .background(color = BillageIconBackground, shape = CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = searchState.name.first().toString(),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = BillagePrimary
-                            )
-                        }
+                            textSize = 18.sp
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = searchState.name,

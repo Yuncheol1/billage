@@ -44,7 +44,8 @@ sealed class UserSearchState {
     data class Found(                         // 등록된 사용자 발견
         val userSeq: Int,
         val name: String,
-        val phone: String
+        val phone: String,
+        val profileImageUrl: String? = null
     ) : UserSearchState()
     object NotFound : UserSearchState()       // 미등록 (초대 필요)
     data class Error(val message: String) : UserSearchState()
@@ -170,11 +171,12 @@ class ContractCreateViewModel @Inject constructor(
                         return@launch
                     }
                     // 등록된 사용자 → 자동으로 선택 처리
-                    updateDebtorUser(data.userSeq, name, phone)
+                    updateDebtorUser(data.userSeq, data.realName ?: name, phone)
                     _searchState.value = UserSearchState.Found(
                         userSeq = data.userSeq,
-                        name = name,
-                        phone = phone
+                        name = data.realName ?: name,
+                        phone = phone,
+                        profileImageUrl = data.profileImageUrl
                     )
                 } else {
                     // 미등록 → 선택 초기화
