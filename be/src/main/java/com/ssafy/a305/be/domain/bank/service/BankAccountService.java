@@ -6,7 +6,11 @@ import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
 import com.ssafy.a305.be.domain.bank.client.SsafyDemandDepositClient;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositTransactionRecDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListRecDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionHistoryListResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
 import com.ssafy.a305.be.domain.enums.BankAccountStatus;
@@ -23,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +35,7 @@ import java.util.stream.Collectors;
 public class BankAccountService {
 
     private static final String PROVIDER_SSAFY = "SSAFY";
+    private static final Pattern YYYYMMDD_PATTERN = Pattern.compile("\\d{8}");
 
     private final UserRepository userRepository;
     private final BankAccountRepository bankAccountRepository;
@@ -68,31 +74,80 @@ public class BankAccountService {
      */
     @Transactional(readOnly = true)
     public BankAccountListItemResponseDto getLinkedDemandDepositAccountDetail(Integer userSeq) {
-        User user = userRepository.findById(userSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.USER_NOT_FOUND));
-
-        if (!hasText(user.getSsafyUserKey())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY userKey가 없어 계좌를 조회할 수 없습니다.");
-        }
-
-        BankAccount account = bankAccountRepository
-                .findFirstByUserUserSeqAndStatusOrderByAccountSeqAsc(userSeq, BankAccountStatus.ACTIVE)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
-
-        if (!hasText(account.getAccountNo())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "계좌번호가 없어 계좌를 조회할 수 없습니다.");
-        }
+        SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
 
         SsafyDemandDepositAccountRecDto rec = ssafyDemandDepositClient.inquireDemandDepositAccount(
-                user.getSsafyUserKey(),
-                account.getAccountNo()
+                ctx.user().getSsafyUserKey(),
+                ctx.bankAccount().getAccountNo()
         );
 
-        if (!account.getAccountNo().equals(rec.accountNo())) {
+        if (!ctx.bankAccount().getAccountNo().equals(rec.accountNo())) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 단건 조회 결과 계좌번호가 일치하지 않습니다.");
         }
 
-        return toListItem(rec, account);
+        return toListItem(rec, ctx.bankAccount());
+    }
+
+    @Transactional(readOnly = true)
+    public BankTransactionHistoryListResponseDto listLinkedAccountTransactionHistory(
+            Integer userSeq,
+            String startDate,
+            String endDate,
+            String transactionType,
+            String orderByType
+    ) {
+        if (!hasText(startDate) || !hasText(endDate)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "조회 시작일·종료일(startDate, endDate)은 필수입니다.");
+        }
+        validateYyyyMmDd(startDate, "startDate");
+        validateYyyyMmDd(endDate, "endDate");
+
+        String resolvedTransactionType = resolveTransactionType(transactionType);
+        String resolvedOrderByType = resolveOrderByType(orderByType);
+
+        SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
+
+        SsafyInquireTransactionHistoryListRecDto rec = ssafyDemandDepositClient.inquireTransactionHistoryList(
+                ctx.user().getSsafyUserKey(),
+                ctx.bankAccount().getAccountNo(),
+                startDate,
+                endDate,
+                resolvedTransactionType,
+                resolvedOrderByType
+        );
+
+        String totalCount = rec != null && hasText(rec.totalCount()) ? rec.totalCount() : "0";
+        List<SsafyDemandDepositTransactionRecDto> rows =
+                rec != null && rec.list() != null ? rec.list() : List.of();
+
+        return new BankTransactionHistoryListResponseDto(
+                totalCount,
+                rows.stream().map(this::toTransactionItem).toList()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public BankTransactionItemResponseDto getLinkedAccountTransactionHistory(
+            Integer userSeq,
+            String transactionUniqueNo
+    ) {
+        if (!hasText(transactionUniqueNo)) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "거래고유번호(transactionUniqueNo)가 없어 거래 내역을 조회할 수 없습니다.");
+        }
+
+        SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
+
+        SsafyDemandDepositTransactionRecDto rec = ssafyDemandDepositClient.inquireTransactionHistory(
+                ctx.user().getSsafyUserKey(),
+                ctx.bankAccount().getAccountNo(),
+                transactionUniqueNo
+        );
+
+        if (!transactionUniqueNo.equals(rec.transactionUniqueNo())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 거래 내역 조회 결과 거래고유번호가 일치하지 않습니다.");
+        }
+
+        return toTransactionItem(rec);
     }
 
     @Transactional
@@ -144,6 +199,40 @@ public class BankAccountService {
         return CreateBankAccountResponseDto.from(bankAccount);
     }
 
+    private SsafyLinkedAccount requireSsafyLinkedActiveAccount(Integer userSeq) {
+        User user = userRepository.findById(userSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!hasText(user.getSsafyUserKey())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY userKey가 없어 계좌를 조회할 수 없습니다.");
+        }
+
+        BankAccount account = bankAccountRepository
+                .findFirstByUserUserSeqAndStatusOrderByAccountSeqAsc(userSeq, BankAccountStatus.ACTIVE)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
+
+        if (!hasText(account.getAccountNo())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "계좌번호가 없어 계좌를 조회할 수 없습니다.");
+        }
+
+        return new SsafyLinkedAccount(user, account);
+    }
+
+    private BankTransactionItemResponseDto toTransactionItem(SsafyDemandDepositTransactionRecDto rec) {
+        return new BankTransactionItemResponseDto(
+                rec.transactionUniqueNo(),
+                rec.transactionDate(),
+                rec.transactionTime(),
+                rec.transactionType(),
+                rec.transactionTypeName(),
+                rec.transactionAccountNo(),
+                rec.transactionBalance(),
+                rec.transactionAfterBalance(),
+                rec.transactionSummary(),
+                rec.transactionMemo()
+        );
+    }
+
     private BankAccountListItemResponseDto toListItem(SsafyDemandDepositAccountRecDto rec, BankAccount linked) {
         Integer accountSeq = linked != null ? linked.getAccountSeq() : null;
         boolean isPrimary = linked != null && Boolean.TRUE.equals(linked.getIsPrimary());
@@ -191,5 +280,39 @@ public class BankAccountService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void validateYyyyMmDd(String value, String fieldName) {
+        if (!YYYYMMDD_PATTERN.matcher(value).matches()) {
+            throw new CustomBusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "%s는 yyyyMMdd 형식이어야 합니다.".formatted(fieldName)
+            );
+        }
+    }
+
+    private String resolveTransactionType(String value) {
+        String normalized = hasText(value) ? value.trim().toUpperCase() : "A";
+        if (!"A".equals(normalized) && !"1".equals(normalized) && !"2".equals(normalized)) {
+            throw new CustomBusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "transactionType은 A, 1, 2 중 하나여야 합니다."
+            );
+        }
+        return normalized;
+    }
+
+    private String resolveOrderByType(String value) {
+        String normalized = hasText(value) ? value.trim().toUpperCase() : "ASC";
+        if (!"ASC".equals(normalized) && !"DESC".equals(normalized)) {
+            throw new CustomBusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "orderByType은 ASC 또는 DESC여야 합니다."
+            );
+        }
+        return normalized;
+    }
+
+    private record SsafyLinkedAccount(User user, BankAccount bankAccount) {
     }
 }

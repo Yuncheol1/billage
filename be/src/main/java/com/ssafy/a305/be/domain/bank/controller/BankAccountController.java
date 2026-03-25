@@ -3,6 +3,8 @@ package com.ssafy.a305.be.domain.bank.controller;
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionHistoryListResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.service.BankAccountService;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
@@ -12,8 +14,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -51,6 +55,35 @@ public class BankAccountController {
         Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
         BankAccountListItemResponseDto data = bankAccountService.getLinkedDemandDepositAccountDetail(userSeq);
         return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 단건 조회 성공", data));
+    }
+
+    /**
+     * 연동(ACTIVE) 계좌 1건 기준 SSAFY 거래 내역 목록(inquireTransactionHistoryList).
+     */
+    @GetMapping("/accounts/transactions")
+    public ResponseEntity<Map<String, Object>> listLinkedAccountTransactions(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) String transactionType,
+            @RequestParam(required = false) String orderByType) {
+        Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
+        BankTransactionHistoryListResponseDto data = bankAccountService.listLinkedAccountTransactionHistory(
+                userSeq, startDate, endDate, transactionType, orderByType);
+        return ResponseEntity.ok(successResponse(HttpStatus.OK, "거래 내역 목록 조회 성공", data));
+    }
+
+    /**
+     * 연동(ACTIVE) 계좌 1건 기준 SSAFY 거래 내역 단건(inquireTransactionHistory).
+     */
+    @GetMapping("/accounts/transactions/{transactionUniqueNo}")
+    public ResponseEntity<Map<String, Object>> getLinkedAccountTransaction(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable String transactionUniqueNo) {
+        Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
+        BankTransactionItemResponseDto data =
+                bankAccountService.getLinkedAccountTransactionHistory(userSeq, transactionUniqueNo);
+        return ResponseEntity.ok(successResponse(HttpStatus.OK, "거래 내역 단건 조회 성공", data));
     }
 
     @PostMapping("/accounts")

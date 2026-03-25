@@ -4,10 +4,16 @@ import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyCreateDemandDepositAccountRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountListRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountRequestDto;
+import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireTransactionHistoryListRequestDto;
+import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireTransactionHistoryRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositTransactionRecDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountListResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountResponseDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListRecDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListResponseDto;
+import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +33,8 @@ public class SsafyDemandDepositClient {
     private static final String CREATE_ACCOUNT_API_NAME = "createDemandDepositAccount";
     private static final String INQUIRE_ACCOUNT_LIST_API_NAME = "inquireDemandDepositAccountList";
     private static final String INQUIRE_ACCOUNT_API_NAME = "inquireDemandDepositAccount";
+    private static final String INQUIRE_TRANSACTION_HISTORY_LIST_API_NAME = "inquireTransactionHistoryList";
+    private static final String INQUIRE_TRANSACTION_HISTORY_API_NAME = "inquireTransactionHistory";
 
     private final RestClient.Builder restClientBuilder;
     private final SsafyApiProperties ssafyApiProperties;
@@ -41,7 +49,8 @@ public class SsafyDemandDepositClient {
                 request,
                 ssafyApiProperties.getCreateDemandDepositAccountPath(),
                 SsafyCreateDemandDepositAccountResponseDto.class,
-                "계좌 생성"
+                "계좌 생성",
+                "ssafy.api.create-demand-deposit-account-path"
         );
         if (response.rec() == null) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 생성 응답이 비어 있습니다.");
@@ -57,7 +66,8 @@ public class SsafyDemandDepositClient {
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountListPath(),
                 SsafyInquireDemandDepositAccountListResponseDto.class,
-                "계좌 목록 조회"
+                "계좌 목록 조회",
+                "ssafy.api.inquire-demand-deposit-account-list-path"
         );
         return Optional.ofNullable(response.rec()).orElse(List.of());
     }
@@ -71,7 +81,8 @@ public class SsafyDemandDepositClient {
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountPath(),
                 SsafyInquireDemandDepositAccountResponseDto.class,
-                "계좌 단건 조회"
+                "계좌 단건 조회",
+                "ssafy.api.inquire-demand-deposit-account-path"
         );
         if (response.rec() == null) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 단건 조회 응답이 비어 있습니다.");
@@ -79,8 +90,66 @@ public class SsafyDemandDepositClient {
         return response.rec();
     }
 
-    private <T> T post(Object requestBody, String path, Class<T> responseType, String actionName) {
-        validateCommonConfiguration(path, actionName);
+    /**
+     * @return {@code REC}. 없으면 {@code null} (호출부에서 빈 목록으로 처리).
+     */
+    public SsafyInquireTransactionHistoryListRecDto inquireTransactionHistoryList(
+            String userKey,
+            String accountNo,
+            String startDate,
+            String endDate,
+            String transactionType,
+            String orderByType
+    ) {
+        SsafyInquireTransactionHistoryListRequestDto request = new SsafyInquireTransactionHistoryListRequestDto(
+                ssafyApiHeaderFactory.create(INQUIRE_TRANSACTION_HISTORY_LIST_API_NAME, userKey),
+                accountNo,
+                startDate,
+                endDate,
+                transactionType,
+                orderByType
+        );
+        SsafyInquireTransactionHistoryListResponseDto response = post(
+                request,
+                ssafyApiProperties.getInquireTransactionHistoryListPath(),
+                SsafyInquireTransactionHistoryListResponseDto.class,
+                "거래 내역 목록 조회",
+                "ssafy.api.inquire-transaction-history-list-path"
+        );
+        return response.rec();
+    }
+
+    public SsafyDemandDepositTransactionRecDto inquireTransactionHistory(
+            String userKey,
+            String accountNo,
+            String transactionUniqueNo
+    ) {
+        SsafyInquireTransactionHistoryRequestDto request = new SsafyInquireTransactionHistoryRequestDto(
+                ssafyApiHeaderFactory.create(INQUIRE_TRANSACTION_HISTORY_API_NAME, userKey),
+                accountNo,
+                transactionUniqueNo
+        );
+        SsafyInquireTransactionHistoryResponseDto response = post(
+                request,
+                ssafyApiProperties.getInquireTransactionHistoryPath(),
+                SsafyInquireTransactionHistoryResponseDto.class,
+                "거래 내역 단건 조회",
+                "ssafy.api.inquire-transaction-history-path"
+        );
+        if (response.rec() == null) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 거래 내역 단건 조회 응답이 비어 있습니다.");
+        }
+        return response.rec();
+    }
+
+    private <T> T post(
+            Object requestBody,
+            String path,
+            Class<T> responseType,
+            String actionName,
+            String pathPropertyKey
+    ) {
+        validateCommonConfiguration(path, pathPropertyKey);
 
         try {
             T response = restClientBuilder.build()
@@ -123,6 +192,12 @@ public class SsafyDemandDepositClient {
         } else if (response instanceof SsafyInquireDemandDepositAccountResponseDto dto) {
             responseCode = dto.header() == null ? null : dto.header().responseCode();
             responseMessage = dto.header() == null ? null : dto.header().responseMessage();
+        } else if (response instanceof SsafyInquireTransactionHistoryListResponseDto dto) {
+            responseCode = dto.header() == null ? null : dto.header().responseCode();
+            responseMessage = dto.header() == null ? null : dto.header().responseMessage();
+        } else if (response instanceof SsafyInquireTransactionHistoryResponseDto dto) {
+            responseCode = dto.header() == null ? null : dto.header().responseCode();
+            responseMessage = dto.header() == null ? null : dto.header().responseMessage();
         } else {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY %s 응답 포맷이 올바르지 않습니다.".formatted(actionName));
         }
@@ -136,20 +211,20 @@ public class SsafyDemandDepositClient {
         }
     }
 
-    private void validateCommonConfiguration(String path, String actionName) {
+    private void validateCommonConfiguration(String path, String pathPropertyKey) {
         if (!hasText(ssafyApiProperties.getApiKey())) {
-            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "SSAFY_API_KEY is required.");
+            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "ssafy.api.api-key is required.");
         }
         if (!hasText(ssafyApiProperties.getInstitutionCode())) {
-            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "SSAFY_INSTITUTION_CODE is required.");
+            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "ssafy.api.institution-code is required.");
         }
         if (!hasText(ssafyApiProperties.getFintechAppNo())) {
-            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "SSAFY_FINTECH_APP_NO is required.");
+            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "ssafy.api.fintech-app-no is required.");
         }
         if (!hasText(path)) {
             throw new CustomBusinessException(
                     ErrorCode.AUTH_CONFIG_INVALID,
-                    "SSAFY_%s_PATH is required.".formatted(actionName.replace(" ", "_").toUpperCase())
+                    "%s is required.".formatted(pathPropertyKey)
             );
         }
     }

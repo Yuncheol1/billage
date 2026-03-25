@@ -18,5 +18,7 @@ public class SsafyApiProperties {
     private String createDemandDepositAccountPath;
     private String inquireDemandDepositAccountListPath;
     private String inquireDemandDepositAccountPath;
+    private String inquireTransactionHistoryListPath;
+    private String inquireTransactionHistoryPath;
     private String demandDepositAccountTypeUniqueNo;
 }
