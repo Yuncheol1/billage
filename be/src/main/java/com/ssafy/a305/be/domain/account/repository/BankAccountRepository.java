@@ -5,8 +5,18 @@ import com.ssafy.a305.be.domain.enums.BankAccountStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface BankAccountRepository extends JpaRepository<BankAccount, Integer> {
     boolean existsByUserUserSeqAndStatus(Integer userSeq, BankAccountStatus status);
     boolean existsByAccountNo(String accountNo);
+
+    List<BankAccount> findByUserUserSeq(Integer userSeq);
+
+    boolean existsByUserUserSeqAndAccountTypeUniqueNoAndStatus(
+            Integer userSeq,
+            String accountTypeUniqueNo,
+            BankAccountStatus status
+    );
 }
