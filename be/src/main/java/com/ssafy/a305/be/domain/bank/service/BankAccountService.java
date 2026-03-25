@@ -12,6 +12,7 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransaction
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyUpdateDemandDepositAccountDepositResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.request.BankAccountDepositRequestDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankAccountDetailResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountDepositResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionHistoryListResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionItemResponseDto;
@@ -83,7 +84,7 @@ public class BankAccountService {
      * 연동된 ACTIVE 계좌 1건을 기준으로 SSAFY 계좌 단건 조회 API를 호출한다.
      */
     @Transactional(readOnly = true)
-    public BankAccountListItemResponseDto getLinkedDemandDepositAccountDetail(Integer userSeq) {
+    public BankAccountDetailResponseDto getLinkedDemandDepositAccountDetail(Integer userSeq) {
         SsafyLinkedAccount ctx = requireSsafyLinkedActiveAccount(userSeq);
 
         SsafyDemandDepositAccountRecDto rec = ssafyDemandDepositClient.inquireDemandDepositAccount(
@@ -95,7 +96,12 @@ public class BankAccountService {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 단건 조회 결과 계좌번호가 일치하지 않습니다.");
         }
 
-        return toListItem(rec, ctx.bankAccount());
+        return new BankAccountDetailResponseDto(
+                rec.bankName(),
+                rec.accountTypeName(),
+                ctx.bankAccount().getAccountNo(),
+                rec.accountBalance()
+        );
     }
 
     @Transactional(readOnly = true)
