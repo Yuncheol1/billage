@@ -1,12 +1,12 @@
 package com.billage.app.ui.common
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -32,11 +32,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.R
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
@@ -59,25 +61,34 @@ fun TopBar(
     onNotificationClick: () -> Unit,
     onMenuClick: (() -> Unit)? = null,
     onLogoutClick: (() -> Unit)? = null,
-    isLogoutInProgress: Boolean = false
+    isLogoutInProgress: Boolean = false,
+    showBrandLogo: Boolean = false
 ) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = BillageSurface),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(BillagePrimary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "B",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                if (showBrandLogo) {
+                    Image(
+                        painter = painterResource(id = R.drawable.billage_logo),
+                        contentDescription = "Billage logo",
+                        modifier = Modifier.size(36.dp),
+                        contentScale = ContentScale.Fit
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(BillagePrimary, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = userName.ifEmpty { "Billage" }.first().uppercase(),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
