@@ -1,8 +1,10 @@
 package com.ssafy.a305.be.domain.contract.controller;
 
+import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
 import com.ssafy.a305.be.domain.contract.service.ContractDocumentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
@@ -28,8 +30,9 @@ public class ContractDocumentController {
     @GetMapping("/html")
     public ResponseEntity<String> getContractHtml(
             @PathVariable Integer contractSeq,
-            @RequestAttribute("userSeq") Integer userSeq) {
+            @AuthenticationPrincipal AuthenticatedUser authUser) {
 
+        Integer userSeq = authUser.userSeq();
         String html = contractDocumentService.generateHtml(contractSeq, userSeq);
 
         return ResponseEntity.ok()
@@ -46,8 +49,9 @@ public class ContractDocumentController {
     @GetMapping("/pdf")
     public ResponseEntity<byte[]> downloadContractPdf(
             @PathVariable Integer contractSeq,
-            @RequestAttribute("userSeq") Integer userSeq) {
+            @AuthenticationPrincipal AuthenticatedUser authUser) {
 
+        Integer userSeq = authUser.userSeq();
         byte[] pdfBytes = contractDocumentService.generatePdf(contractSeq, userSeq);
 
         HttpHeaders headers = new HttpHeaders();

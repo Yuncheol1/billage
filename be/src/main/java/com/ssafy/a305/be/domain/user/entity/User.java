@@ -72,6 +72,9 @@ public class User {
         this.state = "DELETED";
         this.email = appendDeletionSuffix(this.email, deletedAt);
         this.phone = appendDeletionSuffix(this.phone, deletedAt);
+        if (this.ssafyUserKey != null) {
+            this.ssafyUserKey = appendDeletionSuffix(this.ssafyUserKey, deletedAt);
+        }
         this.deletedDttm = deletedAt;
         this.updatedDttm = deletedAt;
     }
