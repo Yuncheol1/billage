@@ -1,6 +1,7 @@
 package com.ssafy.a305.be.domain.bank.controller;
 
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
+import com.ssafy.a305.be.domain.bank.dto.response.BankAccountBalanceResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
@@ -40,6 +41,14 @@ public class BankAccountController {
         Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
         List<BankAccountListItemResponseDto> list = bankAccountService.listDemandDepositAccounts(userSeq);
         return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 목록 조회 성공", list));
+    }
+
+    @GetMapping("/accounts/balance")
+    public ResponseEntity<Map<String, Object>> getDemandDepositBalance(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
+        BankAccountBalanceResponseDto data = bankAccountService.getDemandDepositBalance(userSeq);
+        return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 잔액 조회 성공", data));
     }
 
     @PostMapping("/accounts")
