@@ -1,7 +1,9 @@
 package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseChatRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.AiClauseChatResponseDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
@@ -132,6 +134,37 @@ public class AIService {
         } catch (Exception e) {
             log.error("AI Analysis Communication Error: ", e);
             return null;
+        }
+    }
+
+    public AiClauseChatResponseDto generateClausesFromChat(AiClauseChatRequestDto requestDto) {
+        RestTemplate restTemplate = new RestTemplate();
+        String aiServerUrl = "http://3.35.206.231:8000/internal/v1/clauses/from-chat";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Internal-API-Key", internalApiKey);
+
+        HttpEntity<AiClauseChatRequestDto> entity = new HttpEntity<>(requestDto, headers);
+
+        try {
+            log.info("Requesting AI for clause generation from chat history");
+            ResponseEntity<AiClauseChatResponseDto> response = restTemplate.exchange(
+                    aiServerUrl,
+                    HttpMethod.POST,
+                    entity,
+                    AiClauseChatResponseDto.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return response.getBody();
+            } else {
+                log.error("AI Server (from-chat) returned error Code: {}", response.getStatusCode());
+                throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 협의 내용 생성 실패");
+            }
+        } catch (Exception e) {
+            log.error("AI Server (from-chat) 통신 에러: ", e);
+            throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 서버와 통신 중 오류가 발생했습니다.");
         }
     }
 }
