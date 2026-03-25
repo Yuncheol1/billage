@@ -133,7 +133,39 @@ public class ContractService {
                 .contractId(savedContract.getContractId())
                 .build();
     }
+    @Transactional
+    public ContractClause addClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
+        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
+        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
+        // 2. 상태 검증
+        if (!"DRAFT".equals(contract.getStatus()) && !"NEGOTIATING".equals(contract.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 또는 협상(NEGOTIATING) 상태에서만 특약 추가가 가능합니다.");
+        }
+
+        // 3. 권한 검증
+        if (!contract.getCreditor().getUserSeq().equals(userSeq)
+                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
+        }
+
+        // 4. AI 없이 바로 특약 생성
+        int nextOrderNo = contract.getClauses().size() + 1;
+
+        ContractClause clause = ContractClause.builder()
+                .contract(contract)
+                .clauseId("SPECIAL_" + nextOrderNo)
+                .title("특약사항 " + nextOrderNo)
+                .content(clauseContent)
+                .orderNo(nextOrderNo)
+                .createdDttm(LocalDateTime.now())
+                .build();
+
+        contract.addClause(clause);
+        contractRepository.flush();
+        return clause;
+    }
     @Transactional
     public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
