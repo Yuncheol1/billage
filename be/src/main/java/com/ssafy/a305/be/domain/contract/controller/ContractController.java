@@ -238,4 +238,18 @@ public class ContractController {
                 "status", HttpStatus.OK.value(),
                 "message", "AI 제안서(Mock)가 성공적으로 생성되었습니다."));
     }
+
+    @GetMapping("/{contractSeq}/ai-analysis")
+    public ResponseEntity<Map<String, Object>> getAiAnalysis(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq) {
+
+        Integer userSeq = authUser.userSeq();
+        String analysisResult = contractService.getAiAnalysis(contractSeq, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "AI 분석 결과 조회 성공",
+                "data", analysisResult != null ? analysisResult : "분석 결과를 가져오지 못했습니다."));
+    }
 }

@@ -43,6 +43,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -63,6 +64,18 @@ public class ContractService {
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
+
+    // AI 분석 결과 캐시 (Key: contractSeq, Value: {lastUpdated: LocalDateTime, result: String})
+    private final Map<Integer, AnalysisCacheEntry> analysisCache = new ConcurrentHashMap<>();
+
+    private static class AnalysisCacheEntry {
+        LocalDateTime lastUpdated;
+        String result;
+        AnalysisCacheEntry(LocalDateTime lastUpdated, String result) {
+            this.lastUpdated = lastUpdated;
+            this.result = result;
+        }
+    }
 
     @Transactional
     public ContractDraftResponseDto createDraft(Integer myUserSeq, ContractDraftRequestDto requestDto) {
@@ -749,5 +762,55 @@ public class ContractService {
         messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
 
         return getContractDetail(contractSeq, userSeq);
+    }
+
+    @Transactional(readOnly = true)
+    public String getAiAnalysis(Integer contractSeq, Integer userSeq) {
+        Contract contract = contractRepository.findById(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+
+        // 권한 체크
+        if (!contract.getCreditor().getUserSeq().equals(userSeq) && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "계약 분석을 열람할 권한이 없습니다.");
+        }
+
+        // 캐시 확인 (계약 수정 시각 기준)
+        LocalDateTime lastUpdate = contract.getUpdatedDttm() != null ? contract.getUpdatedDttm() : contract.getCreatedDttm();
+        AnalysisCacheEntry cached = analysisCache.get(contractSeq);
+        if (cached != null && (lastUpdate == null || !lastUpdate.isAfter(cached.lastUpdated))) {
+            log.info("Returning cached AI analysis for contractSeq={}", contractSeq);
+            return cached.result;
+        }
+
+        // 분석용 텍스트 생성
+        String documentContent = generateDocumentText(contract);
+        
+        // AI 분석 호출
+        String analysisResult = aiService.analyzeContract(contract, documentContent);
+        
+        if (analysisResult != null) {
+            analysisCache.put(contractSeq, new AnalysisCacheEntry(lastUpdate, analysisResult));
+        }
+
+        return analysisResult;
+    }
+
+    private String generateDocumentText(Contract contract) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("금전소비대차계약서\n\n");
+        sb.append(String.format("채권자: %s\n", contract.getCreditor().getEmail()));
+        sb.append(String.format("채무자: %s\n", contract.getDebtor().getEmail()));
+        sb.append(String.format("차용원금: 일금 %s원\n", contract.getPrincipalAmount()));
+        sb.append(String.format("이자율: 연 %s%%\n", contract.getInterestRate().multiply(new BigDecimal("100"))));
+        sb.append(String.format("상환방식: %s\n", contract.getRepaymentMethod()));
+        sb.append(String.format("차용기간: %s ~ %s\n\n", contract.getStartDt(), contract.getEndDt()));
+        
+        sb.append("[특약사항]\n");
+        for (int i = 0; i < contract.getClauses().size(); i++) {
+            ContractClause clause = contract.getClauses().get(i);
+            sb.append(String.format("제%d조 (%s): %s\n", i + 1, clause.getTitle(), clause.getContent()));
+        }
+        
+        return sb.toString();
     }
 }
