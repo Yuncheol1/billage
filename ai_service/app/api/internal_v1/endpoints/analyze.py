@@ -40,7 +40,16 @@ def _classify_review_result(warnings: list[WarningItem]) -> str:
 async def analyze_contract(request: AnalyzeRequest):
     """
     [기능 1] RAG 기반 차용증 독소조항 판단 및 세금 위험도 분석
-    Spring이 contract + contract_clause 테이블 데이터를 조합하여 전달
+    
+    Spring이 보내준 데이터를 바탕으로 AI가 분석을 수행하며, 결과로 `review_result` 코드를 반환합니다.
+    
+    ### review_result 판단 로직:
+    1. **AI(Gemini) 직접 분류:** 문맥에 따른 1차 판단
+    2. **서버 키워드 Fallback:** AI 응답이 모호할 경우 서버에서 '증여세', '과세' 등 핵심 키워드를 기반으로 2차 분류
+    
+    ### Spring/Front 연동 가이드:
+    - **SAFE, TAX_RISK_ONLY:** 서명 버튼 활성화 가능
+    - **LEGAL_VIOLATION, BOTH:** 서명 버튼 비활성화 필수
     """
     result_dict = await analyze_service.analyze_document(request)
 

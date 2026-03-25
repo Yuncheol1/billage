@@ -38,8 +38,17 @@ class TaxSummary(BaseModel):
     withholding_tax_rate: Optional[str] = Field(None, description="원천징수 세율 안내 (예: 27.5%)")
 
 class AnalyzeResponse(BaseModel):
-    is_safe: bool = Field(..., description="서명해도 안전한지 여부")
-    review_result: str = Field(..., description="분석 결과 분류: SAFE / TAX_RISK_ONLY / LEGAL_VIOLATION / BOTH")
+    is_safe: bool = Field(..., description="전체적으로 서명해도 안전한지 여부 (완전 무결할 때만 true)")
+    review_result: str = Field(
+        ..., 
+        description=(
+            "분석 결과 분류 (Spring 서명 버튼 제어용): "
+            "SAFE (위험 없음), "
+            "TAX_RISK_ONLY (세무 리스크만 존재 - 서명 가능), "
+            "LEGAL_VIOLATION (법적 무효/위반 조항 존재 - 서명 불가), "
+            "BOTH (세무 리스크와 법적 위반 모두 존재 - 서명 불가)"
+        )
+    )
     warnings: List[WarningItem] = Field(default_factory=list, description="탐지된 위험 항목 리스트")
     tax_summary: Optional[TaxSummary] = Field(None, description="세금 관련 요약 (tax_calculation 테이블 저장용)")
     summary: str = Field(..., description="분석 결과 총평")
