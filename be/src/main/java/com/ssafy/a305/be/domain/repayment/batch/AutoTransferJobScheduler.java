@@ -27,19 +27,19 @@ public class AutoTransferJobScheduler {
     private final Job autoTransferJob;
 
     /** 1차 이체: 매일 오전 10시 */
-    @Scheduled(cron = "0 0 10 * * *")
+    @Scheduled(cron = "0 2 11 * * *")
     public void runSlot10() {
         runJob("SLOT_10");
     }
 
     /** 2차 재시도: 매일 오후 2시 */
-    @Scheduled(cron = "0 0 14 * * *")
+    @Scheduled(cron = "20 2 11 * * *")
     public void runSlot14() {
         runJob("SLOT_14");
     }
 
     /** 3차 재시도: 매일 오후 6시 */
-    @Scheduled(cron = "0 0 18 * * *")
+    @Scheduled(cron = "40 2 11 * * *")
     public void runSlot18() {
         runJob("SLOT_18");
     }
