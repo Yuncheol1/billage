@@ -71,7 +71,7 @@ public class SsafyTransferApiClient {
                 .header(header)
                 .withdrawalAccountNo(withdrawalAccountNo)
                 .depositAccountNo(depositAccountNo)
-                .transactionBalance(amount.toBigInteger().toString())
+                .transactionBalance(amount.setScale(0, java.math.RoundingMode.DOWN).toPlainString())
                 .depositTransactionSummary(memo != null ? memo : "자동이체 입금")
                 .withdrawalTransactionSummary(memo != null ? memo : "자동이체 출금")
                 .build();

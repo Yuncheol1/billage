@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -78,6 +79,7 @@ public class AutoTransferBatchConfig {
     // ──────────────── Reader ────────────────
 
     @Bean
+    @StepScope
     public JpaCursorItemReader<RepaymentSchedule> autoTransferReader() {
         return new JpaCursorItemReaderBuilder<RepaymentSchedule>()
                 .name("autoTransferReader")
@@ -85,6 +87,8 @@ public class AutoTransferBatchConfig {
                 .queryString(
                         "SELECT rs FROM RepaymentSchedule rs " +
                         "JOIN FETCH rs.contract c " +
+                        "JOIN FETCH c.debtor " +
+                        "JOIN FETCH c.creditor " +
                         "WHERE rs.dueDt <= :today " +
                         "AND rs.status = 'NONPAID' " +
                         "AND c.status = 'ACTIVE'")
@@ -101,7 +105,7 @@ public class AutoTransferBatchConfig {
 
             // 1. 자동이체 등록 정보 조회 (계좌 정보)
             AutoTransferRegistration registration = registrationRepository
-                    .findByContract_ContractSeqAndIsActiveTrue(contractSeq)
+                    .findActiveWithAccounts(contractSeq)
                     .orElse(null);
 
             if (registration == null) {
