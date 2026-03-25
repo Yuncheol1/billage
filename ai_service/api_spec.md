@@ -160,7 +160,84 @@
 
 ---
 
-## 3. 세무/법률 Q&A 챗봇
+## 3. 채팅 내역 기반 특약사항 생성
+
+두 사용자(채권자/채무자)의 채팅 대화 내역을 분석하여 합의된 조건을 법적 특약사항으로 변환합니다.
+Spring이 MongoDB에서 조회·가공한 메시지 배열을 전달합니다.
+
+- **Method:** `POST`
+- **Path:** `/internal/v1/clauses/from-chat`
+
+#### [Request Body]
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `contract_seq` | `int` | No | `null` | 소속 계약 식별자 |
+| `room_id` | `string` | No | `null` | 채팅방 ID (추적/로깅용) |
+| `template_type` | `string` | No | `null` | 계약 유형 (`FRIEND_SMALL` 등) |
+| `contract_context` | `string` | No | `""` | 현재까지 작성된 차용증 문맥 |
+| `chat_messages` | `array` | **Yes** | - | 두 사용자 간 채팅 메시지 배열 |
+
+**chat_messages 배열 내부 객체:**
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `sender_seq` | `int` | **Yes** | 발신자 사용자 식별자 |
+| `content` | `string` | **Yes** | 메시지 내용 |
+| `created_at` | `string` | No | 메시지 전송 시간 (ISO 8601) |
+| `msg_type` | `string` | No | `TEXT` / `AI_PROPOSAL` 등 |
+
+#### [Request Example]
+```json
+{
+  "contract_seq": 42,
+  "room_id": "00161bfa-1f2b-4096-b2ed-019051301fc9",
+  "template_type": "FRIEND_SMALL",
+  "contract_context": "채권자 홍길동, 채무자 김철수, 원금 1000만원",
+  "chat_messages": [
+    { "sender_seq": 105, "content": "이자는 어떻게 할까?", "msg_type": "TEXT" },
+    { "sender_seq": 106, "content": "무이자로 하자", "msg_type": "TEXT" },
+    { "sender_seq": 105, "content": "돈 안 갚으면 네 차 압류하는 걸로", "msg_type": "TEXT" },
+    { "sender_seq": 106, "content": "알겠어", "msg_type": "TEXT" }
+  ]
+}
+```
+
+#### [Response Body]
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `clauses` | `array` | 생성된 특약사항 배열 |
+| `clauses[].clause_id` | `string` | 조항 유형 식별자 (`contract_clause.clause_id`) |
+| `clauses[].title` | `string` | 조항 제목 (`contract_clause.title`) |
+| `clauses[].legal_clause` | `string` | 법적으로 정제된 특약 본문 (`contract_clause.content`) |
+| `clauses[].explanation` | `string` | 해당 조항의 법적 의미 설명 |
+| `summary` | `string` | 대화 분석 요약 |
+
+#### [Response Example]
+```json
+{
+  "clauses": [
+    {
+      "clause_id": "COLLATERAL_VEHICLE",
+      "title": "차량 양도담보 설정",
+      "legal_clause": "채무자가 상환 기일 내에 원리금을 변제하지 아니할 경우, 채무자 소유의 차량에 대하여 양도담보권을 설정한다.",
+      "explanation": "채무 불이행 시 차량을 담보로 확보하는 양도담보 조항입니다."
+    },
+    {
+      "clause_id": "INTEREST",
+      "title": "무이자 약정",
+      "legal_clause": "본 계약의 대여금에 대하여 이자를 부과하지 아니한다.",
+      "explanation": "무이자 합의 조항입니다. 단, 가족 간 거래 시 증여세 이슈가 발생할 수 있습니다."
+    }
+  ],
+  "summary": "대화에서 '무이자 합의'와 '채무 불이행 시 차량 담보 설정' 2건의 특약 의도가 파악되었습니다."
+}
+```
+
+---
+
+## 4. 세무/법률 Q&A 챗봇
 
 판례 및 세법 DB(RAG)를 기반으로 전문적인 답변을 제공합니다.
 
