@@ -341,6 +341,7 @@ fun ChatListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
+                    onAccountClick = { showMenu = false },
                     onInsightListClick = {
                         showMenu = false
                         onInsightListClick()

@@ -71,6 +71,15 @@ sealed interface AppDestination {
         override val route: String = "insight_detail"
         const val routeWithArg = "insight_detail/{insightIndex}"
     }
+
+    data object Account : AppDestination {
+        override val route: String = "account"
+    }
+
+    data object AccountDetail : AppDestination {
+        override val route: String = "account_detail"
+        const val routeWithArg = "account_detail/{transactionSeq}"
+    }
 }
 
 class AppNavController(
@@ -246,6 +255,18 @@ class AppNavController(
 
     fun navigateToInsightDetail(insightIndex: Int) {
         navController.navigate("${AppDestination.InsightDetail.route}/$insightIndex") {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToAccount() {
+        navController.navigate(AppDestination.Account.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToAccountDetail(transactionSeq: Int) {
+        navController.navigate("${AppDestination.AccountDetail.route}/$transactionSeq") {
             launchSingleTop = true
         }
     }

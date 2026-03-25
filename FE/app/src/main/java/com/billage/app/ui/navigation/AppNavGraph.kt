@@ -35,6 +35,8 @@ import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
+import com.billage.app.ui.home.AccountDetailScreen
+import com.billage.app.ui.home.AccountScreen
 import com.billage.app.ui.home.InsightDetailScreen
 import com.billage.app.ui.home.InsightListScreen
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
@@ -73,6 +75,7 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
+            onAccountClick = { appNavController.navigateToAccount() },
             onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
@@ -368,6 +371,20 @@ fun NavGraphBuilder.appNavGraph(
         val insightIndex = backStackEntry.arguments?.getString("insightIndex")?.toIntOrNull() ?: 0
         InsightDetailScreen(
             insightIndex = insightIndex,
+            onBackClick = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.Account.route) {
+        AccountScreen(
+            onBackClick = { appNavController.popBackStack() }
+        )
+    }
+
+    composable(route = AppDestination.AccountDetail.routeWithArg) { backStackEntry ->
+        val transactionSeq = backStackEntry.arguments?.getString("transactionSeq")?.toIntOrNull() ?: -1
+        AccountDetailScreen(
+            transactionSeq = transactionSeq,
             onBackClick = { appNavController.popBackStack() }
         )
     }

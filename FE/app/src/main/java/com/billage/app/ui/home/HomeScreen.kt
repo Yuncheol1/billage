@@ -51,6 +51,7 @@ fun HomeScreen(
     onMypageClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     onInsightListClick: () -> Unit = {},
     onInsightDetailClick: (Int) -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState(),
@@ -159,6 +160,10 @@ fun HomeScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
+                    onAccountClick = {
+                        showMenu = false
+                        onAccountClick()
+                    },
                     onInsightListClick = {
                         showMenu = false
                         onInsightListClick()

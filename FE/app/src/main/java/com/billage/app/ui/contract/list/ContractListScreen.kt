@@ -242,6 +242,7 @@ fun ContractListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
+                    onAccountClick = { showMenu = false },
                     onInsightListClick = {
                         showMenu = false
                         onInsightListClick()
