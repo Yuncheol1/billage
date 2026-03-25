@@ -3,6 +3,7 @@ package com.ssafy.a305.be.domain.bank.controller;
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
 import com.ssafy.a305.be.domain.bank.dto.request.BankAccountDepositRequestDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
+import com.ssafy.a305.be.domain.bank.dto.response.BankAccountDetailResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountDepositResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankTransactionHistoryListResponseDto;
@@ -56,7 +57,7 @@ public class BankAccountController {
     public ResponseEntity<Map<String, Object>> getLinkedDemandDepositAccountDetail(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
-        BankAccountListItemResponseDto data = bankAccountService.getLinkedDemandDepositAccountDetail(userSeq);
+        BankAccountDetailResponseDto data = bankAccountService.getLinkedDemandDepositAccountDetail(userSeq);
         return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 단건 조회 성공", data));
     }
 
