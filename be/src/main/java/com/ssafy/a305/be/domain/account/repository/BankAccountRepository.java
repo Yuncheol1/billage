@@ -18,6 +18,11 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, Intege
 
     List<BankAccount> findByUserUserSeq(Integer userSeq);
 
+    Optional<BankAccount> findFirstByUserUserSeqAndStatusOrderByAccountSeqAsc(
+            Integer userSeq,
+            BankAccountStatus status
+    );
+
     boolean existsByUserUserSeqAndAccountTypeUniqueNoAndStatus(
             Integer userSeq,
             String accountTypeUniqueNo,

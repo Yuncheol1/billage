@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  *
  * @param accountSeq           내부 DB 계좌 일련번호 (bank_account.account_seq)
  * @param bankCode             은행 코드 (SSAFY 응답 기준)
- * @param accountNoMasked      마스킹된 계좌번호 (16자리는 {@code XXXX-****-****-XXXX}, 그 외 8자 초과는 {@code XXXX-****-XXXX})
+ * @param accountNo             계좌번호 원문
  * @param accountTypeUniqueNo  개설에 사용한 상품 고유번호 (SSAFY accountTypeUniqueNo)
  * @param isPrimary            해당 사용자의 대표(첫) 활성 계좌 여부
  * @param status               계좌 상태 enum 이름 (예: ACTIVE)
@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public record CreateBankAccountResponseDto(
         Integer accountSeq,
         String bankCode,
-        String accountNoMasked,
+        String accountNo,
         String accountTypeUniqueNo,
         Boolean isPrimary,
         String status,
@@ -28,7 +28,7 @@ public record CreateBankAccountResponseDto(
         return new CreateBankAccountResponseDto(
                 bankAccount.getAccountSeq(),
                 bankAccount.getBankCode(),
-                bankAccount.getAccountNoMasked(),
+                bankAccount.getAccountNo(),
                 bankAccount.getAccountTypeUniqueNo(),
                 bankAccount.getIsPrimary(),
                 bankAccount.getStatus().name(),
