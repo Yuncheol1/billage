@@ -13,4 +13,5 @@ public class UserSearchResponseDto {
     private Integer userSeq;
     private String email;
     private String realName;
+    private String profileImageUrl;
 }

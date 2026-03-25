@@ -33,6 +33,9 @@ public class UserProfile {
     @Column(name = "phone_verified")
     private Boolean phoneVerified;
 
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
     @Column(name = "profile_completed_dt")
     private LocalDate profileCompletedDt;
 
@@ -68,9 +71,10 @@ public class UserProfile {
     @Column(name = "updated_dttm")
     private LocalDateTime updatedDttm;
 
-    public void syncFromKakao(String realName, Boolean phoneVerified, String rrn) {
+    public void syncFromKakao(String realName, Boolean phoneVerified, String rrn, String profileImageUrl) {
         this.realName = realName;
         this.phoneVerified = phoneVerified;
+        this.profileImageUrl = profileImageUrl;
         if ((this.rrn == null || this.rrn.isBlank()) && rrn != null && !rrn.isBlank()) {
             this.rrn = rrn;
         }

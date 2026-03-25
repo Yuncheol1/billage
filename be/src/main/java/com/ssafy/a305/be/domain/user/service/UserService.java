@@ -41,6 +41,7 @@ public class UserService {
                 .realName(user.getProfile() != null ? user.getProfile().getRealName() : null)
                 .email(user.getEmail())
                 .phone(user.getPhone())
+                .profileImageUrl(extractProfileImageUrl(user))
                 .build();
     }
 
@@ -66,8 +67,12 @@ public class UserService {
 
         return userRepository.findByPhoneAndState(normalizedPhone, USER_STATE_ACTIVE)
                 .filter(user -> normalizedRealName.equals(extractRealName(user)))
-                .map(user -> new UserPhoneLookupResponseDto(true, user.getUserSeq()))
-                .orElseGet(() -> new UserPhoneLookupResponseDto(false, null));
+                .map(user -> new UserPhoneLookupResponseDto(
+                        true,
+                        user.getUserSeq(),
+                        extractRealName(user),
+                        extractProfileImageUrl(user)))
+                .orElseGet(() -> new UserPhoneLookupResponseDto(false, null, null, null));
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +97,8 @@ public class UserService {
                 .map(user -> UserSearchResponseDto.builder()
                         .userSeq(user.getUserSeq())
                         .email(user.getEmail())
-                        .realName(user.getProfile() != null ? user.getProfile().getRealName() : "이름없음")
+                        .realName(user.getProfile() != null ? user.getProfile().getRealName() : "Unknown")
+                        .profileImageUrl(extractProfileImageUrl(user))
                         .build())
                 .collect(Collectors.toList());
     }
@@ -124,5 +130,12 @@ public class UserService {
             return "";
         }
         return user.getProfile().getRealName().trim();
+    }
+
+    private String extractProfileImageUrl(User user) {
+        if (user.getProfile() == null) {
+            return null;
+        }
+        return user.getProfile().getProfileImageUrl();
     }
 }

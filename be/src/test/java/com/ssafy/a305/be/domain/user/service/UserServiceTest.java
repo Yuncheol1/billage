@@ -60,6 +60,7 @@ class UserServiceTest {
         UserProfile profile = UserProfile.builder()
                 .user(user)
                 .realName("Test User")
+                .profileImageUrl("https://example.com/me.png")
                 .rrn("")
                 .build();
         user = User.builder()
@@ -78,6 +79,7 @@ class UserServiceTest {
         assertEquals("Test User", result.getRealName());
         assertEquals("example@example.com", result.getEmail());
         assertEquals("01012345678", result.getPhone());
+        assertEquals("https://example.com/me.png", result.getProfileImageUrl());
     }
 
     @Test
@@ -142,6 +144,7 @@ class UserServiceTest {
         UserProfile profile = UserProfile.builder()
                 .user(user)
                 .realName("Hong Gil Dong")
+                .profileImageUrl("https://example.com/hong.png")
                 .rrn("")
                 .build();
         user = User.builder()
@@ -158,6 +161,8 @@ class UserServiceTest {
 
         assertTrue(result.isRegistered());
         assertEquals(7, result.getUserSeq());
+        assertEquals("Hong Gil Dong", result.getRealName());
+        assertEquals("https://example.com/hong.png", result.getProfileImageUrl());
         verify(userRepository).findByPhoneAndState("01040140142", "ACTIVE");
     }
 

@@ -42,7 +42,7 @@ oauth:
   kakao:
     client-id: ${KAKAO_CLIENT_ID:}
     client-secret: ${KAKAO_CLIENT_SECRET:}
-    scope: ${KAKAO_SCOPE:account_email,name,gender,birthday,birthyear,phone_number,friends,talk_message}
+    scope: ${KAKAO_SCOPE:account_email,name,gender,birthday,birthyear,phone_number,profile_image,friends,talk_message}
     token-uri: ${KAKAO_TOKEN_URI:https://kauth.kakao.com/oauth/token}
     user-info-uri: ${KAKAO_USER_INFO_URI:https://kapi.kakao.com/v2/user/me}
 

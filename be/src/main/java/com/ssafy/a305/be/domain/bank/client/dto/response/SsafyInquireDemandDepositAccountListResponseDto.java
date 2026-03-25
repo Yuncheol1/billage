@@ -5,7 +5,12 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.header.SsafyApiResponse
 
 import java.util.List;
 
-/** 수시입출금 계좌 목록 조회 응답 DTO */
+/**
+ * SSAFY 수시입출금 계좌 목록 조회 응답 바디.
+ *
+ * @param header 응답 Header
+ * @param rec    계좌 목록 (배열). 없으면 null 또는 빈 리스트로 매핑될 수 있음
+ */
 public record SsafyInquireDemandDepositAccountListResponseDto(
         @JsonProperty("Header")
         SsafyApiResponseHeaderDto header,

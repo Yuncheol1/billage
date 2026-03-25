@@ -597,15 +597,20 @@ public class ContractService {
 
 
         Integer counterpartySeq = isCreditor ? contract.getDebtor().getUserSeq() : contract.getCreditor().getUserSeq();
-        String counterpartyName = userProfileRepository.findByUserUserSeq(counterpartySeq)
-                .map(UserProfile::getRealName)
-                .orElse(isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
+        UserProfile counterpartyProfile = userProfileRepository.findByUserUserSeq(counterpartySeq).orElse(null);
+        String counterpartyName = counterpartyProfile != null && counterpartyProfile.getRealName() != null
+                ? counterpartyProfile.getRealName()
+                : (isCreditor ? contract.getDebtor().getEmail() : contract.getCreditor().getEmail());
+        String counterpartyProfileImageUrl = counterpartyProfile != null
+                ? counterpartyProfile.getProfileImageUrl()
+                : null;
 
         SignatureStatus signatureStatus = resolveSignatureStatus(contract, userSeq);
         return new ContractDetailResponseDto(
                 contract,
                 userSeq,
                 counterpartyName,
+                counterpartyProfileImageUrl,
                 signatureStatus.isMeSigned(),
                 signatureStatus.isOpponentSigned()
         );

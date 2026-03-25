@@ -8,4 +8,6 @@ import lombok.Getter;
 public class UserPhoneLookupResponseDto {
     private boolean registered;
     private Integer userSeq;
+    private String realName;
+    private String profileImageUrl;
 }
