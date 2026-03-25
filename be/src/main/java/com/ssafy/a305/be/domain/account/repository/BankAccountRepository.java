@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BankAccountRepository extends JpaRepository<BankAccount, Integer> {
@@ -13,6 +14,11 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, Intege
     boolean existsByAccountNo(String accountNo);
 
     List<BankAccount> findByUserUserSeq(Integer userSeq);
+
+    Optional<BankAccount> findFirstByUserUserSeqAndStatusOrderByAccountSeqAsc(
+            Integer userSeq,
+            BankAccountStatus status
+    );
 
     boolean existsByUserUserSeqAndAccountTypeUniqueNoAndStatus(
             Integer userSeq,
