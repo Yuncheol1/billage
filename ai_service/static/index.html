@@ -23,20 +23,86 @@
             <section class="card">
                 <h2>1. 차용증 독소조항 / 세금 분석</h2>
                 <div class="form-group">
-                    <label>차용증 문구 (조항 단위 가능):</label>
-                    <textarea id="analyzeText" rows="4">제2조(상환) 상환기일에 원금을 갚지 못할 경우, 연 30%의 지연이자를 가산하며 신체포기각서를 이행한다.</textarea>
+                    <label>차용증 전문 (contract_text):</label>
+                    <textarea id="analyzeText" rows="4">제1조(대여금) 금 10,000,000원을 대여한다. 제2조(상환) 상환기일에 원금을 갚지 못할 경우, 연 30%의 지연이자를 가산하며 신체포기각서를 이행한다.</textarea>
                 </div>
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label>원금 (원):</label>
+                        <label>계약 번호 (contract_seq):</label>
+                        <input type="number" id="analyzeContractSeq" value="42" placeholder="선택">
+                    </div>
+                    <div class="form-group">
+                        <label>분석 모드 (mode):</label>
+                        <select id="analyzeMode">
+                            <option value="full" selected>full (전체 문서)</option>
+                            <option value="partial">partial (조항 단위)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>계약 유형 (template_type):</label>
+                        <select id="analyzeTemplateType">
+                            <option value="">선택 안 함</option>
+                            <option value="FRIEND_SMALL">지인 간 소액 대여</option>
+                            <option value="FAMILY_JEONSE" selected>가족 간 전세</option>
+                            <option value="PARTNER_BIZ">사업 동업자 대여</option>
+                            <option value="COLLEAGUE_EMERGENCY">직장 동료 긴급 대여</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>원금 (principal_amount):</label>
                         <input type="number" id="principal" value="10000000">
                     </div>
                     <div class="form-group">
-                        <label>적용 이자율 (%):</label>
+                        <label>연 이자율 % (interest_rate):</label>
                         <input type="number" step="0.1" id="interest" value="0">
                     </div>
+                    <div class="form-group">
+                        <label>상환 방식 (repayment_method):</label>
+                        <select id="analyzeRepayment">
+                            <option value="BULLET" selected>BULLET (만기 일시)</option>
+                            <option value="INSTALLMENT">INSTALLMENT (분할)</option>
+                            <option value="CUSTOM">CUSTOM (사용자 정의)</option>
+                        </select>
+                    </div>
                 </div>
-                <button onclick="testAnalyze()">[API 호출] 분석하기</button>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>대출 시작일 (start_dt):</label>
+                        <input type="date" id="analyzeStartDt" value="2026-03-25">
+                    </div>
+                    <div class="form-group">
+                        <label>대출 종료일 (end_dt):</label>
+                        <input type="date" id="analyzeEndDt" value="2027-03-25">
+                    </div>
+                </div>
+
+                <!-- 조항(clauses) 동적 입력 -->
+                <div class="chat-builder">
+                    <label>조항 목록 (clauses):</label>
+                    <div id="analyzeClauseList">
+                        <div class="analyze-clause-row">
+                            <select class="clause-id-select">
+                                <option value="INTEREST">INTEREST</option>
+                                <option value="REPAYMENT_DATE">REPAYMENT_DATE</option>
+                                <option value="PENALTY" selected>PENALTY</option>
+                                <option value="COLLATERAL">COLLATERAL</option>
+                                <option value="GUARANTEE">GUARANTEE</option>
+                                <option value="OTHER">OTHER</option>
+                            </select>
+                            <input type="text" class="clause-title-input" value="특약사항" placeholder="조항 제목">
+                            <input type="text" class="clause-content-input" value="상환 불이행 시 신체를 포기한다." placeholder="조항 내용">
+                            <button class="btn-remove" onclick="removeAnalyzeClause(this)" title="삭제">✕</button>
+                        </div>
+                    </div>
+                    <button class="btn-add-msg" onclick="addAnalyzeClause()">+ 조항 추가</button>
+                </div>
+
+                <button onclick="testAnalyze()" class="btn-primary-lg">[API 호출] 분석하기</button>
                 <div class="result-box" id="analyzeResult">결과가 여기에 표시됩니다.</div>
             </section>
 
@@ -60,6 +126,71 @@
                 </div>
                 <button onclick="testChat()">[API 호출] 질문 전송</button>
                 <div class="result-box" id="chatResult">결과가 여기에 표시됩니다.</div>
+            </section>
+
+            <!-- 4. 채팅 내역 기반 특약 생성 -->
+            <section class="card card-highlight">
+                <h2>4. 💬 채팅 내역 기반 특약 생성 <span class="badge">NEW</span></h2>
+                <p class="desc">두 사용자 간 실제 채팅 대화를 입력하면, AI가 분석하여 법적 특약사항을 자동 생성합니다.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>계약 유형:</label>
+                        <select id="clauseChatType">
+                            <option value="">선택 안 함</option>
+                            <option value="FRIEND_SMALL" selected>지인 간 소액 대여</option>
+                            <option value="FAMILY_JEONSE">가족 간 전세</option>
+                            <option value="PARTNER_BIZ">사업 동업자 대여</option>
+                            <option value="COLLEAGUE_EMERGENCY">직장 동료 긴급 대여</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>차용증 문맥 (선택):</label>
+                        <input type="text" id="clauseChatContext" value="채권자 홍길동, 채무자 김철수, 원금 1000만원" class="full-width">
+                    </div>
+                </div>
+
+                <div class="chat-builder">
+                    <label>채팅 메시지 입력:</label>
+                    <div id="chatMessageList">
+                        <div class="chat-msg-row" data-sender="105">
+                            <select class="sender-select">
+                                <option value="105" selected>사용자A (105)</option>
+                                <option value="106">사용자B (106)</option>
+                            </select>
+                            <input type="text" class="chat-msg-input" value="이자는 어떻게 할까?" placeholder="메시지 입력">
+                            <button class="btn-remove" onclick="removeChatMsg(this)" title="삭제">✕</button>
+                        </div>
+                        <div class="chat-msg-row" data-sender="106">
+                            <select class="sender-select">
+                                <option value="105">사용자A (105)</option>
+                                <option value="106" selected>사용자B (106)</option>
+                            </select>
+                            <input type="text" class="chat-msg-input" value="무이자로 하자" placeholder="메시지 입력">
+                            <button class="btn-remove" onclick="removeChatMsg(this)" title="삭제">✕</button>
+                        </div>
+                        <div class="chat-msg-row" data-sender="105">
+                            <select class="sender-select">
+                                <option value="105" selected>사용자A (105)</option>
+                                <option value="106">사용자B (106)</option>
+                            </select>
+                            <input type="text" class="chat-msg-input" value="돈 안 갚으면 네 차 압류하는 걸로" placeholder="메시지 입력">
+                            <button class="btn-remove" onclick="removeChatMsg(this)" title="삭제">✕</button>
+                        </div>
+                        <div class="chat-msg-row" data-sender="106">
+                            <select class="sender-select">
+                                <option value="105">사용자A (105)</option>
+                                <option value="106" selected>사용자B (106)</option>
+                            </select>
+                            <input type="text" class="chat-msg-input" value="알겠어" placeholder="메시지 입력">
+                            <button class="btn-remove" onclick="removeChatMsg(this)" title="삭제">✕</button>
+                        </div>
+                    </div>
+                    <button class="btn-add-msg" onclick="addChatMsg()">+ 메시지 추가</button>
+                </div>
+
+                <button onclick="testClauseFromChat()" class="btn-primary-lg">[API 호출] 채팅 분석 → 특약 생성</button>
+                <div class="result-box" id="clauseChatResult">결과가 여기에 표시됩니다.</div>
             </section>
         </div>
     </div>
