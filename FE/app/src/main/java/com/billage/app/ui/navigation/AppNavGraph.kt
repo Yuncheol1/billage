@@ -314,7 +314,8 @@ fun NavGraphBuilder.appNavGraph(
                         roomId = roomId,
                         opponentName = opponentName,
                         isNewContract = true,
-                        contractSeq = contractSeq.toIntOrNull() ?: -1
+                        contractSeq = contractSeq.toIntOrNull() ?: -1,
+                        clearContractFlow = true
                     )
                 } else {
                     appNavController.navigateToChatListFromContract()
