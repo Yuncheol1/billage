@@ -212,10 +212,16 @@ public class ContractService {
         AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // AI가 유효한 법률 특약을 생성하지 못하고 거절한 경우
-        if (aiResponse.getLegalClause() == null || aiResponse.getLegalClause().trim().isEmpty()) {
-            String reason = (aiResponse.getExplanation() != null && !aiResponse.getExplanation().isBlank())
-                    ? aiResponse.getExplanation()
-                    : "입력하신 내용으로 유효한 법률 특약을 생성할 수 없습니다.";
+        if (aiResponse.getRejected() ||
+            aiResponse.getLegalClause() == null || 
+            aiResponse.getLegalClause().trim().isEmpty()) {
+            
+            String reason = (aiResponse.getRejectionReason() != null && !aiResponse.getRejectionReason().isBlank())
+                    ? aiResponse.getRejectionReason()
+                    : ((aiResponse.getExplanation() != null && !aiResponse.getExplanation().isBlank())
+                        ? aiResponse.getExplanation()
+                        : "입력하신 내용으로 유효한 법률 특약을 생성할 수 없습니다.");
+                        
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "특약 생성 거절: " + reason);
         }
 

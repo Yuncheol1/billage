@@ -10,6 +10,11 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AiClauseResponseDto {
 
+    private Boolean rejected;
+
+    @JsonProperty("rejection_reason")
+    private String rejectionReason;
+
     private String title;
     
     @JsonProperty("clause_id")
@@ -19,4 +24,6 @@ public class AiClauseResponseDto {
     private String legalClause;
 
     private String explanation;
+    
+
 }
