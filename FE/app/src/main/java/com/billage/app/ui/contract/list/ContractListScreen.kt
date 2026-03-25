@@ -113,7 +113,8 @@ fun ContractListScreen(
                     userName = "빌리지",
                     hasNotification = true,
                     onNotificationClick = onNotificationClick,
-                    onMenuClick = { showMenu = true }
+                    onMenuClick = { showMenu = true },
+                    showBrandLogo = true
                 )
             },
             bottomBar = {

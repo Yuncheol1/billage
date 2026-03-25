@@ -70,7 +70,8 @@ fun HomeScreen(
                     userName = uiState.userName,
                     hasNotification = uiState.hasNotification,
                     onNotificationClick = onNotificationClick,
-                    onMenuClick = { showMenu = true }
+                    onMenuClick = { showMenu = true },
+                    showBrandLogo = true
                 )
             },
             bottomBar = {

@@ -37,9 +37,6 @@ class ContractDetailViewModel @Inject constructor(
     private val _myProfileImageUrl = MutableStateFlow<String?>(null)
     val myProfileImageUrl: StateFlow<String?> = _myProfileImageUrl.asStateFlow()
 
-    private val _updateSuccess = MutableSharedFlow<Boolean>()
-    val updateSuccess: SharedFlow<Boolean> = _updateSuccess
-
     init {
         viewModelScope.launch {
             runCatching { userApi.getMyInfo().data }
@@ -78,19 +75,12 @@ class ContractDetailViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
             try {
                 val request = ContractUpdateRequest(
                     principalAmount = principalAmount,
                     interestRate = interestRate,
                     clauses = clauses
-                )
-                contractRepository.updateContract(
-                    contractSeq,
-                    ContractUpdateRequest(
-                        principalAmount = principalAmount,
-                        interestRate = interestRate,
-                        clauses = clauses
-                    )
                 )
                 contractRepository.updateContract(contractSeq, request, roomId)
                 _updateSuccess.emit(true)
