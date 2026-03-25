@@ -23,6 +23,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, Intege
             BankAccountStatus status
     );
 
+    Optional<BankAccount> findByAccountNo(String accountNo);
+
     boolean existsByUserUserSeqAndAccountTypeUniqueNoAndStatus(
             Integer userSeq,
             String accountTypeUniqueNo,
