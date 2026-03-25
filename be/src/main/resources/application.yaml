@@ -57,7 +57,6 @@ ssafy:
     create-demand-deposit-account-path: ${SSAFY_CREATE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/createDemandDepositAccount}
     inquire-demand-deposit-account-list-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_LIST_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccountList}
     inquire-demand-deposit-account-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccount}
-    inquire-demand-deposit-account-balance-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_BALANCE_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccountBalance}
     demand-deposit-account-type-unique-no: ${SSAFY_DEMAND_DEPOSIT_ACCOUNT_TYPE_UNIQUE_NO:001-1-f8b3869eff034c}
 
 ai:
