@@ -2,12 +2,10 @@ package com.ssafy.a305.be.domain.bank.client;
 
 import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyCreateDemandDepositAccountRequestDto;
-import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountBalanceRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountListRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.request.SsafyInquireDemandDepositAccountRequestDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
-import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountBalanceResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountListResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
@@ -29,7 +27,6 @@ public class SsafyDemandDepositClient {
     private static final String CREATE_ACCOUNT_API_NAME = "createDemandDepositAccount";
     private static final String INQUIRE_ACCOUNT_LIST_API_NAME = "inquireDemandDepositAccountList";
     private static final String INQUIRE_ACCOUNT_API_NAME = "inquireDemandDepositAccount";
-    private static final String INQUIRE_ACCOUNT_BALANCE_API_NAME = "inquireDemandDepositAccountBalance";
 
     private final RestClient.Builder restClientBuilder;
     private final SsafyApiProperties ssafyApiProperties;
@@ -82,23 +79,6 @@ public class SsafyDemandDepositClient {
         return response.rec();
     }
 
-    public SsafyInquireDemandDepositAccountBalanceResponseDto.Rec inquireDemandDepositAccountBalance(String userKey, String accountNo) {
-        SsafyInquireDemandDepositAccountBalanceRequestDto request = new SsafyInquireDemandDepositAccountBalanceRequestDto(
-                ssafyApiHeaderFactory.create(INQUIRE_ACCOUNT_BALANCE_API_NAME, userKey),
-                accountNo
-        );
-        SsafyInquireDemandDepositAccountBalanceResponseDto response = post(
-                request,
-                ssafyApiProperties.getInquireDemandDepositAccountBalancePath(),
-                SsafyInquireDemandDepositAccountBalanceResponseDto.class,
-                "계좌 잔액 조회"
-        );
-        if (response.rec() == null) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 잔액 조회 응답이 비어 있습니다.");
-        }
-        return response.rec();
-    }
-
     private <T> T post(Object requestBody, String path, Class<T> responseType, String actionName) {
         validateCommonConfiguration(path, actionName);
 
@@ -141,9 +121,6 @@ public class SsafyDemandDepositClient {
             responseCode = dto.header() == null ? null : dto.header().responseCode();
             responseMessage = dto.header() == null ? null : dto.header().responseMessage();
         } else if (response instanceof SsafyInquireDemandDepositAccountResponseDto dto) {
-            responseCode = dto.header() == null ? null : dto.header().responseCode();
-            responseMessage = dto.header() == null ? null : dto.header().responseMessage();
-        } else if (response instanceof SsafyInquireDemandDepositAccountBalanceResponseDto dto) {
             responseCode = dto.header() == null ? null : dto.header().responseCode();
             responseMessage = dto.header() == null ? null : dto.header().responseMessage();
         } else {

@@ -1,7 +1,6 @@
 package com.ssafy.a305.be.domain.bank.controller;
 
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
-import com.ssafy.a305.be.domain.bank.dto.response.BankAccountBalanceResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
@@ -43,12 +42,15 @@ public class BankAccountController {
         return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 목록 조회 성공", list));
     }
 
-    @GetMapping("/accounts/balance")
-    public ResponseEntity<Map<String, Object>> getDemandDepositBalance(
+    /**
+     * 로그인 사용자의 연동(ACTIVE) 계좌 1건에 대해 SSAFY 수시입출금 계좌 단건 조회(inquireDemandDepositAccount) 결과를 반환한다.
+     */
+    @GetMapping("/accounts/detail")
+    public ResponseEntity<Map<String, Object>> getLinkedDemandDepositAccountDetail(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         Integer userSeq = requireAuthenticatedUser(authenticatedUser).userSeq();
-        BankAccountBalanceResponseDto data = bankAccountService.getDemandDepositBalance(userSeq);
-        return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 잔액 조회 성공", data));
+        BankAccountListItemResponseDto data = bankAccountService.getLinkedDemandDepositAccountDetail(userSeq);
+        return ResponseEntity.ok(successResponse(HttpStatus.OK, "계좌 단건 조회 성공", data));
     }
 
     @PostMapping("/accounts")

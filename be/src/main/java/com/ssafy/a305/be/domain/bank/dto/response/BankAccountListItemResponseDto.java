@@ -1,8 +1,8 @@
 package com.ssafy.a305.be.domain.bank.dto.response;
 
 /**
- * SSAFY 수시입출금 계좌 목록 조회 결과를 클라이언트에 내려주기 위한 항목 DTO.
- * 계좌번호 원문을 포함한다.
+ * SSAFY 수시입출금 계좌 목록(inquireDemandDepositAccountList) 또는 단건(inquireDemandDepositAccount) 조회 결과를
+ * 클라이언트에 내려주기 위한 DTO. 계좌번호 원문을 포함한다.
  *
  * @param bankCode            은행 코드 (예: 001)
  * @param bankName            은행명

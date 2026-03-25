@@ -6,8 +6,6 @@ import com.ssafy.a305.be.domain.auth.config.SsafyApiProperties;
 import com.ssafy.a305.be.domain.bank.client.SsafyDemandDepositClient;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyCreateDemandDepositAccountResponseDto;
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositAccountRecDto;
-import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireDemandDepositAccountBalanceResponseDto;
-import com.ssafy.a305.be.domain.bank.dto.response.BankAccountBalanceResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankAccountListItemResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.BankMeResponseDto;
 import com.ssafy.a305.be.domain.bank.dto.response.CreateBankAccountResponseDto;
@@ -65,13 +63,16 @@ public class BankAccountService {
                 .toList();
     }
 
+    /**
+     * 연동된 ACTIVE 계좌 1건을 기준으로 SSAFY 계좌 단건 조회 API를 호출한다.
+     */
     @Transactional(readOnly = true)
-    public BankAccountBalanceResponseDto getDemandDepositBalance(Integer userSeq) {
+    public BankAccountListItemResponseDto getLinkedDemandDepositAccountDetail(Integer userSeq) {
         User user = userRepository.findById(userSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!hasText(user.getSsafyUserKey())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY userKey가 없어 잔액을 조회할 수 없습니다.");
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY userKey가 없어 계좌를 조회할 수 없습니다.");
         }
 
         BankAccount account = bankAccountRepository
@@ -79,28 +80,19 @@ public class BankAccountService {
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
 
         if (!hasText(account.getAccountNo())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "계좌번호가 없어 잔액을 조회할 수 없습니다.");
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "계좌번호가 없어 계좌를 조회할 수 없습니다.");
         }
 
-        SsafyInquireDemandDepositAccountBalanceResponseDto.Rec rec = ssafyDemandDepositClient.inquireDemandDepositAccountBalance(
+        SsafyDemandDepositAccountRecDto rec = ssafyDemandDepositClient.inquireDemandDepositAccount(
                 user.getSsafyUserKey(),
                 account.getAccountNo()
         );
 
         if (!account.getAccountNo().equals(rec.accountNo())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 잔액 조회 결과 계좌번호가 일치하지 않습니다.");
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "SSAFY 계좌 단건 조회 결과 계좌번호가 일치하지 않습니다.");
         }
 
-        return new BankAccountBalanceResponseDto(
-                account.getAccountSeq(),
-                account.getAccountNo(),
-                rec.bankCode(),
-                rec.accountBalance(),
-                rec.accountCreatedDate(),
-                rec.accountExpiryDate(),
-                rec.lastTransactionDate(),
-                rec.currency()
-        );
+        return toListItem(rec, account);
     }
 
     @Transactional
