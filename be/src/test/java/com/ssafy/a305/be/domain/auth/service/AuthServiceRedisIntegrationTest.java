@@ -91,6 +91,7 @@ class AuthServiceRedisIntegrationTest {
         when(kakaoOAuthClient.getUserInfo(anyString()))
                 .thenReturn(new KakaoUserInfoResponse(
                         12345L,
+                        null,
                         new KakaoUserInfoResponse.KakaoAccount(
                                 "test@example.com",
                                 null,
@@ -101,14 +102,15 @@ class AuthServiceRedisIntegrationTest {
                                 true,
                                 "male",
                                 "0216",
-                                "1998"
+                                "1998",
+                                null
                         )
                 ));
         when(socialAuthRepository.findByProviderAndProviderUserId("KAKAO", "12345"))
                 .thenReturn(Optional.empty());
         when(userRepository.existsByEmail("test@example.com"))
                 .thenReturn(false);
-        when(userRepository.save(any(User.class)))
+        when(userRepository.saveAndFlush(any(User.class)))
                 .thenAnswer(invocation -> {
                     User user = invocation.getArgument(0);
                     return User.builder()

@@ -313,15 +313,17 @@ public class AuthService {
         String realName = extractRealName(userInfo);
         Boolean phoneVerified = extractPhoneVerified(userInfo);
         String maskedRrn = resolveMaskedRrn(userInfo);
+        String profileImageUrl = extractProfileImageUrl(userInfo);
 
         userProfileRepository.findByUserUserSeq(user.getUserSeq())
                 .ifPresentOrElse(
-                        userProfile -> userProfile.syncFromKakao(realName, phoneVerified, maskedRrn),
+                        userProfile -> userProfile.syncFromKakao(realName, phoneVerified, maskedRrn, profileImageUrl),
                         () -> userProfileRepository.save(UserProfile.builder()
                                 .user(user)
                                 .rrn(maskedRrn)
                                 .realName(realName)
                                 .phoneVerified(phoneVerified)
+                                .profileImageUrl(profileImageUrl)
                                 .profileCompletedDt(null)
                                 .lockEnabled(false)
                                 .lockType(DEFAULT_LOCK_TYPE)
@@ -407,6 +409,22 @@ public class AuthService {
             return Boolean.FALSE;
         }
         return Boolean.TRUE.equals(userInfo.kakaoAccount().phoneNumberVerified());
+    }
+
+    private String extractProfileImageUrl(KakaoUserInfoResponse userInfo) {
+        if (userInfo.kakaoAccount() != null && userInfo.kakaoAccount().profile() != null) {
+            String profileImageUrl = userInfo.kakaoAccount().profile().profileImageUrl();
+            if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+                return profileImageUrl;
+            }
+        }
+
+        if (userInfo.properties() != null && userInfo.properties().profileImage() != null
+                && !userInfo.properties().profileImage().isBlank()) {
+            return userInfo.properties().profileImage();
+        }
+
+        return null;
     }
 
     private void validateMandatoryConsents(Map<Integer, Boolean> requestAgreementMap) {
