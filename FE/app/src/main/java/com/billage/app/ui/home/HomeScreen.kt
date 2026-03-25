@@ -57,6 +57,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.refreshUnreadCount()
+    }
     var showContractTypeSheet by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)

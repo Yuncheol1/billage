@@ -37,6 +37,7 @@ import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
 import com.billage.app.ui.home.InsightDetailScreen
 import com.billage.app.ui.home.InsightListScreen
+import com.billage.app.ui.notification.NotificationScreen
 import com.billage.app.ui.settings.WithdrawalSettingsScreen
 import com.billage.app.ui.theme.BillageTextPrimary
 import com.billage.app.ui.theme.BillageTextSecondary
@@ -73,7 +74,7 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         HomeScreen(
             onContractClick = { appNavController.navigateToMypage() },
-            onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
+            onNotificationClick = { appNavController.navigateToNotifications() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onActivityClick = { /* TODO: 전체 내역 화면으로 이동 */ },
             onChatClick = { appNavController.navigateToChatList() },
@@ -258,7 +259,7 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         ContractListScreen(
             onNavigateHome = { appNavController.navigateToHome() },
-            onNotificationClick = { /* TODO: 알림 화면으로 이동 */ },
+            onNotificationClick = { appNavController.navigateToNotifications() },
             onAddContractClick = { appNavController.navigateToContract() },
             onChatClick = { appNavController.navigateToChatList() },
             onSettingsClick = { appNavController.navigateToSettings() },
@@ -273,6 +274,17 @@ fun NavGraphBuilder.appNavGraph(
         WithdrawalSettingsScreen(
             onBackClick = { appNavController.popBackStack() },
             onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) }
+        )
+    }
+
+    composable(route = AppDestination.Notification.route) {
+        NotificationScreen(
+            onBackClick = { appNavController.popBackStack() },
+            onNotificationClick = { notification ->
+                notification.contractSeq?.let { contractSeq ->
+                    appNavController.navigateToContractDetail(contractSeq.toString())
+                }
+            }
         )
     }
 

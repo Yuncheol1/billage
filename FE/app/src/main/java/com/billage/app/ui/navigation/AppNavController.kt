@@ -63,6 +63,10 @@ sealed interface AppDestination {
         const val routeWithArg = "contract_detail/{contractId}"
     }
 
+    data object Notification : AppDestination {
+        override val route: String = "notification"
+    }
+
     data object InsightList : AppDestination {
         override val route: String = "insight_list"
     }
@@ -181,6 +185,12 @@ class AppNavController(
 
     fun navigateToSettings() {
         navController.navigate(AppDestination.Settings.route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToNotifications() {
+        navController.navigate(AppDestination.Notification.route) {
             launchSingleTop = true
         }
     }
