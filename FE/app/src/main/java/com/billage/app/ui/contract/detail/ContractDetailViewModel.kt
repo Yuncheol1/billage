@@ -73,14 +73,6 @@ class ContractDetailViewModel @Inject constructor(
                     interestRate = interestRate,
                     clauses = clauses
                 )
-                contractRepository.updateContract(
-                    contractSeq,
-                    ContractUpdateRequest(
-                        principalAmount = principalAmount,
-                        interestRate = interestRate,
-                        clauses = clauses
-                    )
-                )
                 contractRepository.updateContract(contractSeq, request, roomId)
                 _updateSuccess.emit(true)
                 // 성공적으로 업데이트 후 상세 정보를 다시 불러옵니다

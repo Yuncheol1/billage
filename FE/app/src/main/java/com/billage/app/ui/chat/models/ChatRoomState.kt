@@ -1,6 +1,7 @@
 package com.billage.app.ui.chat.models
 
 import com.billage.app.data.remote.api.ContractDetailResponse
+import com.billage.app.domain.model.AiAnalysisResult
 
 /**
  * 채팅방의 현재 대화 모드를 정의합니다.
@@ -32,5 +33,8 @@ data class ChatRoomState(
     val isOpponentSigned: Boolean = false,
     val isSubmittingSignature: Boolean = false,
     val signatureErrorMessage: String? = null,
-    val signatureSuccessMessage: String? = null
+    val signatureSuccessMessage: String? = null,
+    val aiAnalysisResult: AiAnalysisResult? = null,
+    val rawAiAnalysisJson: String? = null,
+    val isAiAnalyzing: Boolean = false
 )
