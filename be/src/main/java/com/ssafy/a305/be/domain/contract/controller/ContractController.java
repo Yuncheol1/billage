@@ -4,6 +4,7 @@ import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractSignatureRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.response.AiClauseChatResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
 import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
@@ -251,5 +252,20 @@ public class ContractController {
                 "status", HttpStatus.OK.value(),
                 "message", "AI 분석 결과 조회 성공",
                 "data", analysisResult != null ? analysisResult : "분석 결과를 가져오지 못했습니다."));
+    }
+
+    @PostMapping("/{contractSeq}/clauses/from-chat")
+    public ResponseEntity<Map<String, Object>> generateClausesFromChat(
+            @AuthenticationPrincipal AuthenticatedUser authUser,
+            @PathVariable Integer contractSeq,
+            @RequestParam("roomId") String roomId) {
+
+        Integer userSeq = authUser.userSeq();
+        AiClauseChatResponseDto result = contractService.generateClausesFromChat(contractSeq, userSeq, roomId);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "AI 협의 내용이 생성되었습니다.",
+                "data", result));
     }
 }

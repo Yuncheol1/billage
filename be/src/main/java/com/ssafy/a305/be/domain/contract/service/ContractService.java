@@ -2,13 +2,15 @@ package com.ssafy.a305.be.domain.contract.service;
 
 import com.ssafy.a305.be.domain.account.entity.BankAccount;
 import com.ssafy.a305.be.domain.account.repository.BankAccountRepository;
+import com.ssafy.a305.be.domain.chat.repository.ChatMessageRepository;
 import com.ssafy.a305.be.domain.chat.service.ChatService;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseChatRequestDto;
+import com.ssafy.a305.be.domain.contract.dto.request.AiChatMessageDto;
+import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractDraftRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.request.ContractUpdateRequestDto;
-import com.ssafy.a305.be.domain.contract.dto.response.ContractDetailResponseDto;
-import com.ssafy.a305.be.domain.contract.dto.response.ContractDraftResponseDto;
-import com.ssafy.a305.be.domain.contract.dto.response.ContractListResponseDto;
+import com.ssafy.a305.be.domain.contract.dto.response.*;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.document.entity.Document;
@@ -24,20 +26,17 @@ import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.user.repository.UserRepository;
 import com.ssafy.a305.be.domain.user.repository.UserProfileRepository;
-import com.ssafy.a305.be.domain.contract.dto.request.AiClauseRequestDto;
 import com.ssafy.a305.be.domain.contract.dto.response.AiClauseResponseDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.math.BigDecimal;
 
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -62,6 +61,7 @@ public class ContractService {
     private final SimpMessageSendingOperations messagingTemplate;
     private final BankAccountRepository bankAccountRepository;
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final EntityManager entityManager;
 
     // AI 연동 서비스 (FastAPI 연동)
@@ -417,7 +417,7 @@ public class ContractService {
 
         // 첫 번째 특약에 AI 코멘트 추가
         if (!clauseDtos.isEmpty()) {
-            ContractUpdateRequestDto.ClauseUpdateDto firstClause = clauseDtos.get(0);
+            ContractUpdateRequestDto.ClauseUpdateDto firstClause = clauseDtos.getFirst();
             firstClause.setContent(firstClause.getContent() + " (AI 권장: 이자율 인하 및 원만한 상환 협의 권장)");
         }
 
@@ -491,17 +491,13 @@ public class ContractService {
             // N+1 해결된 메모리 맵에서 상대 실명 매핑
             String realName = realNameMap.getOrDefault(counterparty.getUserSeq(), counterparty.getEmail());
 
-            int totalSchedules = contract.getRepaymentSchedules().size();
-            int paidSchedules = (int) contract.getRepaymentSchedules().stream()
-                    .filter(s -> "PAID".equals(s.getStatus()))
-                    .count();
-
             return new ContractListResponseDto(
                     contract.getContractSeq(),
                     contract.getContractId(),
                     mappedRole,
                     realName,
                     contract.getPrincipalAmount(),
+                    contract.getInterestRate(),
                     contract.getRepaymentMethod(),
                     contract.getStatus(),
                     contract.getStartDt(),
@@ -865,5 +861,90 @@ public class ContractService {
         }
         
         return sb.toString();
+    }
+
+    @Transactional
+    public AiClauseChatResponseDto generateClausesFromChat(Integer contractSeq, Integer userSeq, String roomId) {
+        // 1. 계약 조회 및 권한 확인
+        Contract contract = contractRepository.findById(contractSeq)
+                .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "계약을 찾을 수 없습니다."));
+
+        if (!contract.getCreditor().getUserSeq().equals(userSeq) && 
+            !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "계약 당사자만 AI 협의를 요청할 수 있습니다.");
+        }
+
+        // 2. 채팅 내역 조회 (MongoDB)
+        List<com.ssafy.a305.be.domain.chat.entity.ChatMessage> chatHistory = 
+                chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId);
+
+        // 3. AI 요청 DTO 생성
+        List<AiChatMessageDto> aiMessages = chatHistory.stream()
+                .filter(msg -> "TEXT".equalsIgnoreCase(msg.getMsgType()) || "AI_CHAT".equalsIgnoreCase(msg.getMsgType()))
+                .map(msg -> {
+                    String role = "system";
+                    if (msg.getSenderSeq() != null) {
+                        if (msg.getSenderSeq().equals(contract.getCreditor().getUserSeq())) {
+                            role = "creditor";
+                        } else if (msg.getSenderSeq().equals(contract.getDebtor().getUserSeq())) {
+                            role = "debtor";
+                        }
+                    }
+                    return AiChatMessageDto.builder()
+                            .role(role)
+                            .content(msg.getContent())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        String contractContext = String.format(
+                "원금: %s원, 이자율: %s%%, 상환방식: %s",
+                contract.getPrincipalAmount(),
+                contract.getInterestRate().multiply(new BigDecimal("100")),
+                contract.getRepaymentMethod()
+        );
+
+        String templateType = Boolean.TRUE.equals(contract.getFamily()) ? "FAMILY_JEONSE" : "FRIEND_SMALL";
+
+        AiClauseChatRequestDto requestDto = AiClauseChatRequestDto.builder()
+                .chat_messages(aiMessages)
+                .contract_context(contractContext)
+                .template_type(templateType)
+                .build();
+
+        // 4. AI 서비스 호출
+        AiClauseChatResponseDto response = aiService.generateClausesFromChat(requestDto);
+
+        // 5. 결과가 있으면 aiDraftContent로 저장
+        if (response != null && !Boolean.TRUE.equals(response.getRejected()) && response.getClauses() != null) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                
+                // 프론트엔드 ContractDocumentFullScreen.kt의 ContractUpdateRequest 파싱 규격에 맞춤
+                Map<String, Object> frontendDraft = new HashMap<>();
+                frontendDraft.put("principalAmount", contract.getPrincipalAmount());
+                frontendDraft.put("interestRate", contract.getInterestRate());
+                
+                List<Map<String, Object>> clauses = response.getClauses().stream()
+                        .map(c -> {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put("clauseSeq", -1); // 신규 특약임을 나타냄
+                            map.put("content", String.format("[%s] %s", c.getTitle(), c.getLegalClause()));
+                            return map;
+                        })
+                        .collect(Collectors.toList());
+                frontendDraft.put("clauses", clauses);
+
+                String jsonResult = mapper.writeValueAsString(frontendDraft);
+                contract.setAiDraftContent(jsonResult);
+                contractRepository.save(contract);
+                
+                log.info("AI Clauses generated and saved for contract {}: {} clauses", contractSeq, response.getClauses().size());
+            } catch (Exception e) {
+                log.error("Failed to serialize AI clauses result", e);
+            }
+        }
+
+        return response;
     }
 }
