@@ -25,8 +25,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private static final String USER_STATE_ACTIVE = "ACTIVE";
-    private static final Set<String> WITHDRAWAL_BLOCKING_CONTRACT_STATUSES = Set.of("ACTIVE");
-
+    private static final Set<String> WITHDRAWAL_BLOCKING_CONTRACT_STATUSES = Set.of("SIGNED", "ACTIVE", "OVERDUE");
     private final UserRepository userRepository;
     private final ContractRepository contractRepository;
     private final SocialAuthRepository socialAuthRepository;
