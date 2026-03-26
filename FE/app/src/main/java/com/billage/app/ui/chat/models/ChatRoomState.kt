@@ -36,5 +36,7 @@ data class ChatRoomState(
     val signatureSuccessMessage: String? = null,
     val aiAnalysisResult: AiAnalysisResult? = null,
     val rawAiAnalysisJson: String? = null,
-    val isAiAnalyzing: Boolean = false
+    val isAiAnalyzing: Boolean = false,
+    val pendingAiClauses: List<com.billage.app.data.remote.api.AiClauseResponse>? = null,
+    val selectedClauseIndices: Set<Int> = emptySet()
 )

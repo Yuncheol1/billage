@@ -18,6 +18,8 @@ class AuthSessionStorage(context: Context) {
     fun getStoredFcmToken(): String? = preferences.getString(KEY_FCM_TOKEN, null)
 
     fun getUserState(): String? = preferences.getString(KEY_USER_STATE, null)
+    
+    fun getUserName(): String? = preferences.getString(KEY_USER_NAME, null)
 
     fun isBiometricLoginEnabled(): Boolean = preferences.getBoolean(KEY_BIOMETRIC_LOGIN_ENABLED, false)
 
@@ -70,6 +72,12 @@ class AuthSessionStorage(context: Context) {
         }
     }
 
+    fun saveUserName(name: String) {
+        preferences.edit {
+            putString(KEY_USER_NAME, name)
+        }
+    }
+
     fun updateUserState(userState: String) {
         preferences.edit {
             putString(KEY_USER_STATE, userState)
@@ -100,5 +108,6 @@ class AuthSessionStorage(context: Context) {
         private const val KEY_USER_STATE = "user_state"
         private const val KEY_BIOMETRIC_LOGIN_ENABLED = "biometric_login_enabled"
         private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_USER_NAME = "user_name"
     }
 }

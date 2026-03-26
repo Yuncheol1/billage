@@ -230,9 +230,9 @@ fun ConditionProposalCard(
                         color = BillagePrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    message.modifications.forEachIndexed { index, mod ->
+                    message.modifications.ifEmpty { listOf("특약사항 없음") }.forEachIndexed { index, mod ->
                         Text(
-                            text = "${index + 1}. $mod", 
+                            text = if (message.modifications.isEmpty()) mod else "제${index + 1}조 $mod", 
                             style = MaterialTheme.typography.bodySmall, 
                             color = BillageTextSecondary
                         )
@@ -564,8 +564,17 @@ fun AiProposalCard(
                     modifier = androidx.compose.ui.Modifier.size(18.dp)
                 )
                 Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                val headerText = when {
+                    message.isInitial && message.senderRole == "CREDITOR" -> 
+                        "😊 ${message.senderName ?: "상대방"}님이 돈을 빌려줬어요"
+                    message.isInitial && message.senderRole == "DEBTOR" -> 
+                        "😊 ${message.senderName ?: "상대방"}님이 돈을 요청했어요"
+                    message.isInitial -> "😊 소중한 거래 제안이 도착했어요."
+                    else -> "\uD83E\uDD16 AI 수정 제안 도착"
+                }
+
                 Text(
-                    text = if (message.isInitial) "😊 소중한 거래 제안이 도착했어요." else "\uD83E\uDD16 AI 수정 제안 도착",
+                    text = headerText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = BillageTextPrimary
@@ -633,19 +642,36 @@ fun AiProposalCard(
                     
                     if (!message.isInitial && message.modifications.isNotEmpty()) {
                         Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
-                        message.modifications.filter { it.isNotBlank() }.forEach { mod ->
+                        val filteredMods = message.modifications.filter { it.isNotBlank() }
+                        if (filteredMods.isEmpty()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 androidx.compose.foundation.layout.Box(
                                     modifier = androidx.compose.ui.Modifier
                                         .size(4.dp)
-                                        .background(BillagePrimary, androidx.compose.foundation.shape.CircleShape)
+                                        .background(BillageTextSecondary, androidx.compose.foundation.shape.CircleShape)
                                 )
                                 Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
                                 Text(
-                                    text = mod,
+                                    text = "특약사항 없음",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = BillageTextSecondary
                                 )
+                            }
+                        } else {
+                            filteredMods.forEachIndexed { index, mod ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = androidx.compose.ui.Modifier
+                                            .size(4.dp)
+                                            .background(BillagePrimary, androidx.compose.foundation.shape.CircleShape)
+                                    )
+                                    Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                                    Text(
+                                        text = "제${index + 1}조 $mod",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = BillageTextSecondary
+                                    )
+                                }
                             }
                         }
                     }

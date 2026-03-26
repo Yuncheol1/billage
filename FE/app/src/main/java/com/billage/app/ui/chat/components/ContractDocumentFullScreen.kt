@@ -650,7 +650,14 @@ fun DocumentDiffView(
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (proposal?.clauses.isNullOrEmpty()) {
+        val displayClauses = if (!proposal?.clauses.isNullOrEmpty()) {
+            proposal?.clauses ?: emptyList()
+        } else {
+            // proposal.clauses가 없거나 비어있으면 원본 특약을 보여주어 '변경 없음' 상태임을 알림
+            detail?.clauses ?: emptyList()
+        }
+        
+        if (displayClauses.isEmpty()) {
             Text("설정된 특약사항이 없습니다.", fontSize = 14.sp, color = BillageTextSecondary, modifier = Modifier.padding(vertical = 16.dp))
         } else {
             Text("본 계약의 각 조항은 다음과 같이 구성되며, 채권자와 채무자 '$counterparty'는 상기 요약 정보와 아래 조항에 동의한다.", fontSize = 14.sp, color = BillageTextPrimary, lineHeight = 22.sp)
@@ -659,10 +666,22 @@ fun DocumentDiffView(
         Spacer(modifier = Modifier.height(24.dp))
         
         // 특약사항들 (번호는 1조부터 다시 매김)
-        proposal?.clauses?.forEachIndexed { index, propClause ->
-            val origClause = detail?.clauses?.find { it.clauseSeq == propClause.clauseSeq }
-            val isModified = origClause != null && origClause.content.trim() != propClause.content.trim()
-            val isNew = origClause == null
+        displayClauses.forEachIndexed { index, propClauseOrDetail ->
+            // propClauseOrDetail은 ClauseUpdateDto이거나 ClauseDetailDto일 수 있음 (둘 다 content 가짐)
+            val clauseContent = when (propClauseOrDetail) {
+                is com.billage.app.data.remote.api.ClauseUpdateDto -> propClauseOrDetail.content
+                is com.billage.app.data.remote.api.ClauseDetailDto -> propClauseOrDetail.content
+                else -> ""
+            }
+            val clauseSeq = when (propClauseOrDetail) {
+                is com.billage.app.data.remote.api.ClauseUpdateDto -> propClauseOrDetail.clauseSeq
+                is com.billage.app.data.remote.api.ClauseDetailDto -> propClauseOrDetail.clauseSeq
+                else -> -1
+            }
+
+            val origClause = detail?.clauses?.find { it.clauseSeq == clauseSeq }
+            val isModified = origClause != null && origClause.content.trim() != clauseContent.trim()
+            val isNew = origClause == null && proposal?.clauses?.any { (it as? com.billage.app.data.remote.api.ClauseUpdateDto)?.clauseSeq == clauseSeq } == true
 
             Text(
                 text = "제${index + 1}조 (특약)${if (isNew) " [신규]" else if (isModified) " [수정됨]" else ""}", 
@@ -675,14 +694,14 @@ fun DocumentDiffView(
                 Text(buildAnnotatedString {
                     withStyle(delStyle) { append(origClause!!.content) }
                     append("\n")
-                    withStyle(addStyle) { append(propClause.content) }
+                    withStyle(addStyle) { append(clauseContent) }
                 }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp))
             } else if (isNew) {
                 Text(buildAnnotatedString {
-                    withStyle(addStyle) { append(propClause.content) }
+                    withStyle(addStyle) { append(clauseContent) }
                 }, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp))
             } else {
-                Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
+                Text(clauseContent, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
@@ -734,10 +753,18 @@ fun DocumentOriginalView(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        proposal?.clauses?.forEachIndexed { index, propClause ->
-            Text("제${index + 1}조 (특약)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BillageTextPrimary)
-            Text(propClause.content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
-            Spacer(modifier = Modifier.height(20.dp))
+        val displayClauses = proposal?.clauses?.map { it.content } 
+            ?: detail?.clauses?.map { it.content } 
+            ?: emptyList()
+        
+        if (displayClauses.isEmpty()) {
+            Text("설정된 특약사항이 없습니다.", fontSize = 14.sp, color = BillageTextSecondary, modifier = Modifier.padding(vertical = 16.dp))
+        } else {
+            displayClauses.forEachIndexed { index, content ->
+                Text("제${index + 1}조 (특약)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BillageTextPrimary)
+                Text(content, fontSize = 14.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp), color = BillageTextPrimary)
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
         // 2. AI 분석 리포트

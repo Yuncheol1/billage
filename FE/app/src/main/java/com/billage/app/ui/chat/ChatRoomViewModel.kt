@@ -37,6 +37,7 @@ import javax.inject.Inject
 class ChatRoomViewModel @Inject constructor(
     private val chatApi: ChatApi,
     private val contractApi: ContractApi,
+    private val userApi: com.billage.app.data.remote.api.UserApi,
     private val chatRepository: ChatRepository,
     private val contractRepository: ContractRepository,
     private val authSessionStorage: AuthSessionStorage
@@ -113,12 +114,34 @@ class ChatRoomViewModel @Inject constructor(
                             // STOMP 세션이 준비될 때까지 대기 (메시지 유실 방지)
                             val session = chatRepository.session.filterNotNull().first()
                             
+                            // 실명 로드
+                            var senderName = authSessionStorage.getUserName()
+                            if (senderName == null) {
+                                try {
+                                    val userRes = userApi.getMyInfo()
+                                    if (userRes.status == 200) {
+                                        senderName = userRes.data.realName
+                                        senderName?.let { authSessionStorage.saveUserName(it) }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to fetch user name", e)
+                                }
+                            }
+
+                            val originalPrincipal = detail.principalAmount ?: 0.0
                             val originalInterest = detail.interestRate ?: 0.0
+                            
+                            val senderRole = detail.myRole ?: "CREDITOR"
+
                             val payload = AiProposalPayload(
                                 contractTitle = "빌리지 거래 제안서",
                                 contractSeq = detail.contractSeq,
+                                originalPrincipal = originalPrincipal,
+                                proposedPrincipal = originalPrincipal,
                                 originalInterestRate = originalInterest,
                                 proposedInterestRate = originalInterest,
+                                senderRole = senderRole,
+                                senderName = senderName ?: "나",
                                 modifications = emptyList(),
                                 isInitial = true
                             )
@@ -225,9 +248,18 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun sendMessage(content: String) {
-        val currentRoomId = _chatRoomState.value.roomId
+        val currentState = _chatRoomState.value
+        val currentRoomId = currentState.roomId
         if (currentRoomId.isEmpty() || content.isBlank()) return
-        chatRepository.sendMessage(currentRoomId, myUserSeq, content)
+        
+        // 협의 모드일 때는 isContractMsg = true 로 보내어 나중에 AI가 분석할 수 있게 함
+        val isContractMsg = currentState.mode == ChatRoomMode.CONTRACT
+        chatRepository.sendMessage(
+            roomId = currentRoomId, 
+            senderSeq = myUserSeq, 
+            content = content,
+            isContractMsg = isContractMsg
+        )
     }
 
     fun setModificationMode(contract: ContractListResponse) {
@@ -249,13 +281,6 @@ class ChatRoomViewModel @Inject constructor(
         _chatRoomState.update { it.copy(mode = mode) }
     }
 
-    fun exitModificationMode() {
-        _chatRoomState.update { it.copy(
-            mode = ChatRoomMode.NORMAL,
-            selectedContract = null,
-            draftProposal = null
-        )}
-    }
 
     fun requestAiProposal() {
         val contract = _chatRoomState.value.selectedContract ?: return
@@ -284,11 +309,16 @@ class ChatRoomViewModel @Inject constructor(
                         val originalPrincipal = updatedContract.principalAmount ?: 0.0
                         val originalInterest = updatedContract.interestRate ?: 0.0
                         
-                        val (proposedPrincipal, proposedInterest) = try {
-                            val req = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                        val req = try {
+                            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
                                 .decodeFromString<com.billage.app.data.remote.api.ContractUpdateRequest>(updatedContract.aiDraftContent)
+                        } catch (e: Exception) { null }
+
+                        val (proposedPrincipal, proposedInterest) = if (req != null) {
                             (req.principalAmount ?: originalPrincipal) to (req.interestRate ?: originalInterest)
-                        } catch (e: Exception) { originalPrincipal to originalInterest }
+                        } else {
+                            originalPrincipal to originalInterest
+                        }
 
                         val modifications = mutableListOf<String>()
                         if (originalPrincipal != proposedPrincipal) {
@@ -298,8 +328,27 @@ class ChatRoomViewModel @Inject constructor(
                             modifications.add(String.format("이자율 조정 제안: %.2f%% → %.2f%%", originalInterest * 100, proposedInterest * 100))
                         }
                         
+                        // 특약 사항도 modifications 에 번호(조) 붙여서 추가
+                        req?.clauses?.forEachIndexed { index, clause ->
+                            modifications.add("제${index + 1}조 (특약) ${clause.content.take(20)}${if (clause.content.length > 20) "..." else ""}")
+                        }
+
                         if (modifications.isEmpty()) {
                             modifications.add("계약 조건 검토 제안")
+                        }
+
+                        val detail = _chatRoomState.value.draftContractDetail
+                        val senderRole = detail?.myRole ?: "CREDITOR"
+                        
+                        var senderName = authSessionStorage.getUserName()
+                        if (senderName == null) {
+                            try {
+                                val userRes = userApi.getMyInfo()
+                                if (userRes.status == 200) {
+                                    senderName = userRes.data.realName
+                                    senderName?.let { authSessionStorage.saveUserName(it) }
+                                }
+                            } catch (e: Exception) {}
                         }
 
                         // content = JSON 페이로드, msgType = AI_PROPOSAL
@@ -310,6 +359,8 @@ class ChatRoomViewModel @Inject constructor(
                             proposedPrincipal = proposedPrincipal,
                             originalInterestRate = originalInterest,
                             proposedInterestRate = proposedInterest,
+                            senderRole = senderRole,
+                            senderName = senderName ?: "나",
                             modifications = modifications,
                             isInitial = false
                         )
@@ -329,6 +380,125 @@ class ChatRoomViewModel @Inject constructor(
                 Log.e(TAG, "Failed to request AI proposal", e)
             }
         }
+    }
+
+    /**
+     * AI 협의 모드로 진입합니다. (협의할 차용증 선택 직후 호출)
+     */
+    fun startAiNegotiation(summary: ContractSummary) {
+        _chatRoomState.update { 
+            it.copy(
+                mode = ChatRoomMode.CONTRACT,
+                selectedContract = summary,
+                pendingAiClauses = null,
+                selectedClauseIndices = emptySet()
+            ) 
+        }
+    }
+
+    /**
+     * 지금까지의 대화(isContractMsg=true)를 바탕으로 AI 특약 분석을 요청합니다.
+     */
+    fun analyzeCurrentNegotiation() {
+        val currentState = _chatRoomState.value
+        val roomId = currentState.roomId
+        val contract = currentState.selectedContract ?: return
+        
+        viewModelScope.launch {
+            _chatRoomState.update { it.copy(isAiAnalyzing = true) }
+            try {
+                val res = contractApi.generateClausesFromChat(contract.contractSeq, roomId)
+                if (res.status == 200 && res.data != null) {
+                    val clauses = res.data.clauses ?: emptyList()
+                    _chatRoomState.update { 
+                        it.copy(
+                            pendingAiClauses = clauses,
+                            selectedClauseIndices = clauses.indices.toSet() // 기본으로 전체 선택
+                        ) 
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to analyze negotiation", e)
+            } finally {
+                _chatRoomState.update { it.copy(isAiAnalyzing = false) }
+            }
+        }
+    }
+
+    /**
+     * AI가 제안된 특약 중 특정 항목의 선택 여부를 토글합니다.
+     */
+    fun toggleClauseSelection(index: Int) {
+        _chatRoomState.update { state ->
+            val current = state.selectedClauseIndices.toMutableSet()
+            if (current.contains(index)) current.remove(index) else current.add(index)
+            state.copy(selectedClauseIndices = current)
+        }
+    }
+
+    /**
+     * 선택된 AI 특약들을 확정하여 채팅방에 제안(PROPOSAL)으로 보냅니다.
+     */
+    fun applySelectedAiClauses() {
+        val state = _chatRoomState.value
+        val contract = state.selectedContract ?: return
+        val pending = state.pendingAiClauses ?: return
+        val selected = state.selectedClauseIndices
+        val roomId = state.roomId
+
+        if (selected.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                // 1. 로컬 계약 정보 갱신 (백엔드에서 이미 aiDraftContent가 저장됨 - analyze 시점에)
+                fetchContractDetail(contract.contractSeq)
+
+                // 2. 선택된 조항들만 추려서 채팅 메시지 생성
+                val modifications = mutableListOf<String>()
+                pending.filterIndexed { index, _ -> selected.contains(index) }
+                    .forEachIndexed { idx, clause ->
+                        modifications.add("제${idx + 1}조 (특약) ${clause.legalClause}")
+                    }
+
+                val payload = AiProposalPayload(
+                    contractTitle = "${contract.counterpartyName}님과의 거래 제안(AI)",
+                    contractSeq = contract.contractSeq,
+                    originalPrincipal = 0.0,
+                    proposedPrincipal = 0.0,
+                    originalInterestRate = 0.0,
+                    proposedInterestRate = 0.0,
+                    modifications = modifications,
+                    isInitial = false
+                )
+
+                val contentJson = kotlinx.serialization.json.Json.encodeToString(
+                    AiProposalPayload.serializer(), payload
+                )
+
+                chatRepository.sendMessage(
+                    roomId = roomId,
+                    senderSeq = myUserSeq,
+                    content = contentJson,
+                    isContractMsg = true,
+                    msgType = "AI_PROPOSAL"
+                )
+                
+                // 3. 협의 모드 종료
+                exitModificationMode()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to apply AI clauses", e)
+            }
+        }
+    }
+
+    fun exitModificationMode() {
+        _chatRoomState.update { it.copy(
+            mode = ChatRoomMode.NORMAL,
+            selectedContract = null,
+            draftProposal = null,
+            pendingAiClauses = null,
+            selectedClauseIndices = emptySet()
+        )}
     }
 
     fun submitProposal() {
