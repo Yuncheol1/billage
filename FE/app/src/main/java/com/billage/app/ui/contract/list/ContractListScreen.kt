@@ -36,10 +36,13 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.fragment.app.FragmentActivity
+import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.ui.common.AddContractBottomSheet
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
@@ -74,6 +77,8 @@ fun ContractListScreen(
     menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: ContractListViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
     val uiState by viewModel.uiState.collectAsState()
     LaunchedEffect(Unit) {
         viewModel.refreshUnreadCount()
@@ -116,6 +121,32 @@ fun ContractListScreen(
             (selectedRole == ContractRoleFilter.All || contract.role == selectedRole) &&
             (selectedStatus == ContractStatusFilter.All || contract.status == selectedStatus)
         }
+    }
+
+    fun requestDeleteWithBiometric(contractId: Int) {
+        if (activity == null) {
+            scope.launch {
+                snackbarHostState.showSnackbar("생체 인증을 사용할 수 없는 화면입니다.")
+            }
+            return
+        }
+
+        BiometricLoginManager.prompt(
+            activity = activity,
+            onSuccess = { viewModel.deleteContract(contractId) },
+            onError = { message ->
+                if (message.isNotBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar(message) }
+                }
+            },
+            onEnrollmentRequired = {
+                scope.launch {
+                    snackbarHostState.showSnackbar("삭제하려면 기기에서 지문 인증을 먼저 설정해주세요.")
+                }
+            },
+            title = "계약 삭제",
+            subtitle = "삭제하려면 지문 인증이 필요합니다."
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -221,7 +252,7 @@ fun ContractListScreen(
                                 contract = contract,
                                 onDetailClick = { onContractDetailClick(contract.id) },
                                 onDeleteClick = if (contract.status == ContractStatusFilter.Signing) {
-                                    { viewModel.deleteContract(contract.id) }
+                                    { requestDeleteWithBiometric(contract.id) }
                                 } else null
                             )
                         }

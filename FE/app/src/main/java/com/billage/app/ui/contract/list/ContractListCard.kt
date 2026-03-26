@@ -219,7 +219,7 @@ fun ContractListCard(
 
                 // ── 하단 버튼 행 ──────────────────────────────────
                 if (onDeleteClick != null) {
-                    // DRAFT / NEGOTIATING: 삭제 버튼 + 상세 보기 버튼 분할
+                    // DRAFT / NEGOTIATING: 좌측 상세 보기 + 우측 삭제
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -229,28 +229,6 @@ fun ContractListCard(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { showDeleteDialog = true }
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "계약 삭제",
-                                tint = BillageDanger,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "삭제",
-                                color = BillageDanger,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        VerticalDivider(color = BillageDivider, thickness = 1.dp)
-                        Row(
-                            modifier = Modifier
-                                .weight(2f)
                                 .clickable(onClick = onDetailClick)
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -273,6 +251,27 @@ fun ContractListCard(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = null,
                                 tint = BillagePrimary
+                            )
+                        }
+                        VerticalDivider(color = BillageDivider, thickness = 1.dp)
+                        Row(
+                            modifier = Modifier
+                                .clickable { showDeleteDialog = true }
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "계약 삭제",
+                                tint = BillageDanger,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "삭제",
+                                color = BillageDanger,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
