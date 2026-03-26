@@ -362,7 +362,7 @@ private fun DirectInputSection(
                         Text(text = "✨", fontSize = 12.sp)
                     }
                     Text(
-                        text = if (isLoading) "저장 중..." else "AI 변환",
+                        text = if (isLoading) "변환 중..." else "AI 변환",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
