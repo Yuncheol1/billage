@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.LaunchedEffect
 import com.billage.app.ui.chat.security.SecurityTestBed
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -70,6 +71,7 @@ fun ChatListScreen(
     onInsightListClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onChatBotClick: () -> Unit = {},
     menuProfileState: MenuProfileState = MenuProfileState()
 ) {
     val rooms by viewModel.rooms.collectAsState()
@@ -313,6 +315,33 @@ fun ChatListScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // AI ChatBot FAB
+        FloatingActionButton(
+            onClick = onChatBotClick,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 100.dp),
+            containerColor = BillagePrimary,
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "AI 상담",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                )
             }
         }
 
