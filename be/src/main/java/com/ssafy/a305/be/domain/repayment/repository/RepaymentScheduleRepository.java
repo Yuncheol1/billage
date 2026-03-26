@@ -42,4 +42,5 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("scheduleStatuses") Collection<String> scheduleStatuses,
             @Param("contractStatuses") Collection<String> contractStatuses
     );
+    List<RepaymentSchedule> findAllByContractContractSeqOrderByInstallmentNoAsc(Integer contractSeq);
 }
