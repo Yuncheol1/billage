@@ -37,7 +37,7 @@ internal fun HeroSection(
         status == "ACTIVE" && dday == "만기 초과"    -> BillageDanger
         status == "ACTIVE" && dday == "오늘 만기"    -> BillageWarning
         status == "ACTIVE"                           -> BillagePrimary
-        status == "COMPLETED"                        -> BillageSuccess
+        status == "COMPLETED" || status == "CLOSED" -> BillageSuccess
         status == "CANCELLED"                        -> BillageDanger
         else                                         -> BillagePrimary
     }
@@ -47,7 +47,7 @@ internal fun HeroSection(
         status == "ACTIVE" && dday == "만기 초과"    -> "만기 초과"
         status == "ACTIVE" && dday == "오늘 만기"    -> "오늘 만기"
         status == "ACTIVE"                           -> "계약 중"
-        status == "COMPLETED"                        -> "완료"
+        status == "COMPLETED" || status == "CLOSED" -> "계약 종료"
         status == "CANCELLED"                        -> "취소됨"
         else                                         -> "계약"
     }
@@ -60,7 +60,7 @@ internal fun HeroSection(
             null        -> "든든한 계약이\n진행 중이에요"
             else        -> "${dday}일 남았어요"
         }
-        "COMPLETED" -> "성공적으로\n마무리된 계약이에요"
+        "COMPLETED", "CLOSED" -> "성공적으로\n마무리된 계약이에요"
         "CANCELLED" -> "취소된 계약이에요"
         else        -> "계약이 진행 중이에요"
     }
@@ -72,7 +72,7 @@ internal fun HeroSection(
             "오늘 만기" -> "오늘이 마지막 상환일이에요"
             else        -> "약속한 날짜에 상환이 이루어집니다"
         }
-        "COMPLETED" -> "모든 상환 및 거래가 완료되었습니다"
+        "COMPLETED", "CLOSED" -> "모든 상환 및 거래가 종료되었습니다"
         "CANCELLED" -> "계약이 취소 또는 거절되었습니다"
         else        -> ""
     }
@@ -100,7 +100,7 @@ internal fun HeroSection(
             )
         }
 
-        if (status == "COMPLETED") {
+        if (status == "COMPLETED" || status == "CLOSED") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
