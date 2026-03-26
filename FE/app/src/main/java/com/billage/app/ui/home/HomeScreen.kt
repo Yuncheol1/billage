@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.common.AddContractBottomSheet
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
@@ -191,114 +192,12 @@ fun HomeScreen(
 
     // 계약 만들기 타입 선택 바텀시트
     if (showContractTypeSheet) {
-        ContractTypeBottomSheet(
+        AddContractBottomSheet(
             onDismiss = { showContractTypeSheet = false },
             onSelect = { role ->
                 showContractTypeSheet = false
                 onAddContractClick(role)
             }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ContractTypeBottomSheet(
-    onDismiss: () -> Unit,
-    onSelect: (ContractRole) -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState()
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = BillageSurface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
-        ) {
-            Text(
-                text = "계약 만들기",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = BillageTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            ContractTypeItem(
-                emoji = "🤝",
-                title = "돈 빌려주기",
-                description = "차용증을 생성하고 상환 일정을 관리해요",
-                onClick = { onSelect(ContractRole.CREDITOR) }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            ContractTypeItem(
-                emoji = "🙏",
-                title = "돈 빌리기",
-                description = "차용 요청을 보내고 계약을 진행해요",
-                onClick = { onSelect(ContractRole.DEBTOR) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ContractTypeItem(
-    emoji: String,
-    title: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = BillageBackground,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable { onClick() }
-            .padding(20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .background(
-                    color = BillagePrimaryLight,
-                    shape = RoundedCornerShape(14.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = emoji, fontSize = 26.sp)
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = BillageTextPrimary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = description,
-                fontSize = 13.sp,
-                color = BillageTextSecondary,
-                lineHeight = 18.sp
-            )
-        }
-
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = BillageTextSecondary
         )
     }
 }
