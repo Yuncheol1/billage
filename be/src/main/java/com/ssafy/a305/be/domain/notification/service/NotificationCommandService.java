@@ -111,13 +111,15 @@ public class NotificationCommandService {
 
     @Transactional
     public void sendContractClosedNotifications(Contract contract) {
+        RepaymentSchedule representativeSchedule = resolveRepresentativeSchedule(contract);
+
         sendNotification(
                 contract.getCreditor(),
                 "CONTRACT_CLOSED_CREDITOR",
                 "계약이 완료되었어요",
                 "모든 상환이 완료되어 계약이 종료되었어요.",
                 contract,
-                null,
+                representativeSchedule,
                 Map.of(
                         "type", "CONTRACT",
                         "eventKey", "CONTRACT_CLOSED_CREDITOR",
@@ -131,7 +133,7 @@ public class NotificationCommandService {
                 "계약이 완료되었어요",
                 "모든 상환이 완료되어 계약이 종료되었어요.",
                 contract,
-                null,
+                representativeSchedule,
                 Map.of(
                         "type", "CONTRACT",
                         "eventKey", "CONTRACT_CLOSED_DEBTOR",

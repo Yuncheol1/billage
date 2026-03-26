@@ -1,7 +1,9 @@
 package com.ssafy.a305.be.domain.repayment.repository;
 
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +14,7 @@ import java.util.Optional;
 
 public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSchedule, Integer> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select rs
             from RepaymentSchedule rs
