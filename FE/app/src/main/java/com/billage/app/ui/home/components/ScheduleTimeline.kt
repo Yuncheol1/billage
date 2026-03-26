@@ -17,6 +17,15 @@ import com.billage.app.ui.theme.*
 
 @Composable
 fun ScheduleTimeline(schedules: List<ScheduleItem>) {
+    if (schedules.isEmpty()) {
+        Text(
+            text = "다가오는 일정이 없습니다.",
+            color = BillageTextSecondary,
+            fontSize = 14.sp
+        )
+        return
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         schedules.forEachIndexed { index, schedule ->
             ScheduleTimelineItem(
