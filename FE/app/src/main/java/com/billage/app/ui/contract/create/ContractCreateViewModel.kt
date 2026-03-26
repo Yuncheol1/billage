@@ -309,17 +309,30 @@ class ContractCreateViewModel @Inject constructor(
 
     fun calculateTotalInstallments(): Int? {
         val method = _formState.value.repaymentMethod ?: return null
-        if (method == RepaymentMethod.LUMP_SUM) return null
-
+        
         val start = runCatching { LocalDate.parse(_formState.value.startDate) }.getOrNull() ?: return null
         val end = runCatching { LocalDate.parse(_formState.value.endDate) }.getOrNull() ?: return null
-        val months = ChronoUnit.MONTHS.between(start, end).toInt()
+        
+        // 개월 수 차이 계산
+        val monthsBetween = ChronoUnit.MONTHS.between(start, end).toInt()
+        
+        // 종료일의 일자가 시작일의 일자보다 작으면(예: 1/15 ~ 3/10) 
+        // ChronoUnit.MONTHS는 1개월로 계산되지만, 이자 지급을 위해 2개월로 올림 처리
+        val totalMonths = if (end.dayOfMonth < start.dayOfMonth) {
+            monthsBetween + 1
+        } else {
+            monthsBetween
+        }
+        
+        // 최소 1회 보장
+        val finalInstallments = if (totalMonths <= 0) 1 else totalMonths
 
         return when (method) {
-            RepaymentMethod.MONTHLY -> months
-            RepaymentMethod.QUARTERLY -> months / 3
-            RepaymentMethod.SEMI_ANNUAL -> months / 6
-            RepaymentMethod.ANNUAL -> months / 12
+            RepaymentMethod.LUMP_SUM -> finalInstallments
+            RepaymentMethod.MONTHLY -> finalInstallments
+            RepaymentMethod.QUARTERLY -> (finalInstallments / 3).coerceAtLeast(1)
+            RepaymentMethod.SEMI_ANNUAL -> (finalInstallments / 6).coerceAtLeast(1)
+            RepaymentMethod.ANNUAL -> (finalInstallments / 12).coerceAtLeast(1)
             else -> null
         }
     }
