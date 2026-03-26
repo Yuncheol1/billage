@@ -553,8 +553,8 @@ public class ContractService {
     //(LUMP_SUM =일시상환/ MONTHLY =1달마다/ QUARTERLY=3개월마다 / SEMI_ANNUAL=6개월마다 / ANNUAL=1년마다)
     private void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
         String method = request.getRepaymentMethod();
-
-        if ("LUMP_SUM".equals(method)) {
+        BigDecimal interestRating=request.getInterestRate();
+        if ("LUMP_SUM".equals(method)&&interestRating.compareTo(BigDecimal.ZERO) != 0) {
             int installments = request.getTotalInstallments();
             
             BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt());
@@ -592,7 +592,24 @@ public class ContractService {
                 contract.addRepaymentSchedule(schedule);
             }
 
-        } else {
+        } else if("LUMP_SUM".equals(method)&&interestRating.compareTo(BigDecimal.ZERO) == 0){
+            RepaymentSchedule schedule = RepaymentSchedule.builder()
+                    .contract(contract)
+                    .installmentNo(1)
+                    .dueDt(contract.getEndDt())
+                    .principalDue(request.getPrincipalAmount())
+                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                            request.getStartDt(), request.getEndDt()))
+                    .totalDue(request.getPrincipalAmount()
+                            .add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
+                                    request.getStartDt(), request.getEndDt())))
+                    .status("NONPAID")
+                    .createdDttm(LocalDateTime.now())
+                    .build();
+            contract.addRepaymentSchedule(schedule);
+        }
+
+        else {
             int intervalMonths = switch (method) {
                 case "MONTHLY" -> 1;
                 case "QUARTERLY" -> 3;
