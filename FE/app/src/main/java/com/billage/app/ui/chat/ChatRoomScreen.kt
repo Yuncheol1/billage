@@ -131,56 +131,12 @@ fun ChatRoomScreen(
 
     Scaffold(
         topBar = {
-            ChatTopBar(
-                title = state.roomName,
-                onBackClick = onBackClick
-            )
-        },
-        bottomBar = {
-            ChatBottomInputBar(
-                mode = state.mode,
-                inputText = inputText,
-                onValueChange = { 
-                    if (it.length <= 255) {
-                        inputText = it 
-                    }
-                },
-                onSendClick = {
-                    if (inputText.isNotBlank() && inputText.length <= 255) {
-                        onSendMessage(inputText)
-                        inputText = ""
-                    }
-                },
-                onAddClick = {
-                    actionSheetState = "MENU"
-                    showActionSheet = true
-                    onAddMenuClick() // 기존 콜백도 유지
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // 1. 메인 메시지 영역 (상단바와 하단바/키보드 높이만큼 패딩 적용)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        top = paddingValues.calculateTopPadding(),
-                        bottom = paddingValues.calculateBottomPadding()
-                    )
-            ) {
-                messageListContent()
-            }
-
-            // 2. 상단 고정 안내 배너들 (상단바 패딩만 적용, 키보드 영향을 받지 않도록 별도 배치)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = paddingValues.calculateTopPadding())
-                    .align(Alignment.TopCenter)
-            ) {
+            Column {
+                ChatTopBar(
+                    title = state.roomName,
+                    onBackClick = onBackClick
+                )
+                
                 // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
                 com.billage.app.ui.chat.components.SignatureBanner(
                     isVisible = shouldShowSignatureBanner,
@@ -215,6 +171,36 @@ fun ChatRoomScreen(
                     )
                 }
             }
+        },
+        bottomBar = {
+            ChatBottomInputBar(
+                mode = state.mode,
+                inputText = inputText,
+                onValueChange = { 
+                    if (it.length <= 255) {
+                        inputText = it 
+                    }
+                },
+                onSendClick = {
+                    if (inputText.isNotBlank() && inputText.length <= 255) {
+                        onSendMessage(inputText)
+                        inputText = ""
+                    }
+                },
+                onAddClick = {
+                    actionSheetState = "MENU"
+                    showActionSheet = true
+                    onAddMenuClick() // 기존 콜백도 유지
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            messageListContent()
         }
     }
 

@@ -620,7 +620,7 @@ fun AiProposalCard(
                             if (!message.isInitial && message.originalInterestRate != null && 
                                 message.originalInterestRate != message.proposedInterestRate) {
                                 Text(
-                                    text = "%.2f%%".format(message.originalInterestRate),
+                                    text = "%.2f%%".format(message.originalInterestRate * 100),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = BillageTextSecondary,
                                     textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
@@ -632,7 +632,7 @@ fun AiProposalCard(
                                 )
                             }
                             Text(
-                                text = "%.2f%%".format(message.proposedInterestRate),
+                                text = "%.2f%%".format((message.proposedInterestRate ?: 0.0) * 100),
                                 style = if (message.isInitial) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                                 color = BillagePrimary,
                                 fontWeight = FontWeight.Bold
