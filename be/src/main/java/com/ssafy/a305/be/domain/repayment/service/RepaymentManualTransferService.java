@@ -1,6 +1,7 @@
 package com.ssafy.a305.be.domain.repayment.service;
 
 import com.ssafy.a305.be.domain.contract.entity.Contract;
+import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentSchedulePaidResponseDto;
 import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentScheduleTransferResponseDto;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
@@ -29,6 +30,7 @@ public class RepaymentManualTransferService {
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
     private final SsafyTransferApiClient ssafyTransferApiClient;
+    private final NotificationCommandService notificationCommandService;
 
     @Transactional
     public RepaymentScheduleTransferResponseDto transferRepaymentSchedule(
@@ -86,6 +88,7 @@ public class RepaymentManualTransferService {
         );
 
         schedule.markPaid(LocalDateTime.now());
+        notificationCommandService.sendRepaymentPaidNotifications(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 
         return new RepaymentScheduleTransferResponseDto(
@@ -123,6 +126,7 @@ public class RepaymentManualTransferService {
         }
 
         schedule.markManualPaid(LocalDateTime.now());
+        notificationCommandService.sendRepaymentPaidNotifications(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 
         return new RepaymentSchedulePaidResponseDto(
@@ -149,6 +153,7 @@ public class RepaymentManualTransferService {
 
         if (allSchedulesCompleted) {
             contract.markClosed(LocalDateTime.now());
+            notificationCommandService.sendContractClosedNotifications(contract);
         }
     }
 
