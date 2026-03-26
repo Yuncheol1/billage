@@ -6,8 +6,10 @@ import com.billage.app.data.remote.PdfDownloader
 import com.billage.app.data.remote.api.ClauseUpdateDto
 import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractUpdateRequest
+import com.billage.app.data.remote.api.RepaymentScheduleItem
 import com.billage.app.data.remote.api.UserApi
 import com.billage.app.data.repository.ContractRepository
+import com.billage.app.data.repository.RepaymentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ sealed class PdfDownloadState {
 @HiltViewModel
 class ContractDetailViewModel @Inject constructor(
     private val contractRepository: ContractRepository,
+    private val repaymentRepository: RepaymentRepository,
     private val userApi: UserApi,
     private val pdfDownloader: PdfDownloader
 ) : ViewModel() {
@@ -40,11 +43,32 @@ class ContractDetailViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _repaymentSchedules = MutableStateFlow<List<RepaymentScheduleItem>>(emptyList())
+    val repaymentSchedules: StateFlow<List<RepaymentScheduleItem>> = _repaymentSchedules.asStateFlow()
+
+    private val _isTimelineLoading = MutableStateFlow(false)
+    val isTimelineLoading: StateFlow<Boolean> = _isTimelineLoading.asStateFlow()
+
+    private val _timelineErrorMessage = MutableStateFlow<String?>(null)
+    val timelineErrorMessage: StateFlow<String?> = _timelineErrorMessage.asStateFlow()
+
+    private val _activeActionScheduleSeq = MutableStateFlow<Int?>(null)
+    val activeActionScheduleSeq: StateFlow<Int?> = _activeActionScheduleSeq.asStateFlow()
+
     private val _myName = MutableStateFlow("나")
     val myName: StateFlow<String> = _myName.asStateFlow()
 
     private val _myProfileImageUrl = MutableStateFlow<String?>(null)
     val myProfileImageUrl: StateFlow<String?> = _myProfileImageUrl.asStateFlow()
+
+    private val _contractHtml = MutableStateFlow<String?>(null)
+    val contractHtml: StateFlow<String?> = _contractHtml.asStateFlow()
+
+    private val _pdfDownloadState = MutableStateFlow<PdfDownloadState>(PdfDownloadState.Idle)
+    val pdfDownloadState: StateFlow<PdfDownloadState> = _pdfDownloadState.asStateFlow()
+
+    private val _updateSuccess = MutableSharedFlow<Boolean>()
+    val updateSuccess: SharedFlow<Boolean> = _updateSuccess
 
     init {
         viewModelScope.launch {
@@ -64,16 +88,44 @@ class ContractDetailViewModel @Inject constructor(
             _errorMessage.value = null
             try {
                 _contractDetail.value = contractRepository.getContractDetail(contractSeq)
-            } catch (e: Exception) {
-                _errorMessage.value = "계약 상세 정보를 불러오지 못했습니다"
+            } catch (_: Exception) {
+                _errorMessage.value = "계약 상세 정보를 불러오지 못했습니다."
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    private val _contractHtml = MutableStateFlow<String?>(null)
-    val contractHtml: StateFlow<String?> = _contractHtml.asStateFlow()
+    fun fetchRepaymentSchedules(contractSeq: Int) {
+        viewModelScope.launch {
+            _isTimelineLoading.value = true
+            _timelineErrorMessage.value = null
+            try {
+                _repaymentSchedules.value = repaymentRepository.getRepaymentSchedules(contractSeq)
+            } catch (_: Exception) {
+                _repaymentSchedules.value = emptyList()
+                _timelineErrorMessage.value = "상환 타임라인을 불러오지 못했습니다."
+            } finally {
+                _isTimelineLoading.value = false
+            }
+        }
+    }
+
+    fun markManualRepayment(contractSeq: Int, scheduleSeq: Int) {
+        viewModelScope.launch {
+            _activeActionScheduleSeq.value = scheduleSeq
+            _timelineErrorMessage.value = null
+            try {
+                repaymentRepository.markManualRepayment(scheduleSeq)
+                fetchContractDetail(contractSeq)
+                fetchRepaymentSchedules(contractSeq)
+            } catch (_: Exception) {
+                _timelineErrorMessage.value = "수동 상환 처리에 실패했습니다."
+            } finally {
+                _activeActionScheduleSeq.value = null
+            }
+        }
+    }
 
     fun fetchContractHtml(contractSeq: Int) {
         viewModelScope.launch {
@@ -81,16 +133,13 @@ class ContractDetailViewModel @Inject constructor(
             _errorMessage.value = null
             try {
                 _contractHtml.value = contractRepository.getContractHtml(contractSeq)
-            } catch (e: Exception) {
-                _errorMessage.value = "차용증 문서를 불러오지 못했습니다"
+            } catch (_: Exception) {
+                _errorMessage.value = "차용증 문서를 불러오지 못했습니다."
             } finally {
                 _isLoading.value = false
             }
         }
     }
-
-    private val _pdfDownloadState = MutableStateFlow<PdfDownloadState>(PdfDownloadState.Idle)
-    val pdfDownloadState: StateFlow<PdfDownloadState> = _pdfDownloadState.asStateFlow()
 
     fun downloadPdf(contractSeq: Int) {
         viewModelScope.launch {
@@ -105,9 +154,6 @@ class ContractDetailViewModel @Inject constructor(
     fun clearPdfDownloadState() {
         _pdfDownloadState.value = PdfDownloadState.Idle
     }
-
-    private val _updateSuccess = MutableSharedFlow<Boolean>()
-    val updateSuccess: SharedFlow<Boolean> = _updateSuccess
 
     fun updateContract(
         contractSeq: Int,
@@ -127,7 +173,6 @@ class ContractDetailViewModel @Inject constructor(
                 )
                 contractRepository.updateContract(contractSeq, request, roomId)
                 _updateSuccess.emit(true)
-                // 성공적으로 업데이트 후 상세 정보를 다시 불러옵니다
                 fetchContractDetail(contractSeq)
             } catch (e: Exception) {
                 _errorMessage.value = "계약 수정에 실패했습니다: ${e.message}"

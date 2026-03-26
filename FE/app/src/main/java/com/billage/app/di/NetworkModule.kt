@@ -10,6 +10,7 @@ import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.UserApi
 import com.billage.app.data.remote.api.NotificationApi
 import com.billage.app.data.remote.api.ChatBotApi
+import com.billage.app.data.remote.api.RepaymentApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -83,6 +84,12 @@ object NetworkModule {
     @Singleton
     fun provideContractApi(retrofit: Retrofit): ContractApi {
         return retrofit.create(ContractApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRepaymentApi(retrofit: Retrofit): RepaymentApi {
+        return retrofit.create(RepaymentApi::class.java)
     }
 
     @Provides

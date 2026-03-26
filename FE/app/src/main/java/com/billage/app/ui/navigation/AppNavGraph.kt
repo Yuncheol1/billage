@@ -547,7 +547,10 @@ fun NavGraphBuilder.appNavGraph(
         val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 
         androidx.compose.runtime.LaunchedEffect(contractId) {
-            contractId.toIntOrNull()?.let { viewModel.fetchContractDetail(it) }
+            contractId.toIntOrNull()?.let {
+                viewModel.fetchContractDetail(it)
+                viewModel.fetchRepaymentSchedules(it)
+            }
         }
 
         com.billage.app.ui.contract.detail.ContractDetailScreen(
