@@ -546,14 +546,12 @@ public class ContractService {
             throw new CustomBusinessException(ErrorCode.INVALID_DATE, "종료일은 시작일보다 미래여야 합니다.");
         }
 
-        // 상환 방식 정합성 검증
-        if (!"LUMP_SUM".equals(request.getRepaymentMethod())) {
-            if (request.getTotalInstallments() == null || request.getTotalInstallments() < 1) {
-                throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "할부상환은 총 상환 횟수가 1 이상이어야 합니다.");
-            }
-            if (request.getRepaymentDay() == null || request.getRepaymentDay() < 1 || request.getRepaymentDay() > 31) {
-                throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "매월 상환일(1~31) 설정이 누락되거나 잘못되었습니다.");
-            }
+        // 상환 방식 정합성 검증 (모든 방식은 상환 횟수 1 이상, 상환일 지정 필수)
+        if (request.getTotalInstallments() == null || request.getTotalInstallments() < 1) {
+            throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "총 상환 횟수가 1 이상이어야 합니다.");
+        }
+        if (request.getRepaymentDay() == null || request.getRepaymentDay() < 1 || request.getRepaymentDay() > 31) {
+            throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "매월 상환일(1~31) 설정이 누락되거나 잘못되었습니다.");
         }
     }
     //(LUMP_SUM =일시상환/ MONTHLY =1달마다/ QUARTERLY=3개월마다 / SEMI_ANNUAL=6개월마다 / ANNUAL=1년마다)
@@ -561,20 +559,42 @@ public class ContractService {
         String method = request.getRepaymentMethod();
 
         if ("LUMP_SUM".equals(method)) {
-            RepaymentSchedule schedule = RepaymentSchedule.builder()
-                    .contract(contract)
-                    .installmentNo(1)
-                    .dueDt(contract.getEndDt())
-                    .principalDue(request.getPrincipalAmount())
-                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
-                            request.getStartDt(), request.getEndDt()))
-                    .totalDue(request.getPrincipalAmount()
-                            .add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
-                                    request.getStartDt(), request.getEndDt())))
-                    .status("NONPAID")
-                    .createdDttm(LocalDateTime.now())
-                    .build();
-            contract.addRepaymentSchedule(schedule);
+            int installments = request.getTotalInstallments();
+            
+            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt());
+            BigDecimal interestPerMth = totalInterest.divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
+            BigDecimal remainingInterest = totalInterest;
+
+            for (int i = 1; i <= installments; i++) {
+                boolean isLastMonth = (i == installments);
+                
+                BigDecimal currentPrincipalDue = isLastMonth ? request.getPrincipalAmount() : BigDecimal.ZERO;
+                BigDecimal currentInterestDue = isLastMonth ? remainingInterest : interestPerMth;
+                remainingInterest = remainingInterest.subtract(currentInterestDue);
+                
+                LocalDate targetMonth = request.getStartDt().plusMonths(i);
+                int maxDaysInMonth = targetMonth.lengthOfMonth();
+                int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
+                LocalDate dueDt = targetMonth.withDayOfMonth(actualDay);
+                
+                if (dueDt.isAfter(request.getEndDt())) {
+                    dueDt = request.getEndDt();
+                }
+
+                RepaymentSchedule schedule = RepaymentSchedule.builder()
+                        .contract(contract)
+                        .installmentNo(i)
+                        .dueDt(dueDt)
+                        .principalDue(currentPrincipalDue)
+                        .interestDue(currentInterestDue)
+                        .totalDue(currentPrincipalDue.add(currentInterestDue))
+                        .remainingBalanceAfter(isLastMonth ? BigDecimal.ZERO : request.getPrincipalAmount())
+                        .status("NONPAID")
+                        .createdDttm(LocalDateTime.now())
+                        .build();
+
+                contract.addRepaymentSchedule(schedule);
+            }
 
         } else {
             int intervalMonths = switch (method) {
@@ -640,13 +660,8 @@ public class ContractService {
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE,
                         "채권자의 주 계좌가 등록되어 있지 않습니다. 자동이체를 설정할 수 없습니다."));
 
-        // transferDay: 할부 → repaymentDay, 일시불 → 만기일의 day
-        int transferDay;
-        if ("LUMP_SUM".equals(request.getRepaymentMethod())) {
-            transferDay = request.getEndDt().getDayOfMonth();
-        } else {
-            transferDay = request.getRepaymentDay();
-        }
+        // transferDay: 모든 상환 방식은 지정된 상환일을 따름
+        int transferDay = request.getRepaymentDay();
 
         AutoTransferRegistration registration = AutoTransferRegistration.builder()
                 .contract(contract)
