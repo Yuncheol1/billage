@@ -283,6 +283,7 @@ public class ContractService {
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
+        // 권한 및 상태 체크
         boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
         boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
         if (!isCreditor && !isDebtor) {
@@ -297,51 +298,90 @@ public class ContractService {
         // 이미 서명이 시작된 경우(SIGNED 이상), 기존 서명 무효화 처리
         if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
             signatureRepository.deleteByDocumentContractContractSeq(contractSeq);
-            // Contract 엔티티 상태 초기화는 updateContractTerms 에서 resetAgreement 호출함
-            // 추가로 signedDttm 및 status 초기화 (Service 레벨에서 처리)
-            // contract.resetToNegotiating(); // 만약 엔티티에 메서드가 있다면 사용
         }
 
         // 브로드캐스트를 위한 이전 데이터 보관 및 변경 내역 계산
-        BigDecimal originalPrincipal = contract.getPrincipalAmount();
-        BigDecimal originalInterest = contract.getInterestRate();
+        BigDecimal corePrincipal = contract.getPrincipalAmount();
+        BigDecimal coreInterest = contract.getInterestRate();
         List<String> dynamicModifications = new java.util.ArrayList<>();
 
-        // 데이터 업데이트 (내부적으로 resetAgreement() 호출됨)
-        if (requestDto.getPrincipalAmount() != null && (originalPrincipal == null || originalPrincipal.compareTo(requestDto.getPrincipalAmount()) != 0)) {
-            dynamicModifications.add(String.format("원금 변경: %,d원 → %,d원", 
-                originalPrincipal != null ? originalPrincipal.longValue() : 0, 
-                requestDto.getPrincipalAmount().longValue()));
-        }
-
-        if (requestDto.getInterestRate() != null && (originalInterest == null || originalInterest.compareTo(requestDto.getInterestRate()) != 0)) {
-            dynamicModifications.add(String.format("이자율 변경: %.2f%% → %.2f%%", 
-                originalInterest != null ? originalInterest.doubleValue() : 0.0, 
-                requestDto.getInterestRate().doubleValue()));
-        }
-
-        contract.updateContractTerms(requestDto.getPrincipalAmount(), requestDto.getInterestRate());
-
-        // 서명 상태 초기화 (status 재조정)
-        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
-            contract.resetToNegotiating();
-        }
-
-        if (requestDto.getClauses() != null) {
-            for (ContractUpdateRequestDto.ClauseUpdateDto reqClause : requestDto.getClauses()) {
-                contract.getClauses().stream()
-                        .filter(c -> c.getClauseSeq().equals(reqClause.getClauseSeq()))
-                        .findFirst()
-                        .ifPresent(clause -> {
-                            if (!clause.getContent().equals(reqClause.getContent())) {
-                                dynamicModifications.add(String.format("'%s' 조항 내용 수정됨", clause.getTitle()));
-                                clause.updateContent(reqClause.getContent());
-                            }
-                        });
+        // 1. 원금 및 이자율 직접 업데이트
+        if (requestDto.getPrincipalAmount() != null) {
+            BigDecimal newPrincipal = requestDto.getPrincipalAmount();
+            if (corePrincipal == null || corePrincipal.compareTo(newPrincipal) != 0) {
+                dynamicModifications.add(String.format("원금 수정: %,d원 → %,d원", 
+                    corePrincipal != null ? corePrincipal.longValue() : 0, 
+                    newPrincipal.longValue()));
+                contract.updateContractTerms(newPrincipal, contract.getInterestRate() != null ? contract.getInterestRate() : BigDecimal.ZERO);
             }
         }
 
-        // 아무런 변경이 없었다면 브로드캐스트 생략 가능 (필요 시)
+        if (requestDto.getInterestRate() != null) {
+            BigDecimal newInterest = requestDto.getInterestRate();
+            if (coreInterest == null || coreInterest.compareTo(newInterest) != 0) {
+                dynamicModifications.add(String.format("이자율 수정: %.2f%% → %.2f%%", 
+                    coreInterest != null ? coreInterest.doubleValue() * 100 : 0, 
+                    newInterest.doubleValue() * 100));
+                contract.updateContractTerms(contract.getPrincipalAmount(), newInterest);
+            }
+        }
+
+        // 2. 특약 사항 직접 업데이트
+        if (requestDto.getClauses() != null) {
+            Set<Integer> touchedIds = new java.util.HashSet<>();
+            List<ContractClause> currentClauses = new java.util.ArrayList<>(contract.getClauses());
+            
+            for (ContractUpdateRequestDto.ClauseUpdateDto req : requestDto.getClauses()) {
+                if (req.getClauseSeq() != null && req.getClauseSeq() > 0) {
+                    // 기존 특약 수정 혹은 유지
+                    touchedIds.add(req.getClauseSeq());
+                    currentClauses.stream()
+                        .filter(c -> c.getClauseSeq().equals(req.getClauseSeq()))
+                        .findFirst()
+                        .ifPresent(c -> {
+                            if (!c.getContent().equals(req.getContent())) {
+                                // 내용이 변경된 경우 Diff 효과 (삭제 후 추가로 표시)
+                                dynamicModifications.add("DEL: " + c.getContent());
+                                dynamicModifications.add("ADD: " + req.getContent());
+                                c.updateContent(req.getContent());
+                            }
+                        });
+                } else {
+                    // 신규 특약 추가
+                    int nextOrder = contract.getClauses().size() + 1;
+                    ContractClause newClause = ContractClause.builder()
+                        .contract(contract)
+                        .clauseId("SPECIAL_" + UUID.randomUUID().toString().substring(0, 8))
+                        .title("특약사항")
+                        .content(req.getContent())
+                        .orderNo(nextOrder)
+                        .createdDttm(LocalDateTime.now())
+                        .build();
+                    contract.addClause(newClause);
+                    dynamicModifications.add("ADD: " + req.getContent());
+                }
+            }
+
+            // 삭제된 항목 감지 (기존에 있었으나 요청에 없는 것)
+            for (ContractClause c : currentClauses) {
+                if (!touchedIds.contains(c.getClauseSeq())) {
+                    dynamicModifications.add("DEL: " + c.getContent());
+                    contract.removeClause(c);
+                }
+            }
+        }
+
+        // 상태 초기화
+        contract.setAiDraftContent(null); // 즉시 반영이므로 제안서 필드 비움
+        contract.resetAgreement(); // 수락 상태 초기화
+
+        // 서명 상태 초기화 (status 재조정)
+        String currentStatus = contract.getStatus();
+        if ("SIGNED".equals(currentStatus) || "ACTIVE".equals(currentStatus)) {
+            contract.resetToNegotiating();
+        }
+
+        // 아무런 변경이 없었다면 브로드캐스트 생략 가능
         if (dynamicModifications.isEmpty() && (roomId == null || roomId.isBlank())) {
             return;
         }
@@ -361,15 +401,15 @@ public class ContractService {
                     .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
                     .orElse("알 수 없음");
 
-                // AiProposalPayload 구조와 동일하게 생성
+                // 알림 페이로드 구성
                 Map<String, Object> payload = Map.of(
-                    "contract_title", "빌리지 거래 제안서 (수정)",
+                    "contract_title", "빌리지 거래 수정됨",
                     "contract_seq", contractSeq,
                     "sender_role", senderRole,
                     "sender_name", senderName,
-                    "original_principal", originalPrincipal != null ? originalPrincipal.doubleValue() : 0.0,
+                    "original_principal", corePrincipal != null ? corePrincipal.doubleValue() : 0.0,
                     "proposed_principal", contract.getPrincipalAmount() != null ? contract.getPrincipalAmount().doubleValue() : 0.0,
-                    "original_interest_rate", originalInterest != null ? originalInterest.doubleValue() : 0.0,
+                    "original_interest_rate", coreInterest != null ? coreInterest.doubleValue() : 0.0,
                     "proposed_interest_rate", contract.getInterestRate() != null ? contract.getInterestRate().doubleValue() : 0.0,
                     "modifications", dynamicModifications.isEmpty() ? List.of("기타 약정 변경") : dynamicModifications,
                     "is_initial", false
@@ -384,14 +424,14 @@ public class ContractService {
                         userSeq, 
                         contentJson, 
                         true, 
-                        "AI_PROPOSAL"
+                        "AI_PROPOSAL" // 카카오 카드 UI 유지를 위해 타입 유지
                     );
 
                 com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto response = chatService.saveMessage(msgRequest);
                 messagingTemplate.convertAndSend("/sub/chat/room/" + roomId, response);
 
             } catch (Exception e) {
-                log.error("채팅방 수정 제안서 발송 실패", e);
+                log.error("채팅방 수정 알림 발송 실패", e);
             }
         }
     }
@@ -401,56 +441,34 @@ public class ContractService {
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
 
-        boolean isCreditor = contract.getCreditor().getUserSeq().equals(userSeq);
-        boolean isDebtor = contract.getDebtor().getUserSeq().equals(userSeq);
-        if (!isCreditor && !isDebtor) {
+        // 권한 체크
+        if (!contract.getCreditor().getUserSeq().equals(userSeq) && !contract.getDebtor().getUserSeq().equals(userSeq)) {
             throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약에 접근할 권한이 없습니다.");
         }
 
-        String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status)) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안 작성 중이거나 협상 중인 계약만 제안서를 만들 수 있습니다.");
+        // Mock AI 제안: 이자율 2% 삭감하여 즉시 반영
+        BigDecimal currentRate = contract.getInterestRate();
+        BigDecimal proposedRate = currentRate != null ? currentRate.subtract(new BigDecimal("0.02")) : new BigDecimal("0.05");
+        if (proposedRate.compareTo(BigDecimal.ZERO) < 0) proposedRate = BigDecimal.ZERO;
+
+        ContractUpdateRequestDto updateDto = new ContractUpdateRequestDto();
+        updateDto.setPrincipalAmount(contract.getPrincipalAmount());
+        updateDto.setInterestRate(proposedRate);
+        
+        List<ContractUpdateRequestDto.ClauseUpdateDto> clauses = new ArrayList<>();
+        if (contract.getClauses() != null) {
+            for (ContractClause c : contract.getClauses()) {
+                ContractUpdateRequestDto.ClauseUpdateDto cd = new ContractUpdateRequestDto.ClauseUpdateDto();
+                cd.setClauseSeq(c.getClauseSeq());
+                cd.setContent(c.getContent());
+                clauses.add(cd);
+            }
         }
-
-        // Mock AI 제안 생성 로직: 이자율 2% 삭감
-        BigDecimal proposedInterestRate = contract.getInterestRate() != null
-            ? contract.getInterestRate().subtract(new BigDecimal("2.0000"))
-            : new BigDecimal("5.0000");
-
-        if (proposedInterestRate.compareTo(BigDecimal.ZERO) < 0) {
-            proposedInterestRate = BigDecimal.ZERO;
-        }
-
-        List<ContractUpdateRequestDto.ClauseUpdateDto> clauseDtos = contract.getClauses().stream()
-                .map(c -> {
-                    ContractUpdateRequestDto.ClauseUpdateDto dto = new ContractUpdateRequestDto.ClauseUpdateDto();
-                    dto.setClauseSeq(c.getClauseSeq());
-                    dto.setContent(c.getContent());
-                    return dto;
-                })
-                .collect(Collectors.toList());
-
-        // 첫 번째 특약에 AI 코멘트 추가
-        if (!clauseDtos.isEmpty()) {
-            ContractUpdateRequestDto.ClauseUpdateDto firstClause = clauseDtos.getFirst();
-            firstClause.setContent(firstClause.getContent() + " (AI 권장: 이자율 인하 및 원만한 상환 협의 권장)");
-        }
-
-        ContractUpdateRequestDto proposalDto = new ContractUpdateRequestDto();
-        proposalDto.setPrincipalAmount(contract.getPrincipalAmount());
-        proposalDto.setInterestRate(proposedInterestRate);
-        proposalDto.setClauses(clauseDtos);
-
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            String jsonStr = mapper.writeValueAsString(proposalDto);
-            contract.setAiDraftContent(jsonStr); // AI 초안 내용으로 저장
-        } catch (Exception e) {
-            throw new RuntimeException("AI 제안 생성 실패", e);
-        }
+        updateDto.setClauses(clauses);
+        
+        // 즉시 반영
+        updateContract(contractSeq, updateDto, userSeq, null);
     }
-
-    @Transactional
     public void deleteClause(Integer contractSeq, Integer clauseSeq, Integer userSeq) {
         // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용 권장)
         Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
@@ -804,6 +822,13 @@ public class ContractService {
 
         // 수락 처리
         contract.accept(userSeq);
+        
+        // 양측 합의 완료 시 수행할 추가 작업이 있다면 여기에 구현 (현재는 즉시 반영 방식이므로 병합 불필요)
+        if (Boolean.TRUE.equals(contract.getCreditorAccepted()) && Boolean.TRUE.equals(contract.getDebtorAccepted())) {
+            contract.setAiDraftContent(null); // 혹시 남아있을 제안서 데이터 정리
+            log.info("Contract mutual agreement reached for contractSeq={}", contractSeq);
+        }
+        
         contractRepository.save(contract);
 
         // 시스템 메시지 발송
@@ -890,11 +915,24 @@ public class ContractService {
         }
 
         // 2. 채팅 내역 조회 (MongoDB)
-        List<com.ssafy.a305.be.domain.chat.entity.ChatMessage> chatHistory = 
+        List<com.ssafy.a305.be.domain.chat.entity.ChatMessage> allHistory = 
                 chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId);
 
+        // 타임라인 필터링: 가장 최근의 AI_NEGOTIATION_START 마커를 찾음
+        int startIndex = -1;
+        for (int i = 0; i < allHistory.size(); i++) {
+            com.ssafy.a305.be.domain.chat.entity.ChatMessage msg = allHistory.get(i);
+            if ("SYSTEM".equalsIgnoreCase(msg.getMsgType()) && "AI_NEGOTIATION_START".equals(msg.getContent())) {
+                startIndex = i;
+            }
+        }
+
+        List<com.ssafy.a305.be.domain.chat.entity.ChatMessage> relevantHistory = (startIndex == -1) 
+                ? allHistory 
+                : allHistory.subList(startIndex + 1, allHistory.size());
+
         // 3. AI 요청 DTO 생성
-        List<AiChatMessageDto> aiMessages = chatHistory.stream()
+        List<AiChatMessageDto> aiMessages = relevantHistory.stream()
                 .filter(msg -> "TEXT".equalsIgnoreCase(msg.getMsgType()) || "AI_CHAT".equalsIgnoreCase(msg.getMsgType()))
                 .map(msg -> {
                     String role = "system";
@@ -941,18 +979,33 @@ public class ContractService {
                 frontendDraft.put("principalAmount", contract.getPrincipalAmount());
                 frontendDraft.put("interestRate", contract.getInterestRate());
                 
-                List<Map<String, Object>> clauses = response.getClauses().stream()
-                        .map(c -> {
-                            Map<String, Object> map = new HashMap<>();
-                            map.put("clauseSeq", -1); // 신규 특약임을 나타냄
-                            map.put("content", String.format("[%s] %s", c.getTitle(), c.getLegalClause()));
-                            return map;
-                        })
-                        .collect(Collectors.toList());
+                List<Map<String, Object>> clauses = new ArrayList<>();
+                
+                // 1. 기존 특약들을 먼저 담음 (원본 clauseSeq 유지)
+                if (contract.getClauses() != null) {
+                    for (ContractClause clause : contract.getClauses()) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("clauseSeq", clause.getClauseSeq());
+                        map.put("content", clause.getContent());
+                        clauses.add(map);
+                    }
+                }
+                
+                // 2. AI가 생성한 신규 특약들을 추가 (clauseSeq = -1)
+                if (response.getClauses() != null) {
+                    for (AiClauseResponseDto c : response.getClauses()) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("clauseSeq", -1); // 신규 특약임을 나타냄
+                        map.put("content", String.format("[%s] %s", c.getTitle(), c.getLegalClause()));
+                        clauses.add(map);
+                    }
+                }
+                
                 frontendDraft.put("clauses", clauses);
 
                 String jsonResult = mapper.writeValueAsString(frontendDraft);
                 contract.setAiDraftContent(jsonResult);
+                contract.resetAgreement(); // AI 협의 결과 저장 시 수락 상태 초기화
                 contractRepository.save(contract);
                 
                 log.info("AI Clauses generated and saved for contract {}: {} clauses", contractSeq, response.getClauses().size());
