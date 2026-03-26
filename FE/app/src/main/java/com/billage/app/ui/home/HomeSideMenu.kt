@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.common.ProfileAvatar
-import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillagePrimaryLight
 import com.billage.app.ui.theme.BillageSurface
@@ -132,10 +130,10 @@ fun HomeSideMenu(
                 Surface(
                     shape = RoundedCornerShape(999.dp),
                     color = Color.White.copy(alpha = 0.22f),
-                    modifier = Modifier.clickable(onClick = onProfileClick)
+                    modifier = Modifier.clickable(onClick = onLogoutClick)
                 ) {
                     Text(
-                        text = "프로필 설정",
+                        text = if (isLoggingOut) "로그아웃 중..." else "로그아웃",
                         color = Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -214,31 +212,6 @@ fun HomeSideMenu(
                     text = "버전 1.0.0",
                     color = Color(0xFFA0A8B3),
                     fontSize = 11.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            OutlinedButton(
-                onClick = onLogoutClick,
-                enabled = !isLoggingOut,
-                border = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 20.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PowerSettingsNew,
-                    contentDescription = null,
-                    tint = BillageDanger,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = if (isLoggingOut) "로그아웃 중..." else "로그아웃",
-                    color = BillageDanger,
-                    fontWeight = FontWeight.Bold
                 )
             }
         }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
@@ -49,13 +48,11 @@ import com.billage.app.BuildConfig
 import com.billage.app.R
 import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.data.remote.AuthApi
-import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillagePrimary
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
-    onDevBypassClick: () -> Unit,
     onBiometricLoginSuccess: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -174,7 +171,7 @@ fun LoginScreen(
             )
 
             Text(
-                text = "Borrow clearly. Pay back clearly.",
+                text = "쉽게 빌려주고 빌려요",
                 color = Color.White.copy(alpha = 0.92f),
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -195,7 +192,7 @@ fun LoginScreen(
                     .padding(horizontal = 28.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = "Safe private loan helper",
+                    text = "상세 보기",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
@@ -225,7 +222,7 @@ fun LoginScreen(
                         )
                     } else {
                         Text(
-                            text = "Sign in with biometrics",
+                            text = "지문으로 로그인",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -256,23 +253,7 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            Button(
-                onClick = onDevBypassClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BillageDanger
-                )
-            ) {
-                Text(
-                    text = "Dev bypass",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+            Spacer(modifier = Modifier.height(48.dp))
             Spacer(modifier = Modifier.height(38.dp))
         }
     }

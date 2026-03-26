@@ -51,6 +51,14 @@ object BiometricLoginManager {
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    if (
+                        errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON ||
+                        errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
+                        errorCode == BiometricPrompt.ERROR_CANCELED
+                    ) {
+                        onError("")
+                        return
+                    }
                     onError(errString.toString())
                 }
 
