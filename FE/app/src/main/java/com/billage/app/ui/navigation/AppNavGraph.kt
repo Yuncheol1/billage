@@ -11,6 +11,7 @@ import com.billage.app.ui.contract.create.ContractCreateScreen
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.common.MenuProfileViewModel
 import com.billage.app.ui.chat.ChatRoomScreen
+import com.billage.app.ui.chatbot.ChatBotScreen
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
 import com.billage.app.ui.chat.models.AiProposalPayload
@@ -110,12 +111,20 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         com.billage.app.ui.chat.ChatListScreen(
             onChatRoomClick = { roomId, opponentName -> appNavController.navigateToChatRoom(roomId, opponentName) },
+            onChatBotClick = { appNavController.navigateToChatBot() },
             onHomeClick = { appNavController.navigateToHome() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onContractClick = { appNavController.navigateToMypage() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
+        )
+    }
+
+    composable(route = AppDestination.ChatBot.route) {
+        ChatBotScreen(
+            viewModel = hiltViewModel(),
+            onBackClick = { appNavController.popBackStack() }
         )
     }
 

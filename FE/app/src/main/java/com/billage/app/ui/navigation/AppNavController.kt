@@ -89,6 +89,10 @@ sealed interface AppDestination {
         override val route: String = "contract_document"
         const val routeWithArg = "contract_document/{contractSeq}"
     }
+
+    data object ChatBot : AppDestination {
+        override val route: String = "chatbot"
+    }
 }
 
 class AppNavController(
@@ -297,6 +301,12 @@ class AppNavController(
 
     fun navigateToAccountDetail(transactionUniqueNo: Long) {
         navController.navigate("${AppDestination.AccountDetail.route}/$transactionUniqueNo") {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToChatBot() {
+        navController.navigate(AppDestination.ChatBot.route) {
             launchSingleTop = true
         }
     }

@@ -9,6 +9,7 @@ import com.billage.app.data.remote.api.ChatApi
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.UserApi
 import com.billage.app.data.remote.api.NotificationApi
+import com.billage.app.data.remote.api.ChatBotApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -88,6 +89,12 @@ object NetworkModule {
     @Singleton
     fun provideBankAccountApi(retrofit: Retrofit): BankAccountApi {
         return retrofit.create(BankAccountApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatBotApi(retrofit: Retrofit): ChatBotApi {
+        return retrofit.create(ChatBotApi::class.java)
     }
 
     @Provides
