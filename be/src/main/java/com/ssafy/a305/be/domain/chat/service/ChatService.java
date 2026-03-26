@@ -62,16 +62,19 @@ public class ChatService {
             .build();
 
         // 미리보기 텍스트 정제 (JSON이나 긴 시스템 메시지 대신 요약 노출)
-        String previewText = message.getContent();
+        String tempPreview = message.getContent();
         if ("AI_PROPOSAL".equals(message.getMsgType())) {
-            previewText = "[거래 제안서] 가 도착했습니다.";
+            tempPreview = "[거래 제안서] 가 도착했습니다.";
+        } else if ("CONTRACT_COMPLETE".equals(message.getMsgType())) {
+            tempPreview = "[알림] 계약이 체결되었습니다. 내용을 확인해보세요.";
         } else if ("SYSTEM".equals(message.getMsgType())) {
             if (message.getContent().contains("수락")) {
-                previewText = "[알림] 상대방이 조건을 수락했습니다.";
+                tempPreview = "[알림] 상대방이 조건을 수락했습니다.";
             } else {
-                previewText = "[시스템 메시지]";
+                tempPreview = "[시스템 메시지]";
             }
         }
+        final String previewText = tempPreview;
 
         ChatMessage savedMessage = chatMessageRepository.save(message);
 
@@ -93,7 +96,7 @@ public class ChatService {
                     requestDto.senderSeq(),
                     recipientSeq,
                     senderName,
-                    requestDto.content()
+                    previewText
                 ));
             });
 
