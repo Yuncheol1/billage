@@ -164,7 +164,8 @@ fun ChatBottomInputBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 10.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding(),
             verticalAlignment = Alignment.Bottom
         ) {
             IconButton(onClick = onAddClick) {

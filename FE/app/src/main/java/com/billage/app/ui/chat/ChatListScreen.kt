@@ -27,8 +27,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.LaunchedEffect
@@ -87,82 +85,8 @@ fun ChatListScreen(
         viewModel.fetchRooms()
     }
 
-    var showCreateRoomDialog by remember { mutableStateOf(false) }
-    var isCreating by remember { mutableStateOf(false) }
     var showContractTypeSheet by remember { mutableStateOf(false) }
 
-    if (showCreateRoomDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateRoomDialog = false },
-            title = { Text("새 채팅방 만들기", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.onSearchQueryChange(it) },
-                        label = { Text("상대방 이메일") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    
-                    if (userSearchResults.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
-                            colors = CardDefaults.cardColors(containerColor = BillageBackground),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            LazyColumn {
-                                items(userSearchResults) { user ->
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { viewModel.onSearchQueryChange(user.email) }
-                                            .padding(12.dp)
-                                    ) {
-                                        Text(user.realName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text(user.email, fontSize = 12.sp, color = BillageTextSecondary)
-                                    }
-                                    HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { 
-                        if (searchQuery.isNotBlank()) {
-                            isCreating = true
-                            viewModel.createRoomByEmail(
-                                targetEmail = searchQuery,
-                                onSuccess = { id, opponent -> 
-                                    isCreating = false
-                                    viewModel.onSearchQueryChange("")
-                                    onChatRoomClick(id, opponent)
-                                },
-                                onError = {
-                                    isCreating = false
-                                }
-                            )
-                        }
-                    },
-                    enabled = !isCreating && searchQuery.isNotBlank()
-                ) {
-                    Text(if (isCreating) "생성 중..." else "만들기", color = BillagePrimary, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateRoomDialog = false }) {
-                    Text("취소", color = BillageTextSecondary)
-                }
-            },
-            containerColor = BillageSurface,
-            titleContentColor = BillageTextPrimary,
-            textContentColor = BillageTextPrimary
-        )
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -189,9 +113,6 @@ fun ChatListScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { viewModel.fetchRooms() }) {
                                 Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
-                            }
-                            IconButton(onClick = { showCreateRoomDialog = true }) {
-                                Icon(Icons.Default.Add, contentDescription = "채팅방 추가", tint = BillageTextPrimary)
                             }
                             IconButton(onClick = { showMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = BillageTextPrimary)
@@ -258,36 +179,10 @@ fun ChatListScreen(
                     unread = room.unreadCount.toInt(),
                     hasContract = false
                 )
-                var showLeaveDialog by remember { mutableStateOf(false) }
-                if (showLeaveDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showLeaveDialog = false },
-                        title = { Text("채팅방 나가기", fontWeight = FontWeight.Bold) },
-                        text = { Text("정말 채팅방을 나가시겠습니까?") },
-                        confirmButton = {
-                            TextButton(onClick = { 
-                                showLeaveDialog = false
-                                viewModel.leaveRoom(room.id)
-                            }) {
-                                Text("나가기", color = Color.Red, fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showLeaveDialog = false }) {
-                                Text("취소", color = BillageTextSecondary)
-                            }
-                        },
-                        containerColor = BillageSurface,
-                        titleContentColor = BillageTextPrimary,
-                        textContentColor = BillageTextPrimary
-                    )
-                }
-
                     ChatListItem(
                         chat = chat,
                         profileImageUrl = opponent?.profileImageUrl,
-                        onClick = { onChatRoomClick(chat.id, opponentName) },
-                        onLeaveClick = { showLeaveDialog = true }
+                        onClick = { onChatRoomClick(chat.id, opponentName) }
                     )
                 }
                 if (rooms.isEmpty()) {
@@ -416,8 +311,7 @@ fun ChatListScreen(
 fun ChatListItem(
     chat: ChatPreviewItem,
     profileImageUrl: String?,
-    onClick: () -> Unit,
-    onLeaveClick: () -> Unit
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -509,10 +403,6 @@ fun ChatListItem(
                     }
                 }
             }
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        IconButton(onClick = onLeaveClick, modifier = Modifier.size(24.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "나가기", tint = BillageTextSecondary)
         }
     }
     HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
