@@ -186,6 +186,18 @@ fun NavGraphBuilder.appNavGraph(
             onAddMenuClick = {},
             onRequestAiProposal = { viewModel.requestAiProposal() },
             onContractSelectForModify = { contract -> viewModel.setModificationMode(contract) },
+            onAiNegotiateSelect = { contract -> 
+                viewModel.startAiNegotiation(
+                    com.billage.app.ui.chat.models.ContractSummary(
+                        contractSeq = contract.contractSeq,
+                        contractId = contract.contractId ?: "ID없음",
+                        counterpartyName = contract.counterpartyName ?: "미상"
+                    )
+                )
+            },
+            onAnalyzeNegotiation = { viewModel.analyzeCurrentNegotiation() },
+            onToggleClauseSelection = { index -> viewModel.toggleClauseSelection(index) },
+            onApplyAiClauses = { viewModel.applySelectedAiClauses() },
             onExitModificationMode = { viewModel.exitModificationMode() },
             onCancelProposal = { viewModel.cancelProposal() },
             onSubmitSignature = { request -> viewModel.submitContractSignature(request) },
@@ -233,8 +245,12 @@ fun NavGraphBuilder.appNavGraph(
                                          sender = if (isMe) MessageSender.ME else MessageSender.OTHER,
                                          timestamp = java.time.LocalDateTime.now(),
                                          contractTitle = payload.contractTitle,
+                                         originalPrincipal = payload.originalPrincipal,
+                                         proposedPrincipal = payload.proposedPrincipal,
                                          originalInterestRate = payload.originalInterestRate ?: 0.0,
                                          proposedInterestRate = payload.proposedInterestRate ?: (payload.originalInterestRate ?: 0.0),
+                                         senderRole = payload.senderRole,
+                                         senderName = payload.senderName,
                                          modifications = payload.modifications,
                                          isInitial = payload.isInitial
                                      ),

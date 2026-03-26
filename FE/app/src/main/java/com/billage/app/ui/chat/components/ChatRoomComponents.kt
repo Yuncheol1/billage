@@ -3,7 +3,9 @@ package com.billage.app.ui.chat.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,8 +59,9 @@ fun ChatTopBar(
 @Composable
 fun PinnedContractBanner(
     selectedContract: ContractSummary?,
-    onAiProposalClick: () -> Unit,
+    onAnalyzeClick: () -> Unit,
     onExitClick: () -> Unit,
+    isAnalyzing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (selectedContract == null) return
@@ -123,14 +126,23 @@ fun PinnedContractBanner(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = onAiProposalClick,
+                onClick = onAnalyzeClick,
+                enabled = !isAnalyzing,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = BillagePrimary
                 )
             ) {
-                Text("완성하기", fontWeight = FontWeight.Bold)
+                if (isAnalyzing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("협의 종료 및 AI 분석하기", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -332,17 +344,86 @@ fun AiContractSelectDialog(
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "계약 #${contract.contractId}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "상대방: ${contract.counterpartyName}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = BillageTextSecondary
-                                        )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "계약 #${contract.contractId?.take(10) ?: contract.contractSeq}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BillageTextPrimary
+                                            )
+                                            Surface(
+                                                color = when(contract.status) {
+                                                    "ACTIVE" -> BillagePrimaryLight
+                                                    "DRAFT" -> BillageInfo.copy(alpha = 0.1f)
+                                                    else -> BillageBackground
+                                                },
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = when(contract.status) {
+                                                        "ACTIVE" -> "진행중"
+                                                        "DRAFT" -> "초안"
+                                                        "SIGNED" -> "서명완료"
+                                                        "NEGOTIATING" -> "협의중"
+                                                        else -> contract.status ?: ""
+                                                    },
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = when(contract.status) {
+                                                        "ACTIVE" -> BillagePrimary
+                                                        "DRAFT" -> BillageInfo
+                                                        else -> BillageTextSecondary
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "상대방: ${contract.counterpartyName}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = BillageTextSecondary
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = " | ",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = BillageDivider
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "원금: ${String.format("%,.0f원", contract.principalAmount ?: 0.0)}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = BillageTextSecondary
+                                            )
+                                        }
+                                        if (contract.interestRate != null || contract.startDt != null) {
+                                            Row(modifier = Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                if (contract.interestRate != null) {
+                                                    Text(
+                                                        text = "이자율: ${String.format("%.2f%%", contract.interestRate * 100)}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = BillagePrimary,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                                if (contract.interestRate != null && contract.startDt != null) {
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                }
+                                                if (contract.startDt != null) {
+                                                    Text(
+                                                        text = "시작일: ${contract.startDt}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = BillageTextSecondary
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -352,6 +433,73 @@ fun AiContractSelectDialog(
             }
         },
         confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("취소", color = BillageTextSecondary)
+            }
+        }
+    )
+}
+@Composable
+fun AiClauseSelectionDialog(
+    clauses: List<com.billage.app.data.remote.api.AiClauseResponse>,
+    selectedIndices: Set<Int>,
+    onToggleSelection: (Int) -> Unit,
+    onDismissRequest: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text("AI 제안 특약 선택", fontWeight = FontWeight.Bold, color = BillageTextPrimary) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                itemsIndexed(clauses) { index, clause ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggleSelection(index) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Checkbox(
+                            checked = selectedIndices.contains(index),
+                            onCheckedChange = { onToggleSelection(index) },
+                            colors = CheckboxDefaults.colors(checkedColor = BillagePrimary)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = clause.title ?: "제목 없음", 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 15.sp, 
+                                color = BillageTextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = clause.legalClause ?: "내용 없음", 
+                                fontSize = 13.sp, 
+                                color = BillageTextSecondary,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                    if (index < clauses.lastIndex) {
+                        HorizontalDivider(color = BillageDivider.copy(alpha = 0.5f))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm, 
+                colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
+                enabled = selectedIndices.isNotEmpty()
+            ) {
+                Text("제안 발송하기", fontWeight = FontWeight.Bold)
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
                 Text("취소", color = BillageTextSecondary)

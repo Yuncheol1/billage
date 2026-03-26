@@ -62,12 +62,16 @@ fun ChatRoomScreen(
     onAddMenuClick: () -> Unit = {},
     onRequestAiProposal: () -> Unit = {},
     onContractSelectForModify: (ContractListResponse) -> Unit = {},
+    onAiNegotiateSelect: (ContractListResponse) -> Unit = {},
     onExitModificationMode: () -> Unit = {},
     onCommitProposal: () -> Unit = {},
     onCancelProposal: () -> Unit = {},
     onDirectEditClick: (Int) -> Unit = {},
     onSubmitSignature: (ContractSignatureRequest) -> Unit = {},
     onDismissSignatureFeedback: () -> Unit = {},
+    onAnalyzeNegotiation: () -> Unit = {},
+    onToggleClauseSelection: (Int) -> Unit = {},
+    onApplyAiClauses: () -> Unit = {},
     messageListContent: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -181,13 +185,14 @@ fun ChatRoomScreen(
                 }
             )
 
-            // 계약 모드일 경우 상단에 고정되는 핀 배너
+            // 계약 협의 모드일 경우 상단에 고정되는 배너
             if (state.mode == com.billage.app.ui.chat.models.ChatRoomMode.CONTRACT) {
-                PinnedContractBanner(
+                com.billage.app.ui.chat.components.PinnedContractBanner(
                     selectedContract = state.selectedContract,
+                    isAnalyzing = state.isAiAnalyzing,
                     onExitClick = { onExitModificationMode() },
-                    onAiProposalClick = {
-                        onRequestAiProposal()
+                    onAnalyzeClick = {
+                        onAnalyzeNegotiation()
                     }
                 )
             }
@@ -364,13 +369,22 @@ fun ChatRoomScreen(
             contracts = contracts,
             onDismissRequest = { 
                 showAiSelectDialog = false
-                // 사용자가 다이얼로그를 그냥 닫으면 네고시에이션 모드도 다시 끔
-                onModeChange(com.billage.app.ui.chat.models.ChatRoomMode.NORMAL)
             },
             onContractSelect = { contract: com.billage.app.data.remote.api.ContractListResponse ->
                 showAiSelectDialog = false
-                onContractSelectForModify(contract)
+                onAiNegotiateSelect(contract)
             }
+        )
+    }
+
+    // AI 분석 결과(특약 제안) 선택 다이얼로그
+    state.pendingAiClauses?.let { clauses ->
+        com.billage.app.ui.chat.components.AiClauseSelectionDialog(
+            clauses = clauses,
+            selectedIndices = state.selectedClauseIndices,
+            onToggleSelection = onToggleClauseSelection,
+            onDismissRequest = { onExitModificationMode() },
+            onConfirm = { onApplyAiClauses() }
         )
     }
 

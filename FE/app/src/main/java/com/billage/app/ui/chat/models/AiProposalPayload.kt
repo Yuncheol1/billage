@@ -34,6 +34,14 @@ data class AiProposalPayload(
     @JsonNames("proposedInterestRate")
     val proposedInterestRate: Double? = null,
     
+    @SerialName("sender_role")
+    @JsonNames("senderRole")
+    val senderRole: String? = null,
+    
+    @SerialName("sender_name")
+    @JsonNames("senderName")
+    val senderName: String? = null,
+    
     val modifications: List<String> = emptyList(),
     
     @SerialName("is_initial")

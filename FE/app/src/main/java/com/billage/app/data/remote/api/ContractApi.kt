@@ -91,6 +91,11 @@ interface ContractApi {
     suspend fun getAiAnalysis(
         @Path("contractSeq") contractSeq: Int
     ): AiAnalysisResponse
+    @POST("api/v1/contracts/{contractSeq}/clauses/from-chat")
+    suspend fun generateClausesFromChat(
+        @Path("contractSeq") contractSeq: Int,
+        @Query("roomId") roomId: String
+    ): AiClauseChatBaseResponse
 }
 
 @Serializable
@@ -221,6 +226,7 @@ data class ContractListResponse(
     val role: String? = null,
     val counterpartyName: String? = null,
     val principalAmount: Double? = null,
+    val interestRate: Double? = null,
     val repaymentMethod: String? = null,
     val status: String? = null,
     val startDt: String? = null,
@@ -289,4 +295,27 @@ data class ContractSignatureResponse(
     val role: String,
     val contractFullySigned: Boolean,
     val generatedDocumentSeq: Int? = null
+)
+
+@Serializable
+data class AiClauseChatBaseResponse(
+    val status: Int,
+    val message: String,
+    val data: AiClauseChatResponse
+)
+
+@Serializable
+data class AiClauseChatResponse(
+    val rejected: Boolean,
+    val rejection_reason: String? = null,
+    val clauses: List<AiClauseResponse>? = null,
+    val summary: String? = null
+)
+
+@Serializable
+data class AiClauseResponse(
+    val title: String? = null,
+    @SerialName("clause_id") val clauseId: String? = null,
+    @SerialName("legal_clause") val legalClause: String? = null,
+    val explanation: String? = null
 )

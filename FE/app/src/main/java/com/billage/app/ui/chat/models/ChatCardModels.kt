@@ -119,8 +119,12 @@ data class AiProposalMessage(
     override val sender: MessageSender,
     override val timestamp: LocalDateTime,
     val contractTitle: String,
+    val originalPrincipal: Double? = null,
+    val proposedPrincipal: Double? = null,
     val originalInterestRate: Double?,
     val proposedInterestRate: Double?,
+    val senderRole: String? = null,
+    val senderName: String? = null,
     val modifications: List<String> = emptyList(),
     val isInitial: Boolean = false
 ) : BaseChatMessage
