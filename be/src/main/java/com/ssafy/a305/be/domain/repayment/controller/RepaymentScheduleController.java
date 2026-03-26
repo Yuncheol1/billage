@@ -1,6 +1,6 @@
 package com.ssafy.a305.be.domain.repayment.controller;
 import com.ssafy.a305.be.domain.auth.security.AuthenticatedUser;
-import com.ssafy.a305.be.domain.contract.service.ContractService;
+import com.ssafy.a305.be.domain.repayment.dto.UpcomingScheduleResDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "상환 스케줄 API", description = "계약에 해당하는 상환 스케줄을 처리하는 API")
@@ -45,4 +46,23 @@ public class RepaymentScheduleController {
                 "data", result
         ));
     }
+
+    @Operation(summary = "다가오는 상환 일정 상위 3개 조회", description = "로그인한 사용자가 참여 중인 ACTIVE 상태의 계약 중 가장 기한이 임박한 일정 3개를 조회합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/schedules/upcoming")
+    public ResponseEntity<Map<String, Object>> getUpcomingSchedules(
+            @AuthenticationPrincipal AuthenticatedUser authUser) {
+
+        Integer userSeq = authUser.userSeq();
+        List<UpcomingScheduleResDto> result = repaymentScheduleService.getUpcomingSchedules(userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "status", HttpStatus.OK.value(),
+                "message", "다가오는 상환 일정 조회 성공",
+                "data", result
+        ));
+    }
+
 }

@@ -1,9 +1,13 @@
 package com.ssafy.a305.be.domain.repayment.service;
 
 import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
+import com.ssafy.a305.be.domain.repayment.dto.UpcomingScheduleResDto;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,5 +40,22 @@ public class RepaymentScheduleService {
                 .map(RepaymentScheduleResDto::fromEntity)
                 .collect(Collectors.toList());
         return RepaymentScheduleListResDto.of(contractSeq, dtos);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UpcomingScheduleResDto> getUpcomingSchedules(Integer userSeq) {
+        // 대상으로 삼을 상태: 미납 혹은 일부 미납 상태의 목록
+        List<String> validStatuses = List.of("NONPAID", "SOMEPAID");
+        LocalDate today = LocalDate.now();
+
+        // 정렬은 쿼리에 있으므로, '앞에서 3개만 가져와라'라는 PageRequest 생성
+        PageRequest pageRequest = PageRequest.of(0, 3);
+
+        List<RepaymentSchedule> schedules = repaymentScheduleRepository.findUpcomingSchedules(
+                userSeq, today, validStatuses, pageRequest);
+
+        return schedules.stream()
+                .map(UpcomingScheduleResDto::fromEntity)
+                .collect(Collectors.toList());
     }
 }

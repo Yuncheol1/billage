@@ -4,7 +4,7 @@ import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -43,4 +43,20 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("contractStatuses") Collection<String> contractStatuses
     );
     List<RepaymentSchedule> findAllByContractContractSeqOrderByInstallmentNoAsc(Integer contractSeq);
+
+
+    @Query("""
+            SELECT rs FROM RepaymentSchedule rs 
+            JOIN FETCH rs.contract c 
+            WHERE (c.creditor.userSeq = :userSeq OR c.debtor.userSeq = :userSeq) 
+              AND c.status = 'ACTIVE' 
+              AND rs.status IN (:statuses) 
+              AND rs.dueDt >= :today 
+            ORDER BY rs.dueDt ASC
+            """)
+    List<RepaymentSchedule> findUpcomingSchedules(
+            @Param("userSeq") Integer userSeq,
+            @Param("today") LocalDate today,
+            @Param("statuses") List<String> statuses,
+            Pageable pageable);
 }
