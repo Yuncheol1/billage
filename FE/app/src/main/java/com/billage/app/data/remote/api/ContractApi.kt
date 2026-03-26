@@ -122,7 +122,7 @@ data class CreateContractRequest(
     val principalAmount: Long,       // 원금 (0보다 커야 함)
     val interestRate: Double,        // 이자율 (예: 4.6% → 0.046)
     val repaymentMethod: String,     // "LUMP_SUM" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL"
-    val totalInstallments: Int?,     // 총 상환 횟수 (LUMP_SUM이면 null)
+    val totalInstallments: Int?,     // 총 상환 횟수 (LUMP_SUM의 경우 이자 납부 횟수)
     val repaymentDay: Int,           // 상환일 (1~31)
     @SerialName("startDt")
     val startDt: String,             // 시작일 (예: "2026-03-10")

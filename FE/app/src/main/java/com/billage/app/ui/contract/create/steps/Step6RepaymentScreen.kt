@@ -151,7 +151,7 @@ fun Step6RepaymentScreen(
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
-            InfoBox(text = "원금은 만기에 한 번에 갚고, 이자는 매달 납부하는 방식이에요")
+            InfoBox(text = "원금은 만기에 한 번에 갚고, 이자는 매달 납부하는 방식이에요. 상환일은 빌린 날(시작일)의 일자로 고정되며, 만기일이 상환일보다 빠를 경우 마지막 이자 상환일이 조금 당겨질 수 있어요.")
         }
 
         AnimatedVisibility(
