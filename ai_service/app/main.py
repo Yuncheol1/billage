@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
@@ -7,7 +7,8 @@ import logging
 from contextlib import asynccontextmanager
 from app.api.internal_v1.router import internal_router
 from app.core.config import settings
-from app.core.security import verify_internal_api_key
+from app.core.security import verify_internal_api_key, ensure_security_settings
+from app.services.gms_engine import close_gms_client
 from app.services.rag_engine import get_rag_engine
 
 # --- 로깅 시간 출력(KST) 전역 설정 ---
@@ -33,10 +34,13 @@ async def lifespan(app: FastAPI):
     16GB RAM에 단 한 번만 로드하여 상주(Caching)시킵니다.
     이 조치가 없으면 API 호출 때마다 수 밀리초 이상의 모델 웜업 지연 현상이 발생합니다.
     """
+    ensure_security_settings()
+    logger.info("[Init] Allowed CORS origins: %s", ", ".join(settings.ALLOWED_ORIGINS))
     logger.info("[Lifespan] FastAPI 서버 시작: RAG 엔진과 임베딩 모델을 16GB RAM에 캐싱합니다...")
     get_rag_engine() # 싱글톤 인스턴스 초기화 트리거
     logger.info("[Lifespan] 모델 로딩 완료! 요청 받을 준비가 되었습니다.")
     yield
+    await close_gms_client()
     logger.info("[Lifespan] FastAPI 서버가 종료됩니다. 메모리를 반환합니다...")
 
 app = FastAPI(
@@ -49,7 +53,7 @@ app = FastAPI(
 # 로컬 HTML 테스트 파일을 위한 CORS 임시 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 실제 운영 시에는 프론트/Spring 도메인만 허용하도록 변경 필요
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=False, # 와일드카드(*) 사용 시 브라우저 정책상 credentials(쿠키 등) 허용 불가
     allow_methods=["*"],
     allow_headers=["*"],

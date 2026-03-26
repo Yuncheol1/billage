@@ -2,6 +2,9 @@ from app.services.gms_engine import GMSGeminiClient
 from app.services.rag_engine import get_rag_engine
 from app.schemas.analyze import AnalyzeRequest
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AnalyzeService:
     def __init__(self):
@@ -16,6 +19,12 @@ class AnalyzeService:
         3. Gemini에 전달하여 독소조항/세금 이슈/tax_summary 분석
         """
         
+        logger.info(
+            "Analyze request received: contract_seq=%s template_type=%s clauses=%s",
+            request.contract_seq,
+            request.template_type,
+            len(request.clauses or []),
+        )
         # --- 1. RAG 검색 쿼리 조합 (ERD 메타데이터 활용) ---
         search_query = f"차용증 분석: {request.contract_text}"
         
@@ -39,6 +48,12 @@ class AnalyzeService:
         
         # RAG 검색 실행
         rag_context = self.rag_engine.search_similar_documents(search_query, k=3)
+        logger.info(
+            "Analyze RAG lookup completed: contract_seq=%s fallback=%s query_length=%s",
+            request.contract_seq,
+            "찾을" in rag_context or "오류" in rag_context,
+            len(search_query),
+        )
         
         # Fallback: DB가 비어있을 경우
         if "찾을" in rag_context or "오류" in rag_context:
@@ -126,8 +141,19 @@ class AnalyzeService:
         
         try:
             clean_json = ai_response.replace('```json', '').replace('```', '').strip()
-            return json.loads(clean_json)
+            result = json.loads(clean_json)
+            logger.info(
+                "Analyze LLM parse succeeded: contract_seq=%s warnings=%s",
+                request.contract_seq,
+                len(result.get("warnings", [])),
+            )
+            return result
         except json.JSONDecodeError:
+            logger.warning(
+                "Analyze LLM parse failed: contract_seq=%s response_preview=%s",
+                request.contract_seq,
+                ai_response[:300],
+            )
             return {
                 "is_safe": False,
                 "summary": "AI 응답 파싱 실패",

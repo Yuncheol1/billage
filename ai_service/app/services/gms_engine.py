@@ -7,6 +7,28 @@ import logging
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
+_shared_async_client: httpx.AsyncClient | None = None
+
+
+def _build_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        timeout=settings.GMS_TIMEOUT_SECONDS,
+        connect=settings.GMS_CONNECT_TIMEOUT_SECONDS,
+    )
+
+
+def get_gms_client() -> httpx.AsyncClient:
+    global _shared_async_client
+    if _shared_async_client is None or _shared_async_client.is_closed:
+        _shared_async_client = httpx.AsyncClient(timeout=_build_timeout())
+    return _shared_async_client
+
+
+async def close_gms_client() -> None:
+    global _shared_async_client
+    if _shared_async_client is not None and not _shared_async_client.is_closed:
+        await _shared_async_client.aclose()
+    _shared_async_client = None
 
 class GMSGeminiClient:
     """
@@ -16,42 +38,75 @@ class GMSGeminiClient:
     def __init__(self, model_name: str = "gemini-2.0-flash"):
         self.model_name = model_name
         self.api_url = f"{settings.GMS_URL}/models/{self.model_name}:generateContent"
-        self.max_retries = 3 # 3회 재시도로 상향 조정 (할당량 초과에 더 유연하게 대응)
+        self.max_retries = settings.GMS_MAX_RETRIES
 
     async def _request_with_retry(self, headers: dict, payload: dict) -> dict:
         """API 호출 및 429(할당량 초과) 발생 시 지수 백오프 기반 재시도 로직"""
-        # 매번 client를 생성하지 않고 단일 세션으로 처리하여 성능 및 리소스 관리 향상
-        async with httpx.AsyncClient(timeout=50.0) as client:
-            for attempt in range(self.max_retries + 1):
-                try:
-                    response = await client.post(self.api_url, headers=headers, json=payload)
-                    
-                    # 429 Too Many Requests (할당량 초과) 처리
-                    if response.status_code == 429:
-                        if attempt == self.max_retries:
-                            logger.error("❌ GMS API 최대 재시도 횟수를 초과했습니다.")
-                            response.raise_for_status()
-                        
-                        # 지수 백오프 계산: 2, 4, 8초 + 약간의 랜덤 지터
-                        wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
-                        logger.warning(f"⚠️ GMS 할당량 초과 (429). {wait_time:.1f}초 후 재시도합니다... ({attempt + 1}/{self.max_retries})")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    
-                    response.raise_for_status()
-                    return response.json()
-                
-                except (httpx.RequestError, httpx.HTTPStatusError) as e:
+        client = get_gms_client()
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = await client.post(self.api_url, headers=headers, json=payload)
+
+                if response.status_code == 429:
                     if attempt == self.max_retries:
-                        logger.error(f"❌ GMS API 호출 중 최종 에러 발생: {str(e)}")
-                        raise e
-                    # 일반 네트워크 오류 시 잠시 대기 후 재시도
-                    await asyncio.sleep(2)
-                except Exception as e:
-                    if attempt == self.max_retries:
-                        logger.error(f"❌ 예상치 못한 에러: {e}")
-                        raise e
-                    await asyncio.sleep(1)
+                        logger.error("GMS API maximum retry count exceeded for 429 response.")
+                        response.raise_for_status()
+
+                    wait_time = (settings.GMS_BASE_BACKOFF_SECONDS * (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    logger.warning(
+                        "GMS rate limited: status=429 attempt=%s/%s wait=%.2fs model=%s",
+                        attempt + 1,
+                        self.max_retries,
+                        wait_time,
+                        self.model_name,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code if e.response is not None else "unknown"
+                if status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
+                    wait_time = (settings.GMS_BASE_BACKOFF_SECONDS * (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    logger.warning(
+                        "GMS HTTP error: status=%s attempt=%s/%s wait=%.2fs model=%s",
+                        status_code,
+                        attempt + 1,
+                        self.max_retries,
+                        wait_time,
+                        self.model_name,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+
+                logger.error(
+                    "GMS HTTP error without recovery: status=%s model=%s detail=%s",
+                    status_code,
+                    self.model_name,
+                    str(e),
+                )
+                raise
+            except httpx.RequestError as e:
+                if attempt < self.max_retries:
+                    wait_time = (settings.GMS_BASE_BACKOFF_SECONDS * (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    logger.warning(
+                        "GMS network error: attempt=%s/%s wait=%.2fs model=%s detail=%s",
+                        attempt + 1,
+                        self.max_retries,
+                        wait_time,
+                        self.model_name,
+                        str(e),
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+
+                logger.error("GMS network error without recovery: model=%s detail=%s", self.model_name, str(e))
+                raise
+            except Exception as e:
+                logger.exception("Unexpected GMS client error: model=%s", self.model_name)
+                raise
         raise Exception("API 호출 재시도 횟수를 초과했습니다.")
 
     async def generate_response(self, system_instruction: str, user_prompt: str) -> str:

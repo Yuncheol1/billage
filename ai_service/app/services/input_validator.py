@@ -5,6 +5,7 @@ LLM 호출 전에 명백히 비정상적인 입력을 저비용으로 거부합�
 import re
 import logging
 from typing import Tuple, Optional, List
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,9 @@ def validate_user_intent(text: str) -> Tuple[bool, Optional[str]]:
         return False, "입력이 비어 있습니다. 원하시는 계약 조건을 입력해 주세요."
 
     cleaned = text.strip()
+
+    if len(cleaned) > settings.MAX_USER_INTENT_LENGTH:
+        return False, f"입력이 너무 깁니다 (최대 {settings.MAX_USER_INTENT_LENGTH}자). 핵심 계약 조건만 입력해 주세요."
 
     # 1. 최소 길이 검사
     if len(cleaned) < _MIN_INTENT_LENGTH:
@@ -63,10 +67,23 @@ def validate_chat_messages(messages: List[dict]) -> Tuple[bool, Optional[str]]:
     if not messages:
         return False, "채팅 메시지가 비어 있습니다."
 
+    if len(messages) > settings.MAX_CHAT_MESSAGES:
+        return False, f"채팅 메시지가 너무 많습니다 (최대 {settings.MAX_CHAT_MESSAGES}개). 최근 대화 위주로 전달해 주세요."
+
     # 의미 있는 내용이 있는 메시지가 하나라도 있는지 확인
     meaningful_count = 0
     for msg in messages:
         content = msg.get("content", "").strip()
+        if len(content) > settings.MAX_CHAT_MESSAGE_LENGTH:
+            return False, f"채팅 메시지 하나가 너무 깁니다 (최대 {settings.MAX_CHAT_MESSAGE_LENGTH}자)."
+        if not content:
+            continue
+        if _is_repetitive(content):
+            return False, "반복 문자가 많은 채팅은 처리할 수 없습니다. 계약 관련 대화만 전달해 주세요."
+        if not _has_meaningful_content(content):
+            continue
+        if _check_profanity(content):
+            return False, "부적절한 표현이 포함된 채팅은 처리할 수 없습니다."
         if len(content) >= 2:
             meaningful_count += 1
 

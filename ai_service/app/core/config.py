@@ -4,7 +4,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
+from pydantic import Field, field_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Secure AI Microservice API"
@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 1
     SEMANTIC_CACHE_THRESHOLD: float = 0.95  # 유사도 임계값
+    ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["*"])
+    GMS_TIMEOUT_SECONDS: float = 50.0
+    GMS_CONNECT_TIMEOUT_SECONDS: float = 10.0
+    GMS_MAX_RETRIES: int = 3
+    GMS_BASE_BACKOFF_SECONDS: float = 1.0
+    MAX_USER_INTENT_LENGTH: int = 2000
+    MAX_CHAT_MESSAGES: int = 200
+    MAX_CHAT_MESSAGE_LENGTH: int = 4000
     
     # .env 파일의 위치를 config.py 기준으로 절대 경로 설정 (어디서 실행해도 로드 가능)
     model_config = SettingsConfigDict(
@@ -31,5 +39,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value):
+        if value is None or value == "":
+            return ["*"]
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 settings = Settings()

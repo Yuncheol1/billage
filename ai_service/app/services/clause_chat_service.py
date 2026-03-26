@@ -29,6 +29,12 @@ class ClauseChatService:
         Returns:
             {"clauses": [...], "summary": "..."}
         """
+        logger.info(
+            "Clause chat request received: template_type=%s message_count=%s context_length=%s",
+            template_type,
+            len(chat_messages),
+            len(contract_context or ""),
+        )
         # 1. 채팅 내역을 대화 텍스트로 변환
         conversation_text = self._format_conversation(chat_messages)
 
@@ -47,6 +53,12 @@ class ClauseChatService:
         # 대화 전체를 쿼리로 사용하면 토큰 낭비 → 핵심 키워드 추출용 요약 쿼리 사용
         rag_query = f"차용증 특약사항 {conversation_text[:200]}"
         rag_context = self.rag_engine.search_similar_documents(rag_query, k=3)
+        logger.info(
+            "Clause chat RAG lookup completed: template_type=%s query_length=%s fallback=%s",
+            template_type,
+            len(rag_query),
+            "찾을" in rag_context or "오류" in rag_context,
+        )
 
         # 4. 시스템 프롬프트: 대화 분석 → 복수 특약 생성
         system_prompt = """당신은 대한민국 변호사이자 차용증 작성 전문가입니다.
@@ -102,6 +114,11 @@ class ClauseChatService:
             system_instruction=system_prompt,
             user_prompt=user_prompt,
         )
+        logger.info(
+            "Clause chat LLM response received: template_type=%s response_length=%s",
+            template_type,
+            len(ai_response),
+        )
 
         # 7. JSON 파싱
         return self._parse_response(ai_response)
@@ -150,4 +167,3 @@ class ClauseChatService:
                 "clauses": [],
                 "summary": "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요.",
             }
-

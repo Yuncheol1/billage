@@ -55,18 +55,29 @@ class ChatbotService:
         [기능 3] 세법 및 법률 상담 챗봇 파이프라인 (시맨틱 캐시 통합)
         """
         query_vector = None
+        logger.info(
+            "Chat request received: history_count=%s message_length=%s",
+            len(history),
+            len(message),
+        )
         try:
             # RAG 엔진의 임베딩 모델을 사용하여 질문 벡터화
             query_vector = self.rag_engine.embedding_model.embed_query(message)
             cached_reply = await cache_manager.get_cache(query_vector)
             
             if cached_reply:
+                logger.info("Chat cache hit: history_count=%s message_length=%s", len(history), len(message))
                 return cached_reply
         except Exception as e:
-            logger.warning(f"⚠️ 시맨틱 캐시 조회 중 오류 (무시하고 진행): {str(e)}")
+            logger.warning("Semantic cache lookup failed: detail=%s", str(e))
 
         # 1. RAG 검색 (k=4)
         rag_context = self.rag_engine.search_similar_documents(message, k=4)
+        logger.info(
+            "Chat RAG lookup completed: message_length=%s fallback=%s",
+            len(message),
+            "찾을" in rag_context or "오류" in rag_context,
+        )
         
         # 2. 메시지 보강
         enhanced_message = (
@@ -80,12 +91,13 @@ class ChatbotService:
             enhanced_message, 
             system_instruction=LEGAL_SYSTEM_PROMPT
         )
+        logger.info("Chat LLM response received: reply_length=%s", len(ai_reply))
         
         # 4. 결과 캐시에 저장
         if query_vector:
             try:
                 await cache_manager.set_cache(query_vector, message, ai_reply)
             except Exception as e:
-                logger.warning(f"⚠️ 시맨틱 캐시 저장 중 오류: {str(e)}")
+                logger.warning("Semantic cache write failed: detail=%s", str(e))
             
         return ai_reply
