@@ -546,9 +546,11 @@ public class ContractService {
             }
         }
     }
-
+    //(LUMP_SUM =일시상환/ MONTHLY =1달마다/ QUARTERLY=3개월마다 / SEMI_ANNUAL=6개월마다 / ANNUAL=1년마다)
     private void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
-        if ("LUMP_SUM".equals(request.getRepaymentMethod())) {
+        String method = request.getRepaymentMethod();
+
+        if ("LUMP_SUM".equals(method)) {
             RepaymentSchedule schedule = RepaymentSchedule.builder()
                     .contract(contract)
                     .installmentNo(1)
@@ -564,7 +566,15 @@ public class ContractService {
                     .build();
             contract.addRepaymentSchedule(schedule);
 
-        } else /* if ("INSTALLMENT".equals(request.getRepaymentMethod())) */ {
+        } else {
+            int intervalMonths = switch (method) {
+                case "MONTHLY" -> 1;
+                case "QUARTERLY" -> 3;
+                case "SEMI_ANNUAL" -> 6;
+                case "ANNUAL" -> 12;
+                default -> throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 상환 방식입니다.");
+            };
+
             int installments = request.getTotalInstallments();
             BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2,
                     RoundingMode.DOWN);
@@ -578,7 +588,7 @@ public class ContractService {
 
             for (int i = 1; i <= installments; i++) {
                 // 납부일자 계산 (repaymentDay 기반 엣지 케이스 처리)
-                LocalDate targetMonth = request.getStartDt().plusMonths(i);
+                LocalDate targetMonth = request.getStartDt().plusMonths((long) i * intervalMonths);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
                 int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
 
