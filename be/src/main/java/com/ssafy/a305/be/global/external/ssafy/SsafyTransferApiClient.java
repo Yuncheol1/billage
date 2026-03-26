@@ -95,11 +95,14 @@ public class SsafyTransferApiClient {
             SsafyTransferResponse body = response.getBody();
 
             if (body == null || !body.isSuccess()) {
+                String responseCode = (body != null && body.getHeader() != null)
+                        ? body.getHeader().getResponseCode()
+                        : "Q1000";
                 String errorMsg = (body != null && body.getHeader() != null)
                         ? body.getHeader().getResponseMessage()
                         : "응답 없음";
-                log.error("[SSAFY 이체] 실패 - 사유: {}", errorMsg);
-                throw new TransferFailException("SSAFY 이체 API 실패: " + errorMsg);
+                log.error("[SSAFY 이체] 실패 - code={}, 사유={}", responseCode, errorMsg);
+                throw new TransferFailException("SSAFY_TRANSFER_FAILED|" + responseCode + "|" + errorMsg);
             }
 
             log.info("[SSAFY 이체] 성공 - 출금:{} → 입금:{}", withdrawalAccountNo, depositAccountNo);

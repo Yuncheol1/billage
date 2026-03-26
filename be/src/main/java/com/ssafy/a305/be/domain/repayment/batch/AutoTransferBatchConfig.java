@@ -153,7 +153,9 @@ public class AutoTransferBatchConfig {
             notificationCommandService.sendRepaymentPaidNotifications(schedule);
 
             boolean allSchedulesCompleted = schedule.getContract().getRepaymentSchedules().stream()
-                    .allMatch(item -> "PAID".equals(item.getStatus()) || "WAIVED".equals(item.getStatus()));
+                    .allMatch(item -> "PAID".equals(item.getStatus())
+                            || "MANUAL_PAID".equals(item.getStatus())
+                            || "WAIVED".equals(item.getStatus()));
             if (allSchedulesCompleted) {
                 schedule.getContract().markClosed(now);
                 notificationCommandService.sendContractClosedNotifications(schedule.getContract());
