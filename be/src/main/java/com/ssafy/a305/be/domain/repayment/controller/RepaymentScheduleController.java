@@ -22,7 +22,7 @@ import java.util.Map;
 
 @Tag(name = "상환 스케줄 API", description = "계약에 해당하는 상환 스케줄을 처리하는 API")
 @RestController
-@RequestMapping("/api/v1/contracts")
+@RequestMapping("/api/v1/repayment")
 @RequiredArgsConstructor
 public class RepaymentScheduleController {
     private final RepaymentScheduleService repaymentScheduleService;
