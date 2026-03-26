@@ -26,6 +26,13 @@ interface ContractApi {
         @Body request: AddClauseRequest
     ): AddClauseResponse
 
+    // 자연어 → AI 변환 특약 추가
+    @POST("api/v1/contracts/{contractSeq}/clausesAI")
+    suspend fun addClauseAI(
+        @Path("contractSeq") contractSeq: Int,
+        @Body request: AddAiClauseRequest
+    ): AddAiClauseResponse
+
     // 특약 삭제
     @DELETE("api/v1/contracts/{contractSeq}/clauses/{clauseSeq}")
     suspend fun deleteClause(
@@ -158,6 +165,24 @@ data class AddClauseData(
 data class DeleteClauseResponse(
     val status: Int,
     val message: String
+)
+
+@Serializable
+data class AddAiClauseRequest(
+    val naturalLanguage: String
+)
+
+@Serializable
+data class AddAiClauseResponse(
+    val status: Int,
+    val message: String,
+    val data: AddAiClauseData? = null
+)
+
+@Serializable
+data class AddAiClauseData(
+    val clauseSeq: Int,
+    val content: String   // AI가 변환한 법적 문구
 )
 
 // ─────────────────────────────────────────

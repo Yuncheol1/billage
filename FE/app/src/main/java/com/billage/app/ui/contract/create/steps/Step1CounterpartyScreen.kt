@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -91,6 +93,9 @@ fun Step1CounterpartyScreen(
 ) {
     val isSearchEnabled = realName.isNotBlank() && isValidPhone(phone)
             && searchState !is UserSearchState.Loading
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
@@ -195,7 +200,11 @@ fun Step1CounterpartyScreen(
                         color = if (isSearchEnabled) BillagePrimary else BillageCardBorder,
                         shape = RoundedCornerShape(16.dp)
                     )
-                    .clickable(enabled = isSearchEnabled) { onSearch() }
+                    .clickable(enabled = isSearchEnabled) {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                        onSearch()
+                    }
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 contentAlignment = Alignment.Center
             ) {

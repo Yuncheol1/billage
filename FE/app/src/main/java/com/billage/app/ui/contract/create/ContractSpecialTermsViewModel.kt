@@ -3,6 +3,7 @@ package com.billage.app.ui.contract.create
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.billage.app.data.remote.api.AddAiClauseRequest
 import com.billage.app.data.remote.api.AddClauseRequest
 import com.billage.app.data.remote.api.ContractApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,12 +46,12 @@ class ContractSpecialTermsViewModel @Inject constructor(
     val uiState: StateFlow<SpecialTermsUiState> = _uiState.asStateFlow()
 
     val recommendedTerms = listOf(
-        RecommendedTermItem("⏩", "중도 상환 허용", "중도 상환을 허용한다"),
-        RecommendedTermItem("⏰", "연체 이자 부과", "연체 시 연체이자를 부과한다"),
-        RecommendedTermItem("💳", "계좌이체로만 상환", "상환은 계좌이체로만 한다"),
-        RecommendedTermItem("🔒", "채권 양도 금지", "채권 양도를 금지한다"),
-        RecommendedTermItem("🤫", "계약 내용 비밀 유지", "계약 내용을 비밀로 유지한다"),
-        RecommendedTermItem("⚖️", "분쟁 시 조정 우선", "분쟁 발생 시 조정을 우선한다")
+        RecommendedTermItem("⏩", "중도 상환 허용", "채무자는 만기일 이전에도 원금의 전부 또는 일부를 중도 상환할 수 있으며, 이 경우 중도상환수수료는 부과하지 않는다."),
+        RecommendedTermItem("⏰", "연체 이자 부과", "채무자가 약정된 상환일로부터 지체할 경우, 연체된 금액에 대해 연체 기간 동안 연 20%의 연체이자를 부과한다."),
+        RecommendedTermItem("💳", "계좌이체로만 상환", "모든 상환은 채권자 명의의 지정 계좌로 계좌이체 방식으로만 진행하며, 현금 수령은 인정하지 않는다."),
+        RecommendedTermItem("🔒", "채권 양도 금지", "채권자는 본 계약에 따른 채권을 채무자의 서면 동의 없이 제3자에게 양도하거나 담보로 제공할 수 없다."),
+        RecommendedTermItem("🤫", "계약 내용 비밀 유지", "양 당사자는 본 계약의 내용을 제3자에게 공개하지 않기로 하며, 이를 위반할 경우 손해배상 책임을 진다."),
+        RecommendedTermItem("⚖️", "분쟁 시 조정 우선", "본 계약과 관련한 분쟁이 발생할 경우, 소송 제기 전에 한국소비자원 또는 대한상사중재원의 조정 절차를 먼저 거친다.")
     )
 
     fun addRecommendedTerm(item: RecommendedTermItem) {
@@ -74,23 +75,51 @@ class ContractSpecialTermsViewModel @Inject constructor(
     }
 
     fun addDirectInputTerm() {
-        val content = _uiState.value.directInputText.trim()
+        val naturalLanguage = _uiState.value.directInputText.trim()
 
-        // 유효성 검사
-        if (content.isEmpty()) {
+        if (naturalLanguage.isEmpty()) {
             _uiState.value = _uiState.value.copy(errorMessage = "내용을 입력해주세요")
             return
         }
-        if (content.length < 10) {
-            _uiState.value = _uiState.value.copy(errorMessage = "조금 더 구체적으로 입력해주세요")
+
+        if (contractSeq == -1) {
+            _uiState.value = _uiState.value.copy(errorMessage = "계약 정보를 찾을 수 없어요.")
             return
         }
 
-        callAddClauseApi(
-            clauseContent = content,
-            displayTitle = content,
-            isRecommended = false
-        )
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            try {
+                val response = contractApi.addClauseAI(
+                    contractSeq = contractSeq,
+                    request = AddAiClauseRequest(naturalLanguage = naturalLanguage)
+                )
+                if (response.status == 201) {
+                    val aiContent = response.data?.content ?: naturalLanguage
+                    val clauseSeq = response.data?.clauseSeq ?: -1
+                    val newTerm = SpecialTerm(
+                        title = aiContent,
+                        isRecommended = false,
+                        clauseSeq = clauseSeq
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        addedTerms = _uiState.value.addedTerms + newTerm,
+                        directInputText = ""
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "AI 변환에 실패했어요. 다시 시도해주세요."
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "AI 변환에 실패했어요. 다시 시도해주세요."
+                )
+            }
+        }
     }
 
     fun removeTerm(termId: String) {
