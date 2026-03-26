@@ -149,7 +149,9 @@ fun ChatRoomScreen(
                         BiometricLoginManager.prompt(
                             activity = activity,
                             onSuccess = { showSignatureDialog = true },
-                            onError = { message -> localSignatureMessage = message },
+                            onError = { message ->
+                                localSignatureMessage = message.takeIf { it.isNotBlank() }
+                            },
                             onEnrollmentRequired = {
                                 localSignatureMessage = "기기에서 지문 인증을 사용할 수 없습니다. 화면 잠금과 지문을 먼저 등록해 주세요."
                             },

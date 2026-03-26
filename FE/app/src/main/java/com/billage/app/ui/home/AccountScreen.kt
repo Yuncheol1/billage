@@ -208,6 +208,9 @@ private fun TransactionItem(transaction: TransactionDto, onClick: () -> Unit) {
     val isDeposit = transaction.transactionTypeName.contains("입금")
     val amountColor = if (isDeposit) BillageSuccess else BillageDanger
     val amountPrefix = if (isDeposit) "+" else "-"
+    val displayCounterpart = transaction.counterpartName.ifBlank {
+        transaction.transactionSummary.ifBlank { "-" }
+    }
 
     Row(
         modifier = Modifier
@@ -219,7 +222,7 @@ private fun TransactionItem(transaction: TransactionDto, onClick: () -> Unit) {
     ) {
         Column {
             Text(
-                text = transaction.transactionSummary.ifBlank { "-" },
+                text = displayCounterpart,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = BillageTextPrimary

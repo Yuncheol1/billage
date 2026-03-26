@@ -19,7 +19,11 @@ class RepaymentRepository @Inject constructor(
         return repaymentApi.getUpcomingSchedules().data
     }
 
-    suspend fun markManualRepayment(scheduleSeq: Int): RepaymentActionResult {
-        return repaymentApi.markManualRepayment(scheduleSeq).data
+    suspend fun markRepaymentSchedulePaid(contractSeq: Int, scheduleSeq: Int): RepaymentActionResult? {
+        return repaymentApi.markRepaymentSchedulePaid(contractSeq, scheduleSeq).data
+    }
+
+    suspend fun transferRepaymentSchedule(contractSeq: Int, scheduleSeq: Int): RepaymentActionResult? {
+        return repaymentApi.transferRepaymentSchedule(contractSeq, scheduleSeq).data
     }
 }

@@ -111,16 +111,32 @@ class ContractDetailViewModel @Inject constructor(
         }
     }
 
-    fun markManualRepayment(contractSeq: Int, scheduleSeq: Int) {
+    fun markRepaymentSchedulePaid(contractSeq: Int, scheduleSeq: Int) {
         viewModelScope.launch {
             _activeActionScheduleSeq.value = scheduleSeq
             _timelineErrorMessage.value = null
             try {
-                repaymentRepository.markManualRepayment(scheduleSeq)
+                repaymentRepository.markRepaymentSchedulePaid(contractSeq, scheduleSeq)
                 fetchContractDetail(contractSeq)
                 fetchRepaymentSchedules(contractSeq)
             } catch (_: Exception) {
                 _timelineErrorMessage.value = "수동 상환 처리에 실패했습니다."
+            } finally {
+                _activeActionScheduleSeq.value = null
+            }
+        }
+    }
+
+    fun transferRepaymentSchedule(contractSeq: Int, scheduleSeq: Int) {
+        viewModelScope.launch {
+            _activeActionScheduleSeq.value = scheduleSeq
+            _timelineErrorMessage.value = null
+            try {
+                repaymentRepository.transferRepaymentSchedule(contractSeq, scheduleSeq)
+                fetchContractDetail(contractSeq)
+                fetchRepaymentSchedules(contractSeq)
+            } catch (_: Exception) {
+                _timelineErrorMessage.value = "바로 상환 처리에 실패했습니다."
             } finally {
                 _activeActionScheduleSeq.value = null
             }

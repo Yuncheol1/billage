@@ -364,7 +364,11 @@ fun ContractDetailScreen(
                 TextButton(
                     onClick = {
                         contractSeq.toIntOrNull()?.let { contractSeqInt ->
-                            viewModel.markManualRepayment(contractSeqInt, dialogState.scheduleSeq)
+                            if (detail?.myRole == "CREDITOR") {
+                                viewModel.markRepaymentSchedulePaid(contractSeqInt, dialogState.scheduleSeq)
+                            } else {
+                                viewModel.transferRepaymentSchedule(contractSeqInt, dialogState.scheduleSeq)
+                            }
                         }
                         pendingAction = null
                     }

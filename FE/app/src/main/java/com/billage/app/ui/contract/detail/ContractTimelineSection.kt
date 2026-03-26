@@ -257,7 +257,10 @@ private fun ScheduleAmounts(schedule: RepaymentScheduleItem) {
         ScheduleAmountRow(label = "총 납부액", value = formatCurrency(schedule.totalDue))
         ScheduleAmountRow(label = "원금", value = formatCurrency(schedule.principalDue))
         ScheduleAmountRow(label = "이자", value = formatCurrency(schedule.interestDue))
-        ScheduleAmountRow(label = "납부 후 잔액", value = formatCurrency(schedule.remainingBalanceAfter))
+        ScheduleAmountRow(
+            label = "납부 후 잔액",
+            value = schedule.remainingBalanceAfter?.let(::formatCurrency) ?: "-"
+        )
     }
 }
 
