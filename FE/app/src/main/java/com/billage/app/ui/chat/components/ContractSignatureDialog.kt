@@ -90,14 +90,6 @@ fun ContractSignatureDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (!documentHash.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "문서 해시: ${documentHash.take(16)}...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Box(
@@ -179,7 +171,7 @@ fun ContractSignatureDialog(
                         enabled = strokes.isNotEmpty() && !isSubmitting,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("다시 쓰기")
+                        Text("지우기")
                     }
                     OutlinedButton(
                         onClick = onDismissRequest,

@@ -125,7 +125,10 @@ private fun TransactionDetailContent(
     val isDeposit = transaction.transactionTypeName.contains("입금")
     val amountColor = if (isDeposit) BillageSuccess else BillageDanger
     val amountPrefix = if (isDeposit) "+" else "-"
-    val initial = transaction.transactionSummary.firstOrNull()?.toString() ?: "?"
+    val displayCounterpart = transaction.counterpartName.ifBlank {
+        transaction.transactionSummary.ifBlank { "-" }
+    }
+    val initial = displayCounterpart.firstOrNull()?.toString() ?: "?"
     val formattedDateTime = formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)
 
     LazyColumn(
@@ -159,7 +162,7 @@ private fun TransactionDetailContent(
 
                 // 적요 (거래처명)
                 Text(
-                    text = transaction.transactionSummary.ifBlank { "-" },
+                    text = displayCounterpart,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = BillageTextPrimary
@@ -205,7 +208,7 @@ private fun TransactionDetailContent(
                     .fillMaxWidth()
                     .background(BillageSurface)
             ) {
-                DetailRow(label = "적요", value = transaction.transactionSummary.ifBlank { "-" })
+                DetailRow(label = "적요", value = displayCounterpart)
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = BillageDivider)
 
                 DetailRow(label = "거래 유형", value = transaction.transactionTypeName.ifBlank { "-" })

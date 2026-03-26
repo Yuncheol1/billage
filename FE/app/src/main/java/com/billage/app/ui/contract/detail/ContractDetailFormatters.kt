@@ -1,16 +1,17 @@
 package com.billage.app.ui.contract.detail
 
 import androidx.compose.ui.graphics.Color
-import com.billage.app.ui.theme.BillageDanger
-import com.billage.app.ui.theme.BillageInfo
-import com.billage.app.ui.theme.BillagePrimary
-import com.billage.app.ui.theme.BillageSuccess
-import com.billage.app.ui.theme.BillageTextSecondary
-import com.billage.app.ui.theme.BillageWarning
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+
+private val RepaymentDanger = Color(0xFFFF6B6B)
+private val RepaymentInfo = Color(0xFF26C6DA)
+private val RepaymentPrimary = Color(0xFF2EC4A9)
+private val RepaymentSuccess = Color(0xFF4CAF50)
+private val RepaymentTextSecondary = Color(0xFF7A9490)
+private val RepaymentWarning = Color(0xFFFFA000)
 
 internal fun formatAmount(amount: Double): String =
     "%,.0f".format(amount)
@@ -61,16 +62,18 @@ internal fun repaymentStatusLabel(status: String): String = when (status) {
     "NONPAID" -> "납부 예정"
     "SOMEPAID" -> "부분 납부"
     "PAID" -> "납부 완료"
+    "MANUAL_PAID" -> "수동 상환"
     "WAIVED" -> "면제"
     "OVERDUE" -> "연체"
     else -> status
 }
 
 internal fun repaymentStatusColor(status: String): Color = when (status) {
-    "PAID" -> BillageSuccess
-    "OVERDUE" -> BillageDanger
-    "SOMEPAID" -> BillageWarning
-    "WAIVED" -> BillageInfo
-    "NONPAID" -> BillagePrimary
-    else -> BillageTextSecondary
+    "PAID" -> RepaymentSuccess
+    "OVERDUE" -> RepaymentDanger
+    "SOMEPAID" -> RepaymentWarning
+    "WAIVED" -> RepaymentInfo
+    "NONPAID" -> RepaymentPrimary
+    "MANUAL_PAID" -> RepaymentTextSecondary
+    else -> RepaymentTextSecondary
 }

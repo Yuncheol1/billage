@@ -26,7 +26,7 @@ data class RepaymentScheduleItem(
     val principalDue: Double,
     val interestDue: Double,
     val totalDue: Double,
-    val remainingBalanceAfter: Double,
+    val remainingBalanceAfter: Double? = null,
     val status: String,
     val paidDttm: String? = null
 )
@@ -52,16 +52,18 @@ data class UpcomingScheduleListResponse(
 data class RepaymentActionResponse(
     val status: Int,
     val message: String,
-    val data: RepaymentActionResult
+    val data: RepaymentActionResult? = null
 )
 
 @Serializable
 data class RepaymentActionResult(
     val scheduleSeq: Int,
-    val scheduleStatus: String,
-    val paidDttm: String? = null,
     val contractSeq: Int,
-    val contractStatus: String
+    val status: String,
+    val contractId: String? = null,
+    val transactionDate: String? = null,
+    val withdrawalAccountNo: String? = null,
+    val depositAccountNo: String? = null
 )
 
 interface RepaymentApi {
@@ -73,8 +75,15 @@ interface RepaymentApi {
     @GET("/api/v1/repayment/schedules/upcoming")
     suspend fun getUpcomingSchedules(): UpcomingScheduleListResponse
 
-    @POST("/api/v1/repayment/schedules/{scheduleSeq}/manual-pay")
-    suspend fun markManualRepayment(
+    @POST("/api/v1/contracts/{contractSeq}/repayment-schedules/{scheduleSeq}/paid")
+    suspend fun markRepaymentSchedulePaid(
+        @Path("contractSeq") contractSeq: Int,
+        @Path("scheduleSeq") scheduleSeq: Int
+    ): RepaymentActionResponse
+
+    @POST("/api/v1/contracts/{contractSeq}/repayment-schedules/{scheduleSeq}/transfer")
+    suspend fun transferRepaymentSchedule(
+        @Path("contractSeq") contractSeq: Int,
         @Path("scheduleSeq") scheduleSeq: Int
     ): RepaymentActionResponse
 }

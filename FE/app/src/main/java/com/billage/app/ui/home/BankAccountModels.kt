@@ -1,5 +1,6 @@
 package com.billage.app.ui.home
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -63,6 +64,7 @@ data class TransactionDto(
     val transactionBalance: Long = 0L,
     @Serializable(with = FlexibleLongSerializer::class)
     val transactionAfterBalance: Long = 0L,
+    val counterpartName: String = "",
     val transactionSummary: String = "",
     val transactionMemo: String = ""
 )
@@ -70,6 +72,7 @@ data class TransactionDto(
 @Serializable
 data class TransactionListDto(
     val totalCount: String = "0",
+    @SerialName("transactions")
     val list: List<TransactionDto> = emptyList()
 )
 
