@@ -557,16 +557,15 @@ public class ContractService {
         if ("LUMP_SUM".equals(method)&&interestRating.compareTo(BigDecimal.ZERO) != 0) {
             int installments = request.getTotalInstallments();
             
-            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(), request.getStartDt(), request.getEndDt());
-            BigDecimal interestPerMth = totalInterest.divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
-            BigDecimal remainingInterest = totalInterest;
+            BigDecimal interestPerMth = request.getPrincipalAmount()
+                    .multiply(request.getInterestRate())
+                    .divide(new BigDecimal("12"), 2, RoundingMode.DOWN);
 
             for (int i = 1; i <= installments; i++) {
                 boolean isLastMonth = (i == installments);
                 
                 BigDecimal currentPrincipalDue = isLastMonth ? request.getPrincipalAmount() : BigDecimal.ZERO;
-                BigDecimal currentInterestDue = isLastMonth ? remainingInterest : interestPerMth;
-                remainingInterest = remainingInterest.subtract(currentInterestDue);
+                BigDecimal currentInterestDue = interestPerMth;
                 
                 LocalDate targetMonth = request.getStartDt().plusMonths(i);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
