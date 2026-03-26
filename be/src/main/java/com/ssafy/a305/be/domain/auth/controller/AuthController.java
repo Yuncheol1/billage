@@ -55,7 +55,8 @@ public class AuthController {
         UriComponentsBuilder authorizeUriBuilder = UriComponentsBuilder.fromUriString(KAKAO_AUTHORIZE_URI)
                 .queryParam("response_type", "code")
                 .queryParam("client_id", kakaoOAuthProperties.getClientId())
-                .queryParam("redirect_uri", buildKakaoCallbackUri());
+                .queryParam("redirect_uri", buildKakaoCallbackUri())
+                .queryParam("prompt", "select_account");
 
         if (StringUtils.hasText(kakaoOAuthProperties.getScope())) {
             authorizeUriBuilder.queryParam("scope", kakaoOAuthProperties.getScope());
