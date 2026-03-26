@@ -28,11 +28,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -285,11 +287,39 @@ public class BankAccountService {
                 rec.transactionType(),
                 rec.transactionTypeName(),
                 rec.transactionAccountNo(),
-                rec.transactionBalance(),
+                resolveAbsoluteBalance(rec.transactionBalance()),
                 rec.transactionAfterBalance(),
                 rec.transactionSummary(),
-                rec.transactionMemo()
+                rec.transactionMemo(),
+                resolveCounterpartName(rec.transactionAccountNo())
         );
+    }
+
+    private String resolveCounterpartName(String accountNo) {
+        if (!hasText(accountNo)) {
+            return null;
+        }
+        Optional<BankAccount> found = bankAccountRepository.findByAccountNoWithUserProfile(accountNo.trim());
+        if (found.isEmpty()) {
+            return null;
+        }
+        BankAccount ba = found.get();
+        if (ba.getUser() == null || ba.getUser().getProfile() == null) {
+            return null;
+        }
+        String realName = ba.getUser().getProfile().getRealName();
+        return hasText(realName) ? realName.trim() : null;
+    }
+
+    private String resolveAbsoluteBalance(String balance) {
+        if (!hasText(balance)) {
+            return balance;
+        }
+        try {
+            return new BigDecimal(balance.trim()).abs().toPlainString();
+        } catch (NumberFormatException e) {
+            return balance.trim();
+        }
     }
 
     private BankAccountListItemResponseDto toListItem(SsafyDemandDepositAccountRecDto rec, BankAccount linked) {
