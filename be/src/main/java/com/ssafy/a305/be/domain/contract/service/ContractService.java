@@ -546,10 +546,6 @@ public class ContractService {
         }
 
         // 날짜 유효성 검증
-        LocalDate today = LocalDate.now();
-        if (request.getStartDt().isBefore(today)) {
-            throw new CustomBusinessException(ErrorCode.INVALID_DATE, "시작일은 과거일 수 없습니다.");
-        }
         if (!request.getEndDt().isAfter(request.getStartDt())) {
             throw new CustomBusinessException(ErrorCode.INVALID_DATE, "종료일은 시작일보다 미래여야 합니다.");
         }
