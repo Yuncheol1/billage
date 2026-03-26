@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSchedule, Integer> {
 
@@ -41,5 +42,19 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("today") LocalDate today,
             @Param("scheduleStatuses") Collection<String> scheduleStatuses,
             @Param("contractStatuses") Collection<String> contractStatuses
+    );
+
+    @Query("""
+            select rs
+            from RepaymentSchedule rs
+            join fetch rs.contract c
+            join fetch c.creditor
+            join fetch c.debtor
+            where rs.scheduleSeq = :scheduleSeq
+              and c.contractSeq = :contractSeq
+            """)
+    Optional<RepaymentSchedule> findByScheduleSeqAndContractSeqWithContractUsers(
+            @Param("scheduleSeq") Integer scheduleSeq,
+            @Param("contractSeq") Integer contractSeq
     );
 }
