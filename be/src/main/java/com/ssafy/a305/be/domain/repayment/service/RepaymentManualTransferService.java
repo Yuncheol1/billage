@@ -13,6 +13,7 @@ import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import com.ssafy.a305.be.global.external.ssafy.SsafyTransferApiClient;
 import com.ssafy.a305.be.global.external.ssafy.dto.SsafyTransferResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class RepaymentManualTransferService {
     private static final Set<String> TRANSFER_ALLOWED_STATUSES = Set.of("NONPAID", "OVERDUE");
@@ -88,7 +90,7 @@ public class RepaymentManualTransferService {
         );
 
         schedule.markPaid(LocalDateTime.now());
-        notificationCommandService.sendRepaymentPaidNotifications(schedule);
+        sendRepaymentNotificationsSafely(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 
         return new RepaymentScheduleTransferResponseDto(
@@ -126,7 +128,7 @@ public class RepaymentManualTransferService {
         }
 
         schedule.markManualPaid(LocalDateTime.now());
-        notificationCommandService.sendRepaymentPaidNotifications(schedule);
+        sendRepaymentNotificationsSafely(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 
         return new RepaymentSchedulePaidResponseDto(
@@ -153,7 +155,19 @@ public class RepaymentManualTransferService {
 
         if (allSchedulesCompleted) {
             contract.markClosed(LocalDateTime.now());
-            notificationCommandService.sendContractClosedNotifications(contract);
+            try {
+                notificationCommandService.sendContractClosedNotifications(contract);
+            } catch (Exception e) {
+                log.error("Failed to send contract closed notifications. contractSeq={}", contract.getContractSeq(), e);
+            }
+        }
+    }
+
+    private void sendRepaymentNotificationsSafely(RepaymentSchedule schedule) {
+        try {
+            notificationCommandService.sendRepaymentPaidNotifications(schedule);
+        } catch (Exception e) {
+            log.error("Failed to send repayment paid notifications. scheduleSeq={}", schedule.getScheduleSeq(), e);
         }
     }
 
