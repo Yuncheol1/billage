@@ -5,6 +5,8 @@ import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.billage.app.ui.contract.create.ContractRole
+import com.billage.app.ui.contract.list.ContractRoleFilter
+import com.billage.app.ui.contract.list.ContractStatusFilter
 
 sealed interface AppDestination {
     val route: String
@@ -37,6 +39,7 @@ sealed interface AppDestination {
 
     data object Mypage : AppDestination {
         override val route: String = "mypage"
+        const val routeWithArgs = "mypage?role={role}&status={status}"
     }
 
     data object Settings : AppDestination {
@@ -187,13 +190,28 @@ class AppNavController(
         }
     }
 
-    fun navigateToMypage() {
-        navController.navigate(AppDestination.Mypage.route) {
+    fun navigateToMypage(
+        role: ContractRoleFilter? = null,
+        status: ContractStatusFilter? = null
+    ) {
+        val route = buildString {
+            append(AppDestination.Mypage.route)
+            val params = listOfNotNull(
+                role?.let { "role=${it.name}" },
+                status?.let { "status=${it.name}" }
+            )
+            if (params.isNotEmpty()) {
+                append("?")
+                append(params.joinToString("&"))
+            }
+        }
+
+        navController.navigate(route) {
             popUpTo(AppDestination.Home.route) {
                 saveState = true
             }
             launchSingleTop = true
-            restoreState = true
+            restoreState = role == null && status == null
         }
     }
 

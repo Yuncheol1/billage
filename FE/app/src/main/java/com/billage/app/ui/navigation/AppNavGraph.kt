@@ -37,6 +37,8 @@ import com.billage.app.ui.contract.create.ContractCreateCompleteScreen
 import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.contract.create.ContractSpecialTermsScreen
 import com.billage.app.ui.contract.create.ContractCreateViewModel
+import com.billage.app.ui.contract.list.ContractRoleFilter
+import com.billage.app.ui.contract.list.ContractStatusFilter
 import com.billage.app.ui.contract.detail.ContractDetailViewModel
 import com.billage.app.ui.contract.detail.PdfDownloadState
 import com.billage.app.ui.home.AccountDetailScreen
@@ -78,7 +80,19 @@ fun NavGraphBuilder.appNavGraph(
         val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         HomeScreen(
-            onContractClick = { appNavController.navigateToMypage() },
+            onContractClick = { contractType ->
+                when (contractType) {
+                    "lent" -> appNavController.navigateToMypage(
+                        role = ContractRoleFilter.Lend,
+                        status = ContractStatusFilter.Repaying
+                    )
+                    "borrowed" -> appNavController.navigateToMypage(
+                        role = ContractRoleFilter.Borrow,
+                        status = ContractStatusFilter.Repaying
+                    )
+                    else -> appNavController.navigateToMypage()
+                }
+            },
             onAccountClick = { appNavController.navigateToAccount() },
             onNotificationClick = { appNavController.navigateToNotifications() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
@@ -113,6 +127,8 @@ fun NavGraphBuilder.appNavGraph(
             onHomeClick = { appNavController.navigateToHome() },
             onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onContractClick = { appNavController.navigateToMypage() },
+            onAccountClick = { appNavController.navigateToAccount() },
+            onInsightListClick = { appNavController.navigateToInsightList() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             menuProfileState = menuProfileState
@@ -298,17 +314,39 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(route = AppDestination.Mypage.route) {
+    composable(
+        route = AppDestination.Mypage.routeWithArgs,
+        arguments = listOf(
+            androidx.navigation.navArgument("role") {
+                type = androidx.navigation.NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            androidx.navigation.navArgument("status") {
+                type = androidx.navigation.NavType.StringType
+                nullable = true
+                defaultValue = null
+            }
+        )
+    ) { backStackEntry ->
+        val initialRole = backStackEntry.arguments?.getString("role")
+            ?.let { runCatching { ContractRoleFilter.valueOf(it) }.getOrNull() }
+        val initialStatus = backStackEntry.arguments?.getString("status")
+            ?.let { runCatching { ContractStatusFilter.valueOf(it) }.getOrNull() }
         val menuProfileViewModel: MenuProfileViewModel = hiltViewModel()
         val menuProfileState by menuProfileViewModel.uiState.collectAsState()
         ContractListScreen(
             onNavigateHome = { appNavController.navigateToHome() },
             onNotificationClick = { appNavController.navigateToNotifications() },
-            onAddContractClick = { appNavController.navigateToContract() },
+            onAddContractClick = { role -> appNavController.navigateToContract(role) },
             onChatClick = { appNavController.navigateToChatList() },
+            onAccountClick = { appNavController.navigateToAccount() },
+            onInsightListClick = { appNavController.navigateToInsightList() },
             onSettingsClick = { appNavController.navigateToSettings() },
             onLogoutClick = { appNavController.navigateToLogin(clearBackStack = true) },
             onContractDetailClick = { contractId -> appNavController.navigateToContractDetail(contractId.toString()) },
+            initialRole = initialRole,
+            initialStatus = initialStatus,
             menuProfileState = menuProfileState
         )
     }

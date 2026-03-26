@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.billage.app.ui.common.AddContractBottomSheet
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.MenuProfileState
@@ -65,6 +66,7 @@ fun ChatListScreen(
     onHomeClick: () -> Unit,
     onAddContractClick: (com.billage.app.ui.contract.create.ContractRole) -> Unit,
     onContractClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     onInsightListClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
@@ -85,6 +87,7 @@ fun ChatListScreen(
 
     var showCreateRoomDialog by remember { mutableStateOf(false) }
     var isCreating by remember { mutableStateOf(false) }
+    var showContractTypeSheet by remember { mutableStateOf(false) }
 
     if (showCreateRoomDialog) {
         AlertDialog(
@@ -204,7 +207,7 @@ fun ChatListScreen(
             bottomBar = {
                 BottomBar(
                     selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.ChatList,
-                    onAddContractClick = { onAddContractClick(com.billage.app.ui.contract.create.ContractRole.CREDITOR) }, // BottomBar는 role을 전달하지 않으므로 기본값(또는 바텀시트 동작) 처리
+                    onAddContractClick = { showContractTypeSheet = true },
                     onHomeClick = onHomeClick,
                     onChatClick = {}, // We are already here
                     onContractClick = onContractClick,
@@ -345,7 +348,10 @@ fun ChatListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
-                    onAccountClick = { showMenu = false },
+                    onAccountClick = {
+                        showMenu = false
+                        onAccountClick()
+                    },
                     onInsightListClick = {
                         showMenu = false
                         onInsightListClick()
@@ -364,6 +370,16 @@ fun ChatListScreen(
                 )
             }
         }
+    }
+
+    if (showContractTypeSheet) {
+        AddContractBottomSheet(
+            onDismiss = { showContractTypeSheet = false },
+            onSelect = { role ->
+                showContractTypeSheet = false
+                onAddContractClick(role)
+            }
+        )
     }
 }
 

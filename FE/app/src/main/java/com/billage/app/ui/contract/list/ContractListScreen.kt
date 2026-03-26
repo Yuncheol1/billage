@@ -40,11 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.billage.app.ui.common.AddContractBottomSheet
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.MenuProfileState
 import com.billage.app.ui.common.TopBar
 import com.billage.app.ui.common.rememberLogoutUiState
+import com.billage.app.ui.contract.create.ContractRole
 import com.billage.app.ui.home.HomeSideMenu
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillagePrimary
@@ -60,12 +62,15 @@ import com.billage.app.ui.theme.BillageTextSecondary
 fun ContractListScreen(
     onNavigateHome: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
-    onAddContractClick: () -> Unit = {},
+    onAddContractClick: (ContractRole) -> Unit = {},
     onChatClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onInsightListClick: () -> Unit = {},
     onContractDetailClick: (contractId: Int) -> Unit = {},
+    initialRole: ContractRoleFilter? = null,
+    initialStatus: ContractStatusFilter? = null,
     menuProfileState: MenuProfileState = MenuProfileState(),
     viewModel: ContractListViewModel = hiltViewModel()
 ) {
@@ -75,6 +80,7 @@ fun ContractListScreen(
     }
     val logoutUiState = rememberLogoutUiState(onLoggedOut = onLogoutClick)
     var showMenu by remember { mutableStateOf(false) }
+    var showContractTypeSheet by remember { mutableStateOf(false) }
     val dismissInteraction = remember { MutableInteractionSource() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -88,6 +94,11 @@ fun ContractListScreen(
 
     var selectedRole by rememberSaveable { mutableStateOf(ContractRoleFilter.All) }
     var selectedStatus by rememberSaveable { mutableStateOf(ContractStatusFilter.All) }
+
+    LaunchedEffect(initialRole, initialStatus) {
+        initialRole?.let { selectedRole = it }
+        initialStatus?.let { selectedStatus = it }
+    }
 
     // 필터 변경 시 API 재호출
     // status는 항상 null(전체 조회) — 상태별 apiValues가 복수이므로 서버 필터 불가.
@@ -123,7 +134,7 @@ fun ContractListScreen(
             bottomBar = {
                 BottomBar(
                     selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.Contract,
-                    onAddContractClick = onAddContractClick,
+                    onAddContractClick = { showContractTypeSheet = true },
                     onHomeClick = onNavigateHome,
                     onChatClick = onChatClick,
                     onContractClick = {},
@@ -247,7 +258,10 @@ fun ContractListScreen(
                     isLoggingOut = logoutUiState.isLoggingOut,
                     onClose = { showMenu = false },
                     onProfileClick = { showMenu = false },
-                    onAccountClick = { showMenu = false },
+                    onAccountClick = {
+                        showMenu = false
+                        onAccountClick()
+                    },
                     onInsightListClick = {
                         showMenu = false
                         onInsightListClick()
@@ -260,5 +274,15 @@ fun ContractListScreen(
                 )
             }
         }
+    }
+
+    if (showContractTypeSheet) {
+        AddContractBottomSheet(
+            onDismiss = { showContractTypeSheet = false },
+            onSelect = { role ->
+                showContractTypeSheet = false
+                onAddContractClick(role)
+            }
+        )
     }
 }
