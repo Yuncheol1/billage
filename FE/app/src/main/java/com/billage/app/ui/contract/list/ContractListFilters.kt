@@ -44,7 +44,7 @@ enum class ContractStatusFilter(val label: String, val apiValues: List<String>) 
     /** 계약 체결 후 상환 단계 (SIGNED + ACTIVE + OVERDUE + DISPUTED) */
     Repaying("계약 진행 중", listOf("SIGNED", "ACTIVE", "OVERDUE", "DISPUTED")),
     /** 상환 완료 */
-    Closed("계약 완료", listOf("CLOSED"))
+    Closed("계약 종료", listOf("CLOSED"))
 }
 
 /** API status 문자열 → ContractStatusFilter 변환 헬퍼 */
@@ -105,7 +105,7 @@ fun RoleFilterTabs(
     }
 }
 
-/** 상태 선택 탭 (전체 / 서명 전 / 계약 진행 중 / 계약 완료) — 세그먼트 탭 스타일 */
+/** 상태 선택 탭 (전체 / 서명 전 / 계약 진행 중 / 계약 종료) — 세그먼트 탭 스타일 */
 @Composable
 fun StatusFilterChips(
     selectedStatus: ContractStatusFilter,
