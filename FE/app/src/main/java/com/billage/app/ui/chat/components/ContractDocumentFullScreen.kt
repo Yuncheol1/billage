@@ -8,7 +8,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -49,7 +51,8 @@ fun ContractDocumentFullScreen(
     isInitial: Boolean = false,
     contractAiAnalysis: AiAnalysisResult? = null,
     rawAiAnalysisJson: String? = null,
-    isAiAnalyzing: Boolean = false
+    isAiAnalyzing: Boolean = false,
+    proposedModifications: List<String>? = null
 ) {
     var showModificationWarning by remember { mutableStateOf(false) }
 
@@ -162,7 +165,8 @@ fun ContractDocumentFullScreen(
                             providedProposedInterest = proposedInterestRate,
                             aiAnalysis = contractAiAnalysis, 
                             rawAiAnalysisJson = rawAiAnalysisJson, 
-                            isAiAnalyzing = isAiAnalyzing
+                            isAiAnalyzing = isAiAnalyzing,
+                            proposedModifications = proposedModifications
                         )
                     } else { // Original View
                         DocumentOriginalView(contractTitle, contractDetail, contractAiAnalysis, rawAiAnalysisJson, isAiAnalyzing)
@@ -581,7 +585,8 @@ fun DocumentDiffView(
     providedProposedInterest: Double? = null,
     aiAnalysis: com.billage.app.domain.model.AiAnalysisResult? = null,
     rawAiAnalysisJson: String? = null,
-    isAiAnalyzing: Boolean = false
+    isAiAnalyzing: Boolean = false,
+    proposedModifications: List<String>? = null
 ) {
     val delStyle = SpanStyle(
         color = Color(0xFFCB2431),
@@ -649,6 +654,63 @@ fun DocumentDiffView(
         }
         
         Spacer(modifier = Modifier.height(24.dp))
+
+        // ADD: proposedModifications 기반의 추가 렌더링 로직
+        if (!proposedModifications.isNullOrEmpty()) {
+            Text(
+                text = "제안된 조항 변경사항", 
+                fontWeight = FontWeight.ExtraBold, 
+                fontSize = 18.sp, 
+                color = BillagePrimary,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            proposedModifications.forEach { mod ->
+                val isAdd = mod.startsWith("ADD:")
+                val isDel = mod.startsWith("DEL:")
+                val displayMod = mod.removePrefix("ADD:").removePrefix("DEL:").trim()
+                
+                if (isAdd || isDel) {
+                    val contentColor = if (isAdd) BillagePrimary else BillageDanger
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(contentColor.copy(alpha = 0.05f))
+                            .border(1.dp, contentColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isAdd) Icons.Default.Add else Icons.Default.Remove,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isAdd) "추가/수정됨" else "삭제/수정전",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = contentColor
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = displayMod,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp,
+                            color = BillageTextPrimary,
+                            textDecoration = if (isDel) TextDecoration.LineThrough else null
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            HorizontalDivider(color = BillageDivider, modifier = Modifier.padding(vertical = 16.dp))
+        }
 
         val displayClauses = if (!proposal?.clauses.isNullOrEmpty()) {
             proposal?.clauses ?: emptyList()

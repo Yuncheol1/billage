@@ -166,6 +166,7 @@ fun NavGraphBuilder.appNavGraph(
         var currentOriginalInterest by remember { mutableStateOf<Double?>(null) }
         var currentProposedPrincipal by remember { mutableStateOf<Double?>(null) }
         var currentProposedInterest by remember { mutableStateOf<Double?>(null) }
+        var currentProposedModifications by remember { mutableStateOf<List<String>?>(null) }
         var isInitialDialog by remember { mutableStateOf(false) }
 
         // 차용증 전문/제안서 다이얼로그
@@ -179,6 +180,7 @@ fun NavGraphBuilder.appNavGraph(
                 originalInterestRate = currentOriginalInterest,
                 proposedPrincipal = currentProposedPrincipal,
                 proposedInterestRate = currentProposedInterest,
+                proposedModifications = currentProposedModifications,
                 isInitial = isInitialDialog,
                 onDismissRequest = { showProposalDialog = false },
                 onAccept = {
@@ -248,6 +250,10 @@ fun NavGraphBuilder.appNavGraph(
                 ) {
                     items(messages.asReversed()) { msg ->
                         val isMe = msg.senderSeq == viewModel.myUserSeq
+                        val chatRoomState by viewModel.chatRoomState.collectAsState()
+                        val contractStatus = chatRoomState.draftContractDetail?.status
+                        val isContractReadOnly = contractStatus != null && 
+                            contractStatus != "DRAFT" && contractStatus != "NEGOTIATING"
                         if (msg.msgType == "SYSTEM") {
                             com.billage.app.ui.chat.components.cards.SystemNoticeCard(
                                 message = com.billage.app.ui.chat.models.SystemNoticeMessage(
@@ -284,11 +290,36 @@ fun NavGraphBuilder.appNavGraph(
                                           currentOriginalInterest = payload.originalInterestRate
                                           currentProposedPrincipal = payload.proposedPrincipal
                                           currentProposedInterest = payload.proposedInterestRate
+                                          currentProposedModifications = payload.modifications
                                           isInitialDialog = payload.isInitial
                                           viewModel.fetchContractDetail(payload.contractSeq)
                                           showProposalDialog = true
                                       },
-                                     isEnabled = lastAiProposalIds[payload.contractSeq] == msg.id
+                                     isEnabled = !isContractReadOnly && lastAiProposalIds[payload.contractSeq] == msg.id
+                                 )
+                             }
+                        } else if (msg.msgType == "CONTRACT_COMPLETE") {
+                             // 체결 완료 카드
+                             val payload = try {
+                                 kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                     .decodeFromString<com.billage.app.ui.chat.models.ContractCompletePayload>(msg.content)
+                             } catch (e: Exception) { null }
+
+                             if (payload != null) {
+                                 com.billage.app.ui.chat.components.cards.ContractCompleteCard(
+                                     message = com.billage.app.ui.chat.models.ContractCompleteMessage(
+                                         id = msg.id,
+                                         sender = com.billage.app.ui.chat.models.MessageSender.SYSTEM,
+                                         timestamp = java.time.LocalDateTime.now(),
+                                         contractId = payload.contractId,
+                                         contractTitle = payload.contractTitle,
+                                         principalAmount = payload.principalAmount,
+                                         interestRate = payload.interestRate
+                                     ),
+                                     onViewDetailsClick = {
+                                         viewModel.fetchContractDetail(payload.contractSeq)
+                                         showProposalDialog = true
+                                     }
                                  )
                              }
                         } else {

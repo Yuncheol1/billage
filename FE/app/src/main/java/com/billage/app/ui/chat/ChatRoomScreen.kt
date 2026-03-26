@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import com.billage.app.ui.chat.models.ContractSummary
 import com.billage.app.ui.theme.BillagePrimary
@@ -158,50 +159,61 @@ fun ChatRoomScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
-            com.billage.app.ui.chat.components.SignatureBanner(
-                isVisible = shouldShowSignatureBanner,
-                onSignClick = {
-                    if (activity == null) {
-                        localSignatureMessage = "전자서명을 시작할 Activity 컨텍스트를 찾을 수 없습니다."
-                        return@SignatureBanner
-                    }
-
-                    BiometricLoginManager.prompt(
-                        activity = activity,
-                        onSuccess = { showSignatureDialog = true },
-                        onError = { message -> localSignatureMessage = message },
-                        onEnrollmentRequired = {
-                            localSignatureMessage = "기기에서 지문 인증을 사용할 수 없습니다. 화면 잠금과 지문을 먼저 등록해 주세요."
-                        },
-                        title = "전자서명",
-                        subtitle = "지문 인증 후 계약 서명을 진행합니다."
+            // 1. 메인 메시지 영역 (상단바와 하단바/키보드 높이만큼 패딩 적용)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = paddingValues.calculateTopPadding(),
+                        bottom = paddingValues.calculateBottomPadding()
                     )
-                }
-            )
+            ) {
+                messageListContent()
+            }
 
-            // 계약 협의 모드일 경우 상단에 고정되는 배너
-            if (state.mode == com.billage.app.ui.chat.models.ChatRoomMode.CONTRACT) {
-                com.billage.app.ui.chat.components.PinnedContractBanner(
-                    selectedContract = state.selectedContract,
-                    isAnalyzing = state.isAiAnalyzing,
-                    onExitClick = { onExitModificationMode() },
-                    onAnalyzeClick = {
-                        onAnalyzeNegotiation()
+            // 2. 상단 고정 안내 배너들 (상단바 패딩만 적용, 키보드 영향을 받지 않도록 별도 배치)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = paddingValues.calculateTopPadding())
+                    .align(Alignment.TopCenter)
+            ) {
+                // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
+                com.billage.app.ui.chat.components.SignatureBanner(
+                    isVisible = shouldShowSignatureBanner,
+                    onSignClick = {
+                        if (activity == null) {
+                            localSignatureMessage = "전자서명을 시작할 Activity 컨텍스트를 찾을 수 없습니다."
+                            return@SignatureBanner
+                        }
+
+                        BiometricLoginManager.prompt(
+                            activity = activity,
+                            onSuccess = { showSignatureDialog = true },
+                            onError = { message -> localSignatureMessage = message },
+                            onEnrollmentRequired = {
+                                localSignatureMessage = "기기에서 지문 인증을 사용할 수 없습니다. 화면 잠금과 지문을 먼저 등록해 주세요."
+                            },
+                            title = "전자서명",
+                            subtitle = "지문 인증 후 계약 서명을 진행합니다."
+                        )
                     }
                 )
-            }
-            
-            // 메인 메시지 영역
-            androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
-                messageListContent()
 
-                // MOCK AI 제안 도착 카드 (채팅방 하단 고정 -> 나중에 LazyColumn 내부로 이동 완료)
+                // 계약 협의 모드일 경우 상단에 고정되는 배너
+                if (state.mode == com.billage.app.ui.chat.models.ChatRoomMode.CONTRACT) {
+                    com.billage.app.ui.chat.components.PinnedContractBanner(
+                        selectedContract = state.selectedContract,
+                        isAnalyzing = state.isAiAnalyzing,
+                        onExitClick = { onExitModificationMode() },
+                        onAnalyzeClick = {
+                            onAnalyzeNegotiation()
+                        }
+                    )
+                }
             }
         }
     }
@@ -372,7 +384,14 @@ fun ChatRoomScreen(
             },
             onContractSelect = { contract: com.billage.app.data.remote.api.ContractListResponse ->
                 showAiSelectDialog = false
-                onAiNegotiateSelect(contract)
+                
+                val anyAccepted = state.isMeAccepted || state.isOpponentAccepted
+                if (anyAccepted) {
+                    pendingModificationAction = { onAiNegotiateSelect(contract) }
+                    showModificationConfirm = true
+                } else {
+                    onAiNegotiateSelect(contract)
+                }
             }
         )
     }

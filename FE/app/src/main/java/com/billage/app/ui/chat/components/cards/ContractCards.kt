@@ -659,17 +659,40 @@ fun AiProposalCard(
                             }
                         } else {
                             filteredMods.forEachIndexed { index, mod ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    androidx.compose.foundation.layout.Box(
-                                        modifier = androidx.compose.ui.Modifier
-                                            .size(4.dp)
-                                            .background(BillagePrimary, androidx.compose.foundation.shape.CircleShape)
-                                    )
-                                    Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                                val isAdd = mod.startsWith("ADD: ")
+                                val isDel = mod.startsWith("DEL: ")
+                                val displayMod = when {
+                                    isAdd -> mod.substringAfter("ADD: ")
+                                    isDel -> mod.substringAfter("DEL: ")
+                                    else -> mod
+                                }
+                                
+                                val contentColor = when {
+                                    isAdd -> BillagePrimary
+                                    isDel -> BillageDanger
+                                    else -> BillageTextSecondary
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = androidx.compose.ui.Modifier.padding(vertical = 2.dp)
+                                ) {
                                     Text(
-                                        text = "제${index + 1}조 $mod",
+                                        text = when {
+                                            isAdd -> "+"
+                                            isDel -> "-"
+                                            else -> "•"
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = BillageTextSecondary
+                                        color = contentColor,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = androidx.compose.ui.Modifier.width(12.dp)
+                                    )
+                                    Text(
+                                        text = displayMod,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = contentColor,
+                                        textDecoration = if (isDel) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                                     )
                                 }
                             }
@@ -704,6 +727,119 @@ fun AiProposalCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 전자서명이 완료되어 체결된 계약을 보여주는 전용 카드
+ */
+@Composable
+fun ContractCompleteCard(
+    message: com.billage.app.ui.chat.models.ContractCompleteMessage,
+    onViewDetailsClick: () -> Unit
+) {
+    Box(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, BillagePrimary.copy(alpha = 0.3f)),
+            modifier = androidx.compose.ui.Modifier.width(280.dp)
+        ) {
+            Column(
+                modifier = androidx.compose.ui.Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 상단 완료 아이콘 + 텍스트
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = BillagePrimary,
+                    modifier = androidx.compose.ui.Modifier.size(40.dp)
+                )
+                
+                Spacer(modifier = androidx.compose.ui.Modifier.height(12.dp))
+                
+                Text(
+                    text = "계약 체결 완료",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BillagePrimary
+                )
+                
+                Text(
+                    text = "거래가 안전하게 등록되었습니다.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BillageTextSecondary
+                )
+
+                HorizontalDivider(
+                    modifier = androidx.compose.ui.Modifier.padding(vertical = 16.dp),
+                    color = BillagePrimary.copy(alpha = 0.1f)
+                )
+
+                // 요약 정보
+                Column(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("대여 원금", style = MaterialTheme.typography.labelMedium, color = BillageTextSecondary)
+                        Text(
+                            text = "%,.0f원".format(message.principalAmount ?: 0.0),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BillageTextPrimary
+                        )
+                    }
+                    Row(
+                        modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("연 이자율", style = MaterialTheme.typography.labelMedium, color = BillageTextSecondary)
+                        Text(
+                            text = "%.2f%%".format((message.interestRate ?: 0.0) * 100),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BillagePrimary
+                        )
+                    }
+                }
+
+                Spacer(modifier = androidx.compose.ui.Modifier.height(20.dp))
+
+                // 조회 버튼
+                Button(
+                    onClick = onViewDetailsClick,
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
+                ) {
+                    Text(
+                        text = "체결 문서 확인하기",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = androidx.compose.ui.Modifier.height(8.dp))
+                Text(
+                    text = "ID: ${message.contractId}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BillageTextSecondary.copy(alpha = 0.6f)
+                )
             }
         }
     }
