@@ -50,7 +50,7 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             SELECT rs FROM RepaymentSchedule rs 
             JOIN FETCH rs.contract c 
             WHERE (c.creditor.userSeq = :userSeq OR c.debtor.userSeq = :userSeq) 
-              AND c.status = 'ACTIVE' 
+               AND c.status IN ('SIGNED','ACTIVE', 'OVERDUE') 
               AND rs.status IN (:statuses) 
               AND rs.dueDt >= :today 
             ORDER BY rs.dueDt ASC

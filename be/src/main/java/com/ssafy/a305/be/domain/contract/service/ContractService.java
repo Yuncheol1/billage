@@ -291,14 +291,10 @@ public class ContractService {
         }
 
         String status = contract.getStatus();
-        if (!"DRAFT".equals(status) && !"NEGOTIATING".equals(status) && !"SIGNED".equals(status) && !"ACTIVE".equals(status)) {
+        if (!"DRAFT".equals(status)) {
             throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "수정 가능한 상태가 아닙니다.");
         }
 
-        // 이미 서명이 시작된 경우(SIGNED 이상), 기존 서명 무효화 처리
-        if ("SIGNED".equals(status) || "ACTIVE".equals(status)) {
-            signatureRepository.deleteByDocumentContractContractSeq(contractSeq);
-        }
 
         // 브로드캐스트를 위한 이전 데이터 보관 및 변경 내역 계산
         BigDecimal corePrincipal = contract.getPrincipalAmount();
@@ -375,11 +371,7 @@ public class ContractService {
         contract.setAiDraftContent(null); // 즉시 반영이므로 제안서 필드 비움
         contract.resetAgreement(); // 수락 상태 초기화
 
-        // 서명 상태 초기화 (status 재조정)
-        String currentStatus = contract.getStatus();
-        if ("SIGNED".equals(currentStatus) || "ACTIVE".equals(currentStatus)) {
-            contract.resetToNegotiating();
-        }
+
 
         // 아무런 변경이 없었다면 브로드캐스트 생략 가능
         if (dynamicModifications.isEmpty() && (roomId == null || roomId.isBlank())) {
