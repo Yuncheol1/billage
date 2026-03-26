@@ -349,15 +349,30 @@ public class ContractService {
         // 채팅방에 수정 완료 알림 발송 (roomId가 있을 때만)
         if (roomId != null && !roomId.isBlank()) {
             try {
+                // 발신자 역할 및 이름 조회
+                String senderRole = "UNKNOWN";
+                if (contract.getCreditor().getUserSeq().equals(userSeq)) {
+                    senderRole = "CREDITOR";
+                } else if (contract.getDebtor().getUserSeq().equals(userSeq)) {
+                    senderRole = "DEBTOR";
+                }
+
+                String senderName = userProfileRepository.findByUserUserSeq(userSeq)
+                    .map(com.ssafy.a305.be.domain.user.entity.UserProfile::getRealName)
+                    .orElse("알 수 없음");
+
                 // AiProposalPayload 구조와 동일하게 생성
                 Map<String, Object> payload = Map.of(
-                    "contractTitle", "빌리지 거래 제안서 (수정)",
-                    "contractSeq", contractSeq,
-                    "originalPrincipal", originalPrincipal != null ? originalPrincipal.doubleValue() : 0.0,
-                    "originalInterestRate", originalInterest != null ? originalInterest.doubleValue() : 0.0,
-                    "proposedInterestRate", contract.getInterestRate() != null ? contract.getInterestRate().doubleValue() : 0.0,
+                    "contract_title", "빌리지 거래 제안서 (수정)",
+                    "contract_seq", contractSeq,
+                    "sender_role", senderRole,
+                    "sender_name", senderName,
+                    "original_principal", originalPrincipal != null ? originalPrincipal.doubleValue() : 0.0,
+                    "proposed_principal", contract.getPrincipalAmount() != null ? contract.getPrincipalAmount().doubleValue() : 0.0,
+                    "original_interest_rate", originalInterest != null ? originalInterest.doubleValue() : 0.0,
+                    "proposed_interest_rate", contract.getInterestRate() != null ? contract.getInterestRate().doubleValue() : 0.0,
                     "modifications", dynamicModifications.isEmpty() ? List.of("기타 약정 변경") : dynamicModifications,
-                    "isInitial", false
+                    "is_initial", false
                 );
 
                 ObjectMapper mapper = new ObjectMapper();
@@ -893,6 +908,7 @@ public class ContractService {
                     return AiChatMessageDto.builder()
                             .role(role)
                             .content(msg.getContent())
+                            .sender_seq(msg.getSenderSeq())
                             .build();
                 })
                 .collect(Collectors.toList());

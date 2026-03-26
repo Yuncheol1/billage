@@ -35,8 +35,8 @@ public class ChatService {
 
     // 더미 테스트를 위해 채팅방이 없으면 자동으로 생성해주는 메서드 포함
     public ChatMessageResponseDto saveMessage(ChatMessageRequestDto requestDto) {
-        if (requestDto.content() != null && requestDto.content().length() > 255) {
-            throw new IllegalArgumentException("메시지는 255자 이하로 입력해주세요.");
+        if (requestDto.content() != null && requestDto.content().length() > 1000) {
+            throw new IllegalArgumentException("메시지는 1000자 이하로 입력해주세요.");
         }
         
         log.debug("Saving message to room {}: {}", requestDto.roomId(), requestDto.content());
