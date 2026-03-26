@@ -8,6 +8,9 @@ import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractSignatureRequest
 import com.billage.app.data.remote.api.ContractListResponse
+import com.billage.app.data.remote.api.ContractUpdateRequest
+import com.billage.app.data.remote.api.ClauseUpdateDto
+import com.billage.app.data.remote.api.AiClauseResponse
 import com.billage.app.data.repository.ChatRepository
 import com.billage.app.data.repository.ContractRepository
 import com.billage.app.ui.chat.models.AiProposalMessage
@@ -386,13 +389,35 @@ class ChatRoomViewModel @Inject constructor(
      * AI 협의 모드로 진입합니다. (협의할 차용증 선택 직후 호출)
      */
     fun startAiNegotiation(summary: ContractSummary) {
+        val roomId = _chatRoomState.value.roomId
+        val userSeq = myUserSeq
+        
         _chatRoomState.update { 
             it.copy(
                 mode = ChatRoomMode.CONTRACT,
                 selectedContract = summary,
                 pendingAiClauses = null,
-                selectedClauseIndices = emptySet()
+                selectedClauseIndices = emptySet(),
+                isMeAccepted = false,
+                isOpponentAccepted = false,
+                isMeSigned = false,
+                isOpponentSigned = false
             ) 
+        }
+
+        // 타임라인 필터링을 위한 마커 메시지 발송
+        viewModelScope.launch {
+            try {
+                chatRepository.sendMessage(
+                    roomId = roomId,
+                    senderSeq = userSeq,
+                    content = "AI_NEGOTIATION_START",
+                    isContractMsg = true,
+                    msgType = "SYSTEM"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send negotiation start marker", e)
+            }
         }
     }
 
@@ -437,56 +462,59 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     /**
-     * 선택된 AI 특약들을 확정하여 채팅방에 제안(PROPOSAL)으로 보냅니다.
+     * 선택된 AI 특약들을 확정하여 DB에 즉시 반영하고 채팅방에 공유합니다.
      */
     fun applySelectedAiClauses() {
         val state = _chatRoomState.value
         val contract = state.selectedContract ?: return
-        val pending = state.pendingAiClauses ?: return
-        val selected = state.selectedClauseIndices
+        val pendingAiClauses = state.pendingAiClauses ?: return
+        val selectedIdx = state.selectedClauseIndices
         val roomId = state.roomId
 
-        if (selected.isEmpty()) return
+        if (selectedIdx.isEmpty()) {
+            exitModificationMode()
+            return
+        }
 
         viewModelScope.launch {
             try {
-                // 1. 로컬 계약 정보 갱신 (백엔드에서 이미 aiDraftContent가 저장됨 - analyze 시점에)
-                fetchContractDetail(contract.contractSeq)
-
-                // 2. 선택된 조항들만 추려서 채팅 메시지 생성
-                val modifications = mutableListOf<String>()
-                pending.filterIndexed { index, _ -> selected.contains(index) }
-                    .forEachIndexed { idx, clause ->
-                        modifications.add("제${idx + 1}조 (특약) ${clause.legalClause}")
+                // 1. 서버에 즉시 반영 요청 (updateContract API 활용)
+                // AI 분석에서 제안한 원금/이자율이 있다면 반영, 없으면 현재 값 유지
+                val currentDetail = state.draftContractDetail
+                val proposedPrincipal = currentDetail?.principalAmount ?: 0.0
+                val proposedInterest = currentDetail?.interestRate ?: 0.0
+                
+                val updateClauses = pendingAiClauses
+                    .filterIndexed { index, _ -> selectedIdx.contains(index) }
+                    .map { clause: AiClauseResponse ->
+                        // 신규 조항으로 추가 (clauseSeq = 0 or null depending on DTO, here 0 for Int)
+                        ClauseUpdateDto(
+                            clauseSeq = 0, 
+                            content = clause.legalClause ?: ""
+                        )
                     }
 
-                val payload = AiProposalPayload(
-                    contractTitle = "${contract.counterpartyName}님과의 거래 제안(AI)",
-                    contractSeq = contract.contractSeq,
-                    originalPrincipal = 0.0,
-                    proposedPrincipal = 0.0,
-                    originalInterestRate = 0.0,
-                    proposedInterestRate = 0.0,
-                    modifications = modifications,
-                    isInitial = false
+                val updateRequest = ContractUpdateRequest(
+                    principalAmount = proposedPrincipal,
+                    interestRate = proposedInterest,
+                    clauses = updateClauses
                 )
 
-                val contentJson = kotlinx.serialization.json.Json.encodeToString(
-                    AiProposalPayload.serializer(), payload
-                )
-
-                chatRepository.sendMessage(
-                    roomId = roomId,
-                    senderSeq = myUserSeq,
-                    content = contentJson,
-                    isContractMsg = true,
-                    msgType = "AI_PROPOSAL"
-                )
+                // updateContract 호출 (백엔드에서 DB 수정 + 수락 상태 초기화 + AI_PROPOSAL 메시지 발송 수행)
+                val response = contractApi.updateContract(contract.contractSeq, updateRequest, roomId)
                 
-                // 3. 협의 모드 종료
-                exitModificationMode()
+                if (response.status == 200) {
+                    // 2. 최신 계약 정보 다시 불러오기 (수락 상태 등이 초기화된 최신 정보)
+                    fetchContractDetail(contract.contractSeq)
+                    
+                    // 3. 협의 모드 종료
+                    exitModificationMode()
+                    Log.d(TAG, "AI clauses applied directly to contract ${contract.contractSeq}")
+                } else {
+                    Log.e(TAG, "Failed to apply AI clauses: ${response.message}")
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to apply AI clauses", e)
+                Log.e(TAG, "Error in applySelectedAiClauses", e)
             }
         }
     }
@@ -553,18 +581,34 @@ class ChatRoomViewModel @Inject constructor(
 
                     val roomId = _chatRoomState.value.roomId
                     if (roomId.isNotBlank()) {
-                        val notice = if (response.data.contractFullySigned) {
-                            "양측 전자서명이 완료되어 계약이 체결되었습니다."
+                        if (response.data.contractFullySigned) {
+                            val detail = _chatRoomState.value.draftContractDetail
+                            val payload = com.billage.app.ui.chat.models.ContractCompletePayload(
+                                contractId = detail?.contractId ?: "ID없음",
+                                contractTitle = "빌리지 차용 상환 계약",
+                                principalAmount = detail?.principalAmount ?: 0.0,
+                                interestRate = detail?.interestRate ?: 0.0,
+                                contractSeq = contractSeq
+                            )
+                            val contentJson = kotlinx.serialization.json.Json.encodeToString(
+                                com.billage.app.ui.chat.models.ContractCompletePayload.serializer(), payload
+                            )
+                            chatRepository.sendMessage(
+                                roomId = roomId,
+                                senderSeq = myUserSeq,
+                                content = contentJson,
+                                isContractMsg = true,
+                                msgType = "CONTRACT_COMPLETE"
+                            )
                         } else {
-                            "전자서명을 완료했습니다."
+                            chatRepository.sendMessage(
+                                roomId = roomId,
+                                senderSeq = myUserSeq,
+                                content = "전자서명을 완료했습니다.",
+                                isContractMsg = true,
+                                msgType = "SYSTEM"
+                            )
                         }
-                        chatRepository.sendMessage(
-                            roomId = roomId,
-                            senderSeq = myUserSeq,
-                            content = notice,
-                            isContractMsg = true,
-                            msgType = "SYSTEM"
-                        )
                     }
 
                     _chatRoomState.update {

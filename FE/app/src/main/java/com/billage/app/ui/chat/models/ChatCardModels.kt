@@ -108,8 +108,19 @@ data class ContractCompleteMessage(
     override val sender: MessageSender,
     override val timestamp: LocalDateTime,
     val contractId: String,
-    val contractTitle: String
+    val contractTitle: String,
+    val principalAmount: Double? = null,
+    val interestRate: Double? = null
 ) : BaseChatMessage
+
+@kotlinx.serialization.Serializable
+data class ContractCompletePayload(
+    val contractId: String,
+    val contractTitle: String,
+    val principalAmount: Double,
+    val interestRate: Double,
+    val contractSeq: Int
+)
 
 /**
  * AI 수정 제안 카드 - 종료 버튼 누른 사람이 채팅방에 발송
