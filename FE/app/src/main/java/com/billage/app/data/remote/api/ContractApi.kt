@@ -261,6 +261,8 @@ data class ContractDetailResponse(
     val isOpponentAccepted: Boolean? = false,
     val isMeSigned: Boolean? = false,
     val isOpponentSigned: Boolean? = false,
+    val roomId: String? = null,
+    val counterpartyUserSeq: Int? = null,
     val clauses: List<ClauseDetailDto> = emptyList()
 )
 

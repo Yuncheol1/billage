@@ -571,6 +571,9 @@ fun NavGraphBuilder.appNavGraph(
             onBackClick = { appNavController.popBackStack() },
             onViewDocumentClick = {
                 contractId.toIntOrNull()?.let { appNavController.navigateToContractDocument(it) }
+            },
+            onNavigateToChat = { roomId, opponentName ->
+                appNavController.navigateToChatRoom(roomId, opponentName)
             }
         )
     }
