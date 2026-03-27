@@ -6,6 +6,7 @@ import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
+import com.ssafy.a305.be.domain.repayment.service.RepaymentTransferRequestGuard;
 import com.ssafy.a305.be.global.exception.TransferFailException;
 import com.ssafy.a305.be.global.external.ssafy.SsafyTransferApiClient;
 import jakarta.persistence.EntityManagerFactory;
@@ -25,6 +26,8 @@ import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -52,6 +55,7 @@ public class AutoTransferBatchConfig {
     private final AutoTransferRegistrationRepository registrationRepository;
     private final RepaymentEventRepository repaymentEventRepository;
     private final NotificationCommandService notificationCommandService;
+    private final RepaymentTransferRequestGuard repaymentTransferRequestGuard;
 
     // ──────────────── Job ────────────────
 
@@ -104,67 +108,91 @@ public class AutoTransferBatchConfig {
     public ItemProcessor<RepaymentSchedule, RepaymentSchedule> autoTransferProcessor() {
         return schedule -> {
             Integer contractSeq = schedule.getContract().getContractSeq();
+            Integer scheduleSeq = schedule.getScheduleSeq();
 
-            // 1. 자동이체 등록 정보 조회 (계좌 정보)
-            AutoTransferRegistration registration = registrationRepository
-                    .findActiveWithAccounts(contractSeq)
-                    .orElse(null);
-
-            if (registration == null) {
-                log.warn("[자동이체] contractSeq={} 에 대한 활성 자동이체 등록이 없습니다. Skip.", contractSeq);
-                return null; // null 반환 → Writer에 전달되지 않음 (필터링)
+            String lockToken = repaymentTransferRequestGuard.tryAcquire(scheduleSeq);
+            if (lockToken == null) {
+                log.info("[자동이체] scheduleSeq={}는 이미 처리 중이어서 Skip.", scheduleSeq);
+                return null;
             }
 
-            String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
-            String depositAccountNo = registration.getCreditorAccount().getAccountNo();
-            BigDecimal amount = schedule.getTotalDue();
-            String contractId = schedule.getContract().getContractId();
-
-            // 2. SSAFY 계좌이체 API 호출 (실패 시 TransferFailException → Skip)
-            // userKey는 채무자(출금자)의 키를 사용
-            String debtorUserKey = schedule.getContract().getDebtor().getSsafyUserKey();
-            ssafyTransferApiClient.transfer(
-                    withdrawalAccountNo,
-                    depositAccountNo,
-                    amount,
-                    contractId,
-                    debtorUserKey
-            );
-
-            // 3. 성공 → 상환 스케줄 상태 변경
-            LocalDateTime now = LocalDateTime.now();
-            schedule.markPaid(now);
-
-            // 4. 상환 이벤트 기록 (evidenceGrade=GOLD, status=AUTO_CONFIRMED)
-            RepaymentEvent event = RepaymentEvent.builder()
-                    .repaymentSchedule(schedule)
-                    .contract(schedule.getContract())
-                    .evidenceGrade("GOLD")
-                    .amountPaid(amount)
-                    .reportedByUser(schedule.getContract().getDebtor())
-                    .confirmedByUser(schedule.getContract().getCreditor())
-                    .status("AUTO_CONFIRMED")
-                    .note("자동이체 처리")
-                    .requestedDttm(now)
-                    .confirmedDttm(now)
-                    .build();
-            repaymentEventRepository.save(event);
-
-            notificationCommandService.sendRepaymentPaidNotifications(schedule);
-
-            boolean allSchedulesCompleted = schedule.getContract().getRepaymentSchedules().stream()
-                    .allMatch(item -> "PAID".equals(item.getStatus())
-                            || "MANUAL_PAID".equals(item.getStatus())
-                            || "WAIVED".equals(item.getStatus()));
-            if (allSchedulesCompleted) {
-                schedule.getContract().markClosed(now);
-                notificationCommandService.sendContractClosedNotifications(schedule.getContract());
+            boolean releaseInFinally = true;
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        repaymentTransferRequestGuard.release(scheduleSeq, lockToken);
+                    }
+                });
+                releaseInFinally = false;
             }
 
-            log.info("[자동이체] 성공 - scheduleSeq={}, contractSeq={}, amount={}",
-                    schedule.getScheduleSeq(), contractSeq, amount);
+            try {
+                // 1. 자동이체 등록 정보 조회 (계좌 정보)
+                AutoTransferRegistration registration = registrationRepository
+                        .findActiveWithAccounts(contractSeq)
+                        .orElse(null);
 
-            return schedule;
+                if (registration == null) {
+                    log.warn("[자동이체] contractSeq={} 에 대한 활성 자동이체 등록이 없습니다. Skip.", contractSeq);
+                    return null; // null 반환 → Writer에 전달되지 않음 (필터링)
+                }
+
+                String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
+                String depositAccountNo = registration.getCreditorAccount().getAccountNo();
+                BigDecimal amount = schedule.getTotalDue();
+                String contractId = schedule.getContract().getContractId();
+
+                // 2. SSAFY 계좌이체 API 호출 (실패 시 TransferFailException → Skip)
+                // userKey는 채무자(출금자)의 키를 사용
+                String debtorUserKey = schedule.getContract().getDebtor().getSsafyUserKey();
+                ssafyTransferApiClient.transfer(
+                        withdrawalAccountNo,
+                        depositAccountNo,
+                        amount,
+                        contractId,
+                        debtorUserKey
+                );
+
+                // 3. 성공 → 상환 스케줄 상태 변경
+                LocalDateTime now = LocalDateTime.now();
+                schedule.markPaid(now);
+
+                // 4. 상환 이벤트 기록 (evidenceGrade=GOLD, status=AUTO_CONFIRMED)
+                RepaymentEvent event = RepaymentEvent.builder()
+                        .repaymentSchedule(schedule)
+                        .contract(schedule.getContract())
+                        .evidenceGrade("GOLD")
+                        .amountPaid(amount)
+                        .reportedByUser(schedule.getContract().getDebtor())
+                        .confirmedByUser(schedule.getContract().getCreditor())
+                        .status("AUTO_CONFIRMED")
+                        .note("자동이체 처리")
+                        .requestedDttm(now)
+                        .confirmedDttm(now)
+                        .build();
+                repaymentEventRepository.save(event);
+
+                notificationCommandService.sendRepaymentPaidNotifications(schedule);
+
+                boolean allSchedulesCompleted = schedule.getContract().getRepaymentSchedules().stream()
+                        .allMatch(item -> "PAID".equals(item.getStatus())
+                                || "MANUAL_PAID".equals(item.getStatus())
+                                || "WAIVED".equals(item.getStatus()));
+                if (allSchedulesCompleted) {
+                    schedule.getContract().markClosed(now);
+                    notificationCommandService.sendContractClosedNotifications(schedule.getContract());
+                }
+
+                log.info("[자동이체] 성공 - scheduleSeq={}, contractSeq={}, amount={}",
+                        scheduleSeq, contractSeq, amount);
+
+                return schedule;
+            } finally {
+                if (releaseInFinally) {
+                    repaymentTransferRequestGuard.release(scheduleSeq, lockToken);
+                }
+            }
         };
     }
 

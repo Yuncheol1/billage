@@ -43,7 +43,7 @@ public class RepaymentManualTransferService {
             Integer scheduleSeq,
             Integer userSeq
     ) {
-        String lockToken = repaymentTransferRequestGuard.tryAcquire(userSeq, contractSeq, scheduleSeq);
+        String lockToken = repaymentTransferRequestGuard.tryAcquire(scheduleSeq);
         if (lockToken == null) {
             throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST, "이미 처리 중인 수동 이체 요청입니다. 잠시 후 다시 시도해주세요.");
         }
@@ -53,7 +53,7 @@ public class RepaymentManualTransferService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int status) {
-                    repaymentTransferRequestGuard.release(userSeq, contractSeq, scheduleSeq, lockToken);
+                    repaymentTransferRequestGuard.release(scheduleSeq, lockToken);
                 }
             });
             releaseInFinally = false;
@@ -124,7 +124,7 @@ public class RepaymentManualTransferService {
             );
         } finally {
             if (releaseInFinally) {
-                repaymentTransferRequestGuard.release(userSeq, contractSeq, scheduleSeq, lockToken);
+                repaymentTransferRequestGuard.release(scheduleSeq, lockToken);
             }
         }
     }
