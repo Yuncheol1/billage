@@ -84,6 +84,7 @@ fun ContractEditScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding() // 시스템 네비게이션 바 대응
                     .padding(16.dp)
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
@@ -97,6 +98,7 @@ fun ContractEditScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding() // 키보드만큼 공간 확보
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -191,6 +193,9 @@ fun ContractEditScreen(
                     )
                 )
             }
+            
+            // 키보드에 가려지지 않도록 추가 여백
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }

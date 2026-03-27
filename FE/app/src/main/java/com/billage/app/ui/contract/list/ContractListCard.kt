@@ -219,7 +219,7 @@ fun ContractListCard(
 
                 // ── 하단 버튼 행 ──────────────────────────────────
                 if (onDeleteClick != null) {
-                    // DRAFT / NEGOTIATING: 좌측 상세 보기 + 우측 삭제
+                    // DRAFT: 좌측 상세 보기 + 우측 삭제
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
