@@ -10,7 +10,11 @@ import com.billage.app.ui.contract.list.ContractListScreen
 import com.billage.app.ui.contract.create.ContractCreateScreen
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.common.MenuProfileViewModel
-import com.billage.app.ui.chat.ChatRoomScreen
+import com.billage.app.ui.chat.components.ChatTopBar
+import com.billage.app.ui.chat.components.ContractSignatureDialog
+import com.billage.app.ui.chat.components.PinnedContractBanner
+import com.billage.app.ui.chat.components.SignedContractFullScreen
+import com.billage.app.ui.chat.components.ContractDocumentFullScreen
 import com.billage.app.ui.chatbot.ChatBotScreen
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
@@ -161,6 +165,7 @@ fun NavGraphBuilder.appNavGraph(
         val chatRoomState by viewModel.chatRoomState.collectAsState()
 
         var showProposalDialog by remember { mutableStateOf(false) }
+        var showSignedContractDialog by remember { mutableStateOf(false) }
         var currentOriginalPrincipal by remember { mutableStateOf<Double?>(null) }
         var currentOriginalInterest by remember { mutableStateOf<Double?>(null) }
         var currentProposedPrincipal by remember { mutableStateOf<Double?>(null) }
@@ -170,7 +175,7 @@ fun NavGraphBuilder.appNavGraph(
 
         // 차용증 전문/제안서 다이얼로그
         if (showProposalDialog && chatRoomState.draftContractDetail != null) {
-            com.billage.app.ui.chat.components.ContractDocumentFullScreen(
+            ContractDocumentFullScreen(
                 contractTitle = chatRoomState.draftContractDetail?.contractId ?: "ID없음",
                 contractDetail = chatRoomState.draftContractDetail!!,
                 isMeAccepted = chatRoomState.isMeAccepted,
@@ -187,18 +192,23 @@ fun NavGraphBuilder.appNavGraph(
                     viewModel.submitProposal()
                 },
                 onEdit = {
-                    if (chatRoomState.isMeAccepted && chatRoomState.isOpponentAccepted) {
-                        // ViewModel에서 에러 상태를 처리하거나 
-                    } else {
-                        showProposalDialog = false
-                        chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
-                            appNavController.navigateToContractEdit(seq, roomId)
-                        }
+                    showProposalDialog = false
+                    chatRoomState.draftContractDetail?.contractSeq?.let { seq ->
+                        appNavController.navigateToContractEdit(seq, roomId)
                     }
                 },
                 contractAiAnalysis = chatRoomState.aiAnalysisResult,
                 rawAiAnalysisJson = chatRoomState.rawAiAnalysisJson,
                 isAiAnalyzing = chatRoomState.isAiAnalyzing
+            )
+        }
+
+        // 체결 완료된 차용증 전문 보기 다이얼로그 (Read-only)
+        if (showSignedContractDialog && chatRoomState.draftContractDetail != null) {
+            SignedContractFullScreen(
+                contractTitle = chatRoomState.draftContractDetail?.contractId ?: "ID없음",
+                contractDetail = chatRoomState.draftContractDetail!!,
+                onDismissRequest = { showSignedContractDialog = false }
             )
         }
 
@@ -251,8 +261,7 @@ fun NavGraphBuilder.appNavGraph(
                         val isMe = msg.senderSeq == viewModel.myUserSeq
                         val chatRoomState by viewModel.chatRoomState.collectAsState()
                         val contractStatus = chatRoomState.draftContractDetail?.status
-                        val isContractReadOnly = contractStatus != null && 
-                            contractStatus != "DRAFT" && contractStatus != "NEGOTIATING"
+                        val isContractReadOnly = contractStatus != null && contractStatus != "DRAFT"
                         if (msg.msgType == "SYSTEM") {
                             com.billage.app.ui.chat.components.cards.SystemNoticeCard(
                                 message = com.billage.app.ui.chat.models.SystemNoticeMessage(
@@ -317,7 +326,7 @@ fun NavGraphBuilder.appNavGraph(
                                      ),
                                      onViewDetailsClick = {
                                          viewModel.fetchContractDetail(payload.contractSeq)
-                                         showProposalDialog = true
+                                         showSignedContractDialog = true
                                      }
                                  )
                              }

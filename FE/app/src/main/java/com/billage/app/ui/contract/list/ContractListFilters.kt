@@ -39,8 +39,8 @@ enum class ContractRoleFilter(val label: String, val apiValue: String?) {
  */
 enum class ContractStatusFilter(val label: String, val apiValues: List<String>) {
     All("전체", emptyList()),
-    /** 서명 및 협의 단계 (DRAFT + NEGOTIATING) */
-    Signing("서명 전", listOf("DRAFT", "NEGOTIATING")),
+    /** 서명 전 단계 (DRAFT) */
+    Signing("서명 전", listOf("DRAFT")),
     /** 계약 체결 후 상환 단계 (SIGNED + ACTIVE + OVERDUE + DISPUTED) */
     Repaying("계약 진행 중", listOf("SIGNED", "ACTIVE", "OVERDUE", "DISPUTED")),
     /** 상환 완료 */

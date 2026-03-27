@@ -303,6 +303,7 @@ private fun ActionGridItem(
 @Composable
 fun AiContractSelectDialog(
     contracts: List<com.billage.app.data.remote.api.ContractListResponse>,
+    roomName: String,
     onDismissRequest: () -> Unit,
     onContractSelect: (com.billage.app.data.remote.api.ContractListResponse) -> Unit
 ) {
@@ -318,13 +319,15 @@ fun AiContractSelectDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
-                if (contracts.isEmpty()) {
-                    Text("진행 중인 차용증이 없습니다.", color = BillageTextSecondary)
+                val draftContracts = contracts.filter { it.status == "DRAFT" && it.counterpartyName == roomName }
+                
+                if (draftContracts.isEmpty()) {
+                    Text("수정 가능한 차용증(초안)이 없습니다.", color = BillageTextSecondary)
                 } else {
                     androidx.compose.foundation.lazy.LazyColumn(
                         modifier = Modifier.heightIn(max = 300.dp)
                     ) {
-                        items(contracts) { contract ->
+                        items(draftContracts) { contract ->
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()

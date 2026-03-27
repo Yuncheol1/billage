@@ -253,7 +253,9 @@ fun ChatRoomScreen(
                         )
                     }
 
-                    val editableContracts = contracts.filter { it.status == "DRAFT" || it.status == "NEGOTIATING" }
+                    val editableContracts = contracts.filter { 
+                        it.status == "DRAFT" && it.counterpartyName == state.roomName 
+                    }
                     
                     if (editableContracts.isNotEmpty()) {
                         LazyColumn(
@@ -367,6 +369,7 @@ fun ChatRoomScreen(
     if (showAiSelectDialog) {
         com.billage.app.ui.chat.components.AiContractSelectDialog(
             contracts = contracts,
+            roomName = state.roomName,
             onDismissRequest = { 
                 showAiSelectDialog = false
             },

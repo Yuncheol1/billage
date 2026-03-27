@@ -33,7 +33,7 @@ internal fun HeroSection(
     dday: String? = null
 ) {
     val accentColor = when {
-        status == "DRAFT" || status == "NEGOTIATING" -> BillageWarning
+        status == "DRAFT" -> BillageWarning
         status == "ACTIVE" && dday == "만기 초과"    -> BillageDanger
         status == "ACTIVE" && dday == "오늘 만기"    -> BillageWarning
         status == "ACTIVE"                           -> BillagePrimary
@@ -43,7 +43,7 @@ internal fun HeroSection(
     }
 
     val badgeLabel = when {
-        status == "DRAFT" || status == "NEGOTIATING" -> "서명 대기"
+        status == "DRAFT" -> "서명 대기"
         status == "ACTIVE" && dday == "만기 초과"    -> "만기 초과"
         status == "ACTIVE" && dday == "오늘 만기"    -> "오늘 만기"
         status == "ACTIVE"                           -> "계약 중"
@@ -53,7 +53,7 @@ internal fun HeroSection(
     }
 
     val mainText = when (status) {
-        "DRAFT", "NEGOTIATING" -> "서로의 서명을 기다리고 있어요"
+        "DRAFT" -> "서로의 서명을 기다리고 있어요"
         "ACTIVE" -> when (dday) {
             "만기 초과" -> "만기가 초과된\n계약이에요"
             "오늘 만기" -> "오늘이 만기일이에요"
@@ -66,7 +66,7 @@ internal fun HeroSection(
     }
 
     val subText = when (status) {
-        "DRAFT", "NEGOTIATING" -> "두 분의 서명이 완료되면 계약이 시작돼요"
+        "DRAFT" -> "두 분의 서명이 완료되면 계약이 시작돼요"
         "ACTIVE" -> when (dday) {
             "만기 초과" -> "만기일이 지났어요. 상대방과 확인해 보세요"
             "오늘 만기" -> "오늘이 마지막 상환일이에요"
