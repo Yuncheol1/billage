@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -84,7 +85,8 @@ fun ContractDetailScreen(
     contractSeq: String,
     viewModel: ContractDetailViewModel,
     onBackClick: () -> Unit,
-    onViewDocumentClick: () -> Unit = {}
+    onViewDocumentClick: () -> Unit = {},
+    onNavigateToChat: (roomId: String, opponentName: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -163,33 +165,32 @@ fun ContractDetailScreen(
         },
         bottomBar = {
             val currentDetail = detail
-            if (currentDetail != null) {
-                val buttonText = when (currentDetail.status) {
-                    "DRAFT", "NEGOTIATING" -> "채팅방에서 수정하기"
-                    "ACTIVE" -> "상환 내역 보기"
-                    else -> null
-                }
-                if (buttonText != null) {
-                    Box(
+            if (currentDetail != null && currentDetail.roomId != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BillageSurface)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            onNavigateToChat(
+                                currentDetail.roomId,
+                                currentDetail.counterpartyName ?: "상대방"
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BillageSurface)
-                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
                     ) {
-                        Button(
-                            onClick = { },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary)
-                        ) {
-                            Text(
-                                text = buttonText,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Text(
+                            text = "채팅방 바로가기",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

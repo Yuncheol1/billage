@@ -511,43 +511,46 @@ class ChatRoomViewModel @Inject constructor(
                         
                         var handledByField = false
                         
-                        // Heuristic: 이자율 관련 조항 텍스트에서 숫자 추출
+                        // Heuristic: 이자율 관련 조항 텍스트에서 숫자 추출 (마지막 매칭 항목을 선택하여 '변경 후' 값을 잡음)
                         if (clauseId == "INTEREST") {
-                            val interestRegex = """(\d+(\.\d+)?)%""".toRegex()
-                            val match = interestRegex.find(content)
-                            if (match != null) {
-                                val value = match.groupValues[1].toDoubleOrNull()
+                            // %, 퍼센트, 퍼 등 지원
+                            val interestRegex = """(\d+(\.\d+)?)\s*(?:%|퍼센트|퍼)""".toRegex()
+                            val matches = interestRegex.findAll(content).toList()
+                            if (matches.isNotEmpty()) {
+                                val lastMatch = matches.last()
+                                val value = lastMatch.groupValues[1].toDoubleOrNull()
                                 if (value != null) {
                                     proposedInterest = value / 100.0
-                                    handledByField = true // 필드로 반영되었으므로 특약 리스트에 추가 안 함
-                                    Log.d(TAG, "Extracted interest rate: $proposedInterest from $content")
+                                    handledByField = true
+                                    Log.d(TAG, "Extracted LAST interest rate: $proposedInterest from $content")
                                 }
                             }
                         }
                         
-                        // Heuristic: 원금 관련 조항 텍스트에서 숫자 추출
+                        // Heuristic: 원금 관련 조항 텍스트에서 숫자 추출 (마지막 매칭 항목 선택)
                         if (clauseId == "PRINCIPAL") {
                             // "1000000원" 또는 "100만원" 형태 지원
-                            val manWonRegex = """(\d+(\.\d+)?)만원""".toRegex()
-                            val wonRegex = """(\d+([,]\d+)*)원""".toRegex()
+                            val manWonRegex = """(\d+(\.\d+)?)\s*만원""".toRegex()
+                            val wonRegex = """(\d+([,]\d+)*)\s*원""".toRegex()
                             
-                            val manMatch = manWonRegex.find(content)
-                            if (manMatch != null) {
-                                val value = manMatch.groupValues[1].toDoubleOrNull()
+                            val manMatches = manWonRegex.findAll(content).toList()
+                            val wonMatches = wonRegex.findAll(content).toList()
+                            
+                            if (manMatches.isNotEmpty()) {
+                                val lastMatch = manMatches.last()
+                                val value = lastMatch.groupValues[1].toDoubleOrNull()
                                 if (value != null) {
                                     proposedPrincipal = value * 10000.0
                                     handledByField = true
-                                    Log.d(TAG, "Extracted principal (man-won): $proposedPrincipal from $content")
+                                    Log.d(TAG, "Extracted LAST principal (man-won): $proposedPrincipal from $content")
                                 }
-                            } else {
-                                val wonMatch = wonRegex.find(content)
-                                if (wonMatch != null) {
-                                    val value = wonMatch.groupValues[1].replace(",", "").toDoubleOrNull()
-                                    if (value != null) {
-                                        proposedPrincipal = value
-                                        handledByField = true
-                                        Log.d(TAG, "Extracted principal (won): $proposedPrincipal from $content")
-                                    }
+                            } else if (wonMatches.isNotEmpty()) {
+                                val lastMatch = wonMatches.last()
+                                val value = lastMatch.groupValues[1].replace(",", "").toDoubleOrNull()
+                                if (value != null) {
+                                    proposedPrincipal = value
+                                    handledByField = true
+                                    Log.d(TAG, "Extracted LAST principal (won): $proposedPrincipal from $content")
                                 }
                             }
                         }
