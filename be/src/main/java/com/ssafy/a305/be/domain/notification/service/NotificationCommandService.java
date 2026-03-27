@@ -143,6 +143,34 @@ public class NotificationCommandService {
     }
 
     @Transactional
+    public void sendContractDeletedPush(Contract contract, Integer deletedByUserSeq) {
+        User recipient;
+        User deletedBy;
+
+        if (contract.getCreditor().getUserSeq().equals(deletedByUserSeq)) {
+            recipient = contract.getDebtor();
+            deletedBy = contract.getCreditor();
+        } else {
+            recipient = contract.getCreditor();
+            deletedBy = contract.getDebtor();
+        }
+
+        String deletedByName = resolveDisplayName(deletedBy);
+
+        sendPushOnly(
+                recipient,
+                "계약이 삭제되었어요",
+                deletedByName + "님이 계약을 삭제했어요.",
+                Map.of(
+                        "type", "CONTRACT",
+                        "eventKey", "CONTRACT_DELETED",
+                        "contractSeq", String.valueOf(contract.getContractSeq()),
+                        "deletedByUserSeq", String.valueOf(deletedByUserSeq)
+                )
+        );
+    }
+
+    @Transactional
     public void sendDueReminderNotifications(RepaymentSchedule schedule, LocalDate today) {
         if (!ACTIVE_LIKE_CONTRACT_STATUSES.contains(schedule.getContract().getStatus())
                 || !OPEN_SCHEDULE_STATUSES.contains(schedule.getStatus())) {
@@ -329,6 +357,38 @@ public class NotificationCommandService {
             notificationLog.markDispatchResult("SENT", firstMessageId, LocalDateTime.now());
         } else {
             notificationLog.markDispatchResult("FAILED", null, LocalDateTime.now());
+        }
+    }
+
+    private void sendPushOnly(
+            User user,
+            String title,
+            String message,
+            Map<String, String> data
+    ) {
+        List<FcmToken> tokens = fcmTokenRepository.findAllByUserUserSeqAndIsActiveTrue(user.getUserSeq());
+        if (tokens.isEmpty()) {
+            return;
+        }
+
+        for (FcmToken token : tokens) {
+            try {
+                Message.Builder builder = Message.builder()
+                        .setToken(token.getToken())
+                        .setNotification(Notification.builder()
+                                .setTitle(title)
+                                .setBody(message)
+                                .build());
+                data.forEach(builder::putData);
+                FirebaseMessaging.getInstance().send(builder.build());
+            } catch (Exception e) {
+                NotificationCommandService.log.warn(
+                        "Failed to send push-only notification. userSeq={}, tokenSeq={}",
+                        user.getUserSeq(),
+                        token.getTokenSeq(),
+                        e
+                );
+            }
         }
     }
 

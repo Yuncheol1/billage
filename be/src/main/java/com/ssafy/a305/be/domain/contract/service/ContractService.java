@@ -16,6 +16,7 @@ import com.ssafy.a305.be.domain.contract.entity.ContractClause;
 import com.ssafy.a305.be.domain.document.entity.Document;
 import com.ssafy.a305.be.domain.document.repository.DocumentRepository;
 import com.ssafy.a305.be.domain.document.repository.SignatureRepository;
+import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
@@ -63,6 +64,7 @@ public class ContractService {
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final EntityManager entityManager;
+    private final NotificationCommandService notificationCommandService;
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
@@ -835,6 +837,12 @@ public class ContractService {
 
         // Contract 자체 삭제 (Cascade.ALL 에 의해 contract_clause, repayment_schedule 자동 삭제)
         contractRepository.delete(contract);
+
+        try {
+            notificationCommandService.sendContractDeletedPush(contract, userSeq);
+        } catch (Exception e) {
+            log.error("Failed to send contract deleted push. contractSeq={}", contractSeq, e);
+        }
     }
 
     @Transactional
