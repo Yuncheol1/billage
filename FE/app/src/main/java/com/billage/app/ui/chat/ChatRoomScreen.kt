@@ -47,6 +47,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import com.billage.app.ui.chat.models.ContractSummary
+import com.billage.app.ui.common.SecureScreen
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.chat.security.ContractSignatureUtils
@@ -129,7 +130,9 @@ fun ChatRoomScreen(
         )
     }
 
-    Scaffold(
+    // SecureScreen 적용: 전자서명 배너와 서명 입력 UI가 있는 화면에서만 화면 캡처를 방지합니다.
+    SecureScreen {
+        Scaffold(
         topBar = {
             Column {
                 ChatTopBar(
@@ -204,6 +207,7 @@ fun ChatRoomScreen(
         ) {
             messageListContent()
         }
+    }
     }
 
     // '+' 버튼 클릭 시 뜨는 바텀 시트 메뉴 (차용증 조회/수정 등)
