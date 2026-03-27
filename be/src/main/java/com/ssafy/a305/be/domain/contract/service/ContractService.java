@@ -732,13 +732,24 @@ public class ContractService {
                 : null;
 
         SignatureStatus signatureStatus = resolveSignatureStatus(contract, userSeq);
+        
+        // 채팅방 ID 조회 (없으면 생성)
+        String roomId = null;
+        try {
+            roomId = chatService.createRoomByUserSeq(userSeq, counterpartySeq).id();
+        } catch (Exception e) {
+            log.error("Failed to get or create chat room for navigation", e);
+        }
+
         return new ContractDetailResponseDto(
                 contract,
                 userSeq,
                 counterpartyName,
                 counterpartyProfileImageUrl,
                 signatureStatus.isMeSigned(),
-                signatureStatus.isOpponentSigned()
+                signatureStatus.isOpponentSigned(),
+                roomId,
+                counterpartySeq
         );
     }
 
