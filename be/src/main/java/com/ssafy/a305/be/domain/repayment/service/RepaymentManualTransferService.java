@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +35,7 @@ public class RepaymentManualTransferService {
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
     private final SsafyTransferApiClient ssafyTransferApiClient;
     private final NotificationCommandService notificationCommandService;
+    private final RepaymentTransferRequestGuard repaymentTransferRequestGuard;
 
     @Transactional
     public RepaymentScheduleTransferResponseDto transferRepaymentSchedule(
@@ -40,68 +43,90 @@ public class RepaymentManualTransferService {
             Integer scheduleSeq,
             Integer userSeq
     ) {
-        RepaymentSchedule schedule = repaymentScheduleRepository
-                .findByScheduleSeqAndContractSeqWithContractUsers(scheduleSeq, contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "해당 계약의 상환 회차를 찾을 수 없습니다."));
-
-        Contract contract = schedule.getContract();
-        validateContractStatus(contract);
-        if (!contract.getDebtor().getUserSeq().equals(userSeq)) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "채무자만 수동 이체를 실행할 수 있습니다.");
+        String lockToken = repaymentTransferRequestGuard.tryAcquire(userSeq, contractSeq, scheduleSeq);
+        if (lockToken == null) {
+            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST, "이미 처리 중인 수동 이체 요청입니다. 잠시 후 다시 시도해주세요.");
         }
 
-        if (!TRANSFER_ALLOWED_STATUSES.contains(schedule.getStatus())) {
-            throw new CustomBusinessException(
-                    ErrorCode.INVALID_CONTRACT_STATUS,
-                    "미납(NONPAID) 또는 연체(OVERDUE) 상태의 회차만 수동 이체를 실행할 수 있습니다."
+        boolean releaseInFinally = true;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    repaymentTransferRequestGuard.release(userSeq, contractSeq, scheduleSeq, lockToken);
+                }
+            });
+            releaseInFinally = false;
+        }
+
+        try {
+            RepaymentSchedule schedule = repaymentScheduleRepository
+                    .findByScheduleSeqAndContractSeqWithContractUsers(scheduleSeq, contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "해당 계약의 상환 회차를 찾을 수 없습니다."));
+
+            Contract contract = schedule.getContract();
+            validateContractStatus(contract);
+            if (!contract.getDebtor().getUserSeq().equals(userSeq)) {
+                throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "채무자만 수동 이체를 실행할 수 있습니다.");
+            }
+
+            if (!TRANSFER_ALLOWED_STATUSES.contains(schedule.getStatus())) {
+                throw new CustomBusinessException(
+                        ErrorCode.INVALID_CONTRACT_STATUS,
+                        "미납(NONPAID) 또는 연체(OVERDUE) 상태의 회차만 수동 이체를 실행할 수 있습니다."
+                );
+            }
+
+            BigDecimal amount = schedule.getTotalDue();
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "회차의 이체 금액이 유효하지 않습니다.");
+            }
+
+            AutoTransferRegistration registration = autoTransferRegistrationRepository
+                    .findActiveWithAccounts(contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(
+                            ErrorCode.BANK_ACCOUNT_NOT_FOUND,
+                            "자동이체 등록 정보가 없어 수동 이체를 실행할 수 없습니다."
+                    ));
+
+            String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
+            String depositAccountNo = registration.getCreditorAccount().getAccountNo();
+            String debtorUserKey = contract.getDebtor().getSsafyUserKey();
+
+            if (debtorUserKey == null || debtorUserKey.isBlank()) {
+                throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채무자의 SSAFY userKey가 없어 수동 이체를 실행할 수 없습니다.");
+            }
+            if (withdrawalAccountNo == null || withdrawalAccountNo.isBlank()
+                    || depositAccountNo == null || depositAccountNo.isBlank()) {
+                throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND, "수동 이체에 필요한 계좌 정보가 없습니다.");
+            }
+
+            SsafyTransferResponse transferResponse = ssafyTransferApiClient.transfer(
+                    withdrawalAccountNo,
+                    depositAccountNo,
+                    amount,
+                    contract.getContractId(),
+                    debtorUserKey
             );
+
+            schedule.markPaid(LocalDateTime.now());
+            sendRepaymentNotificationsSafely(schedule);
+            closeContractIfAllSchedulesCompleted(contract);
+
+            return new RepaymentScheduleTransferResponseDto(
+                    contractSeq,
+                    scheduleSeq,
+                    contract.getContractId(),
+                    schedule.getStatus(),
+                    extractTransactionDate(transferResponse),
+                    withdrawalAccountNo,
+                    depositAccountNo
+            );
+        } finally {
+            if (releaseInFinally) {
+                repaymentTransferRequestGuard.release(userSeq, contractSeq, scheduleSeq, lockToken);
+            }
         }
-
-        BigDecimal amount = schedule.getTotalDue();
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "회차의 이체 금액이 유효하지 않습니다.");
-        }
-
-        AutoTransferRegistration registration = autoTransferRegistrationRepository
-                .findActiveWithAccounts(contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(
-                        ErrorCode.BANK_ACCOUNT_NOT_FOUND,
-                        "자동이체 등록 정보가 없어 수동 이체를 실행할 수 없습니다."
-                ));
-
-        String withdrawalAccountNo = registration.getDebtorAccount().getAccountNo();
-        String depositAccountNo = registration.getCreditorAccount().getAccountNo();
-        String debtorUserKey = contract.getDebtor().getSsafyUserKey();
-
-        if (debtorUserKey == null || debtorUserKey.isBlank()) {
-            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "채무자의 SSAFY userKey가 없어 수동 이체를 실행할 수 없습니다.");
-        }
-        if (withdrawalAccountNo == null || withdrawalAccountNo.isBlank()
-                || depositAccountNo == null || depositAccountNo.isBlank()) {
-            throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND, "수동 이체에 필요한 계좌 정보가 없습니다.");
-        }
-
-        SsafyTransferResponse transferResponse = ssafyTransferApiClient.transfer(
-                withdrawalAccountNo,
-                depositAccountNo,
-                amount,
-                contract.getContractId(),
-                debtorUserKey
-        );
-
-        schedule.markPaid(LocalDateTime.now());
-        sendRepaymentNotificationsSafely(schedule);
-        closeContractIfAllSchedulesCompleted(contract);
-
-        return new RepaymentScheduleTransferResponseDto(
-                contractSeq,
-                scheduleSeq,
-                contract.getContractId(),
-                schedule.getStatus(),
-                extractTransactionDate(transferResponse),
-                withdrawalAccountNo,
-                depositAccountNo
-        );
     }
 
     @Transactional
