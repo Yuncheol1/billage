@@ -2,6 +2,8 @@ package com.billage.app.ui.contract.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.billage.app.core.events.AppEvent
+import com.billage.app.core.events.AppEventBus
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.ContractListResponse
 import com.billage.app.data.repository.NotificationRepository
@@ -41,9 +43,12 @@ class ContractListViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ContractListUiState())
     val uiState: StateFlow<ContractListUiState> = _uiState.asStateFlow()
+    private var currentRole: String? = "ALL"
+    private var currentStatus: String? = null
 
     init {
         observeUnreadCount()
+        observeAppEvents()
         refreshUnreadCount()
         fetchContracts()
     }
@@ -76,12 +81,14 @@ class ContractListViewModel @Inject constructor(
         role: String? = null,
         status: String? = null
     ) {
+        currentRole = role ?: "ALL"
+        currentStatus = status
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val response = contractApi.getContracts(
-                    role = role ?: "ALL",
-                    status = status
+                    role = currentRole,
+                    status = currentStatus
                 )
                 val mapped = response.data.map { it.toContractCardModel() }
                 _uiState.update { it.copy(isLoading = false, contracts = mapped) }
@@ -103,6 +110,19 @@ class ContractListViewModel @Inject constructor(
         viewModelScope.launch {
             notificationRepository.unreadCount.collectLatest { unreadCount ->
                 _uiState.update { it.copy(hasNotification = unreadCount > 0) }
+            }
+        }
+    }
+
+    private fun observeAppEvents() {
+        viewModelScope.launch {
+            AppEventBus.events.collectLatest { event ->
+                when (event) {
+                    is AppEvent.ContractDeleted -> {
+                        fetchContracts(currentRole, currentStatus)
+                        refreshUnreadCount()
+                    }
+                }
             }
         }
     }

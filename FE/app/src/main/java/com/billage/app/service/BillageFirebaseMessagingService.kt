@@ -14,9 +14,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.billage.app.MainActivity
 import com.billage.app.R
+import com.billage.app.core.events.AppEvent
+import com.billage.app.core.events.AppEventBus
 import com.billage.app.data.local.AuthSessionStorage
 import com.billage.app.data.remote.api.FcmTokenRequest
 import com.billage.app.data.remote.api.NotificationApi
+import com.billage.app.data.repository.NotificationRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +31,9 @@ class BillageFirebaseMessagingService : FirebaseMessagingService() {
 
     @Inject
     lateinit var notificationApi: NotificationApi
+
+    @Inject
+    lateinit var notificationRepository: NotificationRepository
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
@@ -52,7 +58,7 @@ class BillageFirebaseMessagingService : FirebaseMessagingService() {
         // Check if message contains a data payload.
         if (remoteMessage.data.isNotEmpty()) {
             Log.d("FCM_MSG", "Message data payload: ${remoteMessage.data}")
-            // Handle the data payload (e.g., custom notification logic)
+            handleDataPayload(remoteMessage.data)
         }
 
         // Check if message contains a notification payload.
@@ -68,11 +74,16 @@ class BillageFirebaseMessagingService : FirebaseMessagingService() {
 
         val contractSeq = remoteMessage.data["contractSeq"]?.toIntOrNull()
         val notificationSeq = remoteMessage.data["notificationSeq"]?.toLongOrNull()
+        val eventKey = remoteMessage.data["eventKey"]
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(MainActivity.EXTRA_OPEN_NOTIFICATIONS, true)
-            contractSeq?.let { putExtra(MainActivity.EXTRA_CONTRACT_SEQ, it) }
+            if (eventKey != "CONTRACT_DELETED") {
+                putExtra(MainActivity.EXTRA_OPEN_NOTIFICATIONS, true)
+            }
+            if (eventKey != "CONTRACT_DELETED") {
+                contractSeq?.let { putExtra(MainActivity.EXTRA_CONTRACT_SEQ, it) }
+            }
             notificationSeq?.let { putExtra(MainActivity.EXTRA_NOTIFICATION_SEQ, it) }
         }
 
@@ -105,6 +116,20 @@ class BillageFirebaseMessagingService : FirebaseMessagingService() {
                 .notify((notificationSeq ?: System.currentTimeMillis()).toInt(), notification)
         }.onFailure {
             Log.e("FCM_MSG", "Failed to show local notification", it)
+        }
+    }
+
+    private fun handleDataPayload(data: Map<String, String>) {
+        if (AuthSessionStorage(applicationContext).hasSession()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching { notificationRepository.refreshUnreadCount() }
+                    .onFailure { Log.e("FCM_MSG", "Failed to refresh unread count", it) }
+            }
+        }
+
+        val contractSeq = data["contractSeq"]?.toIntOrNull() ?: return
+        when (data["eventKey"]) {
+            "CONTRACT_DELETED" -> AppEventBus.emit(AppEvent.ContractDeleted(contractSeq))
         }
     }
 
