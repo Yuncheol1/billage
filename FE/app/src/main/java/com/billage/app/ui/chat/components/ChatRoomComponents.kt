@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.chat.models.ChatRoomMode
@@ -448,6 +449,7 @@ fun AiContractSelectDialog(
 fun AiClauseSelectionDialog(
     clauses: List<com.billage.app.data.remote.api.AiClauseResponse>,
     selectedIndices: Set<Int>,
+    rejectionReason: String? = null,
     onToggleSelection: (Int) -> Unit,
     onDismissRequest: () -> Unit,
     onConfirm: () -> Unit
@@ -456,41 +458,62 @@ fun AiClauseSelectionDialog(
         onDismissRequest = onDismissRequest,
         title = { Text("AI 제안 특약 선택", fontWeight = FontWeight.Bold, color = BillageTextPrimary) },
         text = {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 400.dp)
-            ) {
-                itemsIndexed(clauses) { index, clause ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onToggleSelection(index) }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Checkbox(
-                            checked = selectedIndices.contains(index),
-                            onCheckedChange = { onToggleSelection(index) },
-                            colors = CheckboxDefaults.colors(checkedColor = BillagePrimary)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = clause.title ?: "제목 없음", 
-                                fontWeight = FontWeight.Bold, 
-                                fontSize = 15.sp, 
-                                color = BillageTextPrimary
+            if (rejectionReason != null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Info,
+                        contentDescription = null,
+                        tint = BillageTextSecondary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = rejectionReason,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BillageTextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 400.dp)
+                ) {
+                    itemsIndexed(clauses) { index, clause ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onToggleSelection(index) }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Checkbox(
+                                checked = selectedIndices.contains(index),
+                                onCheckedChange = { onToggleSelection(index) },
+                                colors = CheckboxDefaults.colors(checkedColor = BillagePrimary)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = clause.legalClause ?: "내용 없음", 
-                                fontSize = 13.sp, 
-                                color = BillageTextSecondary,
-                                lineHeight = 18.sp
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = clause.title ?: "제목 없음", 
+                                    fontWeight = FontWeight.Bold, 
+                                    fontSize = 15.sp, 
+                                    color = BillageTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = clause.legalClause ?: "내용 없음", 
+                                    fontSize = 13.sp, 
+                                    color = BillageTextSecondary,
+                                    lineHeight = 18.sp
+                                )
+                            }
                         }
-                    }
-                    if (index < clauses.lastIndex) {
-                        HorizontalDivider(color = BillageDivider.copy(alpha = 0.5f))
+                        if (index < clauses.lastIndex) {
+                            HorizontalDivider(color = BillageDivider.copy(alpha = 0.5f))
+                        }
                     }
                 }
             }
@@ -499,7 +522,7 @@ fun AiClauseSelectionDialog(
             Button(
                 onClick = onConfirm, 
                 colors = ButtonDefaults.buttonColors(containerColor = BillagePrimary),
-                enabled = selectedIndices.isNotEmpty()
+                enabled = selectedIndices.isNotEmpty() && rejectionReason == null
             ) {
                 Text("제안 발송하기", fontWeight = FontWeight.Bold)
             }

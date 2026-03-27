@@ -38,5 +38,6 @@ data class ChatRoomState(
     val rawAiAnalysisJson: String? = null,
     val isAiAnalyzing: Boolean = false,
     val pendingAiClauses: List<com.billage.app.data.remote.api.AiClauseResponse>? = null,
-    val selectedClauseIndices: Set<Int> = emptySet()
+    val selectedClauseIndices: Set<Int> = emptySet(),
+    val aiRejectionReason: String? = null
 )

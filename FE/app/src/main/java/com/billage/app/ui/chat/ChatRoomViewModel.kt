@@ -68,6 +68,7 @@ class ChatRoomViewModel @Inject constructor(
     private var isInitialProposalSent = false
 
     fun joinRoom(roomId: String, roomName: String, isNewContract: Boolean = false, contractSeq: Int? = null) {
+        if (isNewContract) isInitialProposalSent = false
         if (_chatRoomState.value.roomId == roomId && _messages.value.isNotEmpty() && !isNewContract) return 
         _chatRoomState.update { it.copy(roomId = roomId, roomName = roomName) }
         Log.d(TAG, "Joining room: $roomId (isNewContract: $isNewContract, contractSeq: $contractSeq)")
@@ -101,18 +102,34 @@ class ChatRoomViewModel @Inject constructor(
             // -1 과 같은 유효하지 않은 ID 무시
             val validContractSeq = if (contractSeq != null && contractSeq > 0) contractSeq else null
 
-            if (isNewContract && _messages.value.none { it.msgType == "AI_PROPOSAL" }) {
-                try {
-                    val targetSeq = validContractSeq ?: run {
-                        val res = contractApi.getContracts()
-                        if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
+            // 상태 동기화는 카드 발송 여부와 상관없이 항상 시도
+            try {
+                val syncTargetSeq = validContractSeq ?: run {
+                    val res = contractApi.getContracts()
+                    if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
+                }
+                if (syncTargetSeq != null && syncTargetSeq > 0) {
+                    val detailRes = contractApi.getContractDetail(syncTargetSeq)
+                    if (detailRes.status == 200) {
+                        applyContractDetail(detailRes.data)
                     }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync initial contract state", e)
+            }
 
-                    if (targetSeq != null && targetSeq > 0) {
-                        val detailRes = contractApi.getContractDetail(targetSeq)
+            // 제안 카드 발송 로직 (isNewContract && 아직 이 계약에 대한 제안이 없는 경우)
+            if (isNewContract && validContractSeq != null) {
+                try {
+                    // 동일한 contractSeq에 대해 이미 제안이 발송되었는지 히스토리에서 확인
+                    val alreadyProposed = _messages.value.any { 
+                        it.msgType == "AI_PROPOSAL" && it.content.contains("\"contract_seq\":$validContractSeq") 
+                    }
+                    
+                    if (!alreadyProposed) {
+                        val detailRes = contractApi.getContractDetail(validContractSeq)
                         if (detailRes.status == 200) {
                             val detail = detailRes.data
-                            applyContractDetail(detail)
 
                             // STOMP 세션이 준비될 때까지 대기 (메시지 유실 방지)
                             val session = chatRepository.session.filterNotNull().first()
@@ -150,8 +167,8 @@ class ChatRoomViewModel @Inject constructor(
                             )
                             val contentJson = Json.encodeToString(AiProposalPayload.serializer(), payload)
                             
-                            // 중복 발송 방지를 위한 최종 체크 (상태값 및 플래그 활용)
-                            if (isInitialProposalSent || _messages.value.any { it.msgType == "AI_PROPOSAL" }) {
+                            // 최종 발송 시점에서도 한 번 더 체크 (isInitialProposalSent는 세션 내 중복 방지용)
+                            if (isInitialProposalSent) {
                                 return@launch
                             }
                             isInitialProposalSent = true
@@ -170,22 +187,6 @@ class ChatRoomViewModel @Inject constructor(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to send initial contract card", e)
-                }
-            } else {
-                // 이미 메시지가 있는 경우에도 상태 동기화는 필요
-                try {
-                    val targetSeq = validContractSeq ?: run {
-                        val res = contractApi.getContracts()
-                        if (res.status == 200 && res.data.isNotEmpty()) res.data.first().contractSeq else null
-                    }
-                    if (targetSeq != null && targetSeq > 0) {
-                        val detailRes = contractApi.getContractDetail(targetSeq)
-                        if (detailRes.status == 200) {
-                            applyContractDetail(detailRes.data)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to sync acceptance state", e)
                 }
             }
 
@@ -411,7 +412,7 @@ class ChatRoomViewModel @Inject constructor(
                 chatRepository.sendMessage(
                     roomId = roomId,
                     senderSeq = userSeq,
-                    content = "AI_NEGOTIATION_START",
+                    content = "AI 협의를 시작합니다.",
                     isContractMsg = true,
                     msgType = "SYSTEM"
                 )
@@ -430,16 +431,27 @@ class ChatRoomViewModel @Inject constructor(
         val contract = currentState.selectedContract ?: return
         
         viewModelScope.launch {
-            _chatRoomState.update { it.copy(isAiAnalyzing = true) }
+            _chatRoomState.update { it.copy(isAiAnalyzing = true, aiRejectionReason = null) }
             try {
                 val res = contractApi.generateClausesFromChat(contract.contractSeq, roomId)
                 if (res.status == 200 && res.data != null) {
-                    val clauses = res.data.clauses ?: emptyList()
-                    _chatRoomState.update { 
-                        it.copy(
-                            pendingAiClauses = clauses,
-                            selectedClauseIndices = clauses.indices.toSet() // 기본으로 전체 선택
-                        ) 
+                    val aiData = res.data
+                    if (aiData.rejected) {
+                        _chatRoomState.update { 
+                            it.copy(
+                                pendingAiClauses = emptyList(),
+                                aiRejectionReason = aiData.rejection_reason ?: "합의 내용을 추출할 수 없습니다. 대화를 더 진행해 보세요."
+                            )
+                        }
+                    } else {
+                        val clauses = aiData.clauses ?: emptyList()
+                        _chatRoomState.update { 
+                            it.copy(
+                                pendingAiClauses = clauses,
+                                selectedClauseIndices = clauses.indices.toSet(),
+                                aiRejectionReason = null
+                            ) 
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -478,29 +490,81 @@ class ChatRoomViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // 1. 서버에 즉시 반영 요청 (updateContract API 활용)
-                // AI 분석에서 제안한 원금/이자율이 있다면 반영, 없으면 현재 값 유지
-                val currentDetail = state.draftContractDetail
-                val proposedPrincipal = currentDetail?.principalAmount ?: 0.0
-                val proposedInterest = currentDetail?.interestRate ?: 0.0
+                // 1. 현재 계약 상세 정보 가져오기
+                val currentDetail = state.draftContractDetail ?: return@launch
                 
-                val updateClauses = pendingAiClauses
-                    .filterIndexed { index, _ -> selectedIdx.contains(index) }
-                    .map { clause: AiClauseResponse ->
-                        // 신규 조항으로 추가 (clauseSeq = 0 or null depending on DTO, here 0 for Int)
-                        ClauseUpdateDto(
-                            clauseSeq = 0, 
-                            content = clause.legalClause ?: ""
-                        )
+                // 2. 기본값 설정 (현재 값 유지)
+                var proposedPrincipal = currentDetail.principalAmount
+                var proposedInterest = currentDetail.interestRate
+                
+                // 3. 기존 특약들을 Update DTO로 변환하여 유지
+                val finalClauses = mutableListOf<ClauseUpdateDto>()
+                currentDetail.clauses.forEach { clause ->
+                    finalClauses.add(ClauseUpdateDto(clauseSeq = clause.clauseSeq, content = clause.content))
+                }
+                
+                // 4. 선택된 AI 제안 특약 처리
+                pendingAiClauses.filterIndexed { index, _ -> selectedIdx.contains(index) }
+                    .forEach { aiClause ->
+                        val content = aiClause.legalClause ?: ""
+                        val clauseId = aiClause.clauseId
+                        
+                        var handledByField = false
+                        
+                        // Heuristic: 이자율 관련 조항 텍스트에서 숫자 추출
+                        if (clauseId == "INTEREST") {
+                            val interestRegex = """(\d+(\.\d+)?)%""".toRegex()
+                            val match = interestRegex.find(content)
+                            if (match != null) {
+                                val value = match.groupValues[1].toDoubleOrNull()
+                                if (value != null) {
+                                    proposedInterest = value / 100.0
+                                    handledByField = true // 필드로 반영되었으므로 특약 리스트에 추가 안 함
+                                    Log.d(TAG, "Extracted interest rate: $proposedInterest from $content")
+                                }
+                            }
+                        }
+                        
+                        // Heuristic: 원금 관련 조항 텍스트에서 숫자 추출
+                        if (clauseId == "PRINCIPAL") {
+                            // "1000000원" 또는 "100만원" 형태 지원
+                            val manWonRegex = """(\d+(\.\d+)?)만원""".toRegex()
+                            val wonRegex = """(\d+([,]\d+)*)원""".toRegex()
+                            
+                            val manMatch = manWonRegex.find(content)
+                            if (manMatch != null) {
+                                val value = manMatch.groupValues[1].toDoubleOrNull()
+                                if (value != null) {
+                                    proposedPrincipal = value * 10000.0
+                                    handledByField = true
+                                    Log.d(TAG, "Extracted principal (man-won): $proposedPrincipal from $content")
+                                }
+                            } else {
+                                val wonMatch = wonRegex.find(content)
+                                if (wonMatch != null) {
+                                    val value = wonMatch.groupValues[1].replace(",", "").toDoubleOrNull()
+                                    if (value != null) {
+                                        proposedPrincipal = value
+                                        handledByField = true
+                                        Log.d(TAG, "Extracted principal (won): $proposedPrincipal from $content")
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 필드 업데이트로 처리되지 않은 경우에만 별도 특약으로 추가
+                        if (!handledByField) {
+                            finalClauses.add(ClauseUpdateDto(clauseSeq = 0, content = content))
+                        }
                     }
 
                 val updateRequest = ContractUpdateRequest(
                     principalAmount = proposedPrincipal,
                     interestRate = proposedInterest,
-                    clauses = updateClauses
+                    clauses = finalClauses
                 )
 
-                // updateContract 호출 (백엔드에서 DB 수정 + 수락 상태 초기화 + AI_PROPOSAL 메시지 발송 수행)
+                // updateContract 호출
                 val response = contractApi.updateContract(contract.contractSeq, updateRequest, roomId)
                 
                 if (response.status == 200) {

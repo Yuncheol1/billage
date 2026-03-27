@@ -114,12 +114,15 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Contract.routeWithArg) { backStackEntry ->
         val role = backStackEntry.arguments?.getString("role")
             ?.let { ContractRole.valueOf(it) } ?: ContractRole.CREDITOR
+        val initialName = backStackEntry.arguments?.getString("initialName")
+        
         ContractCreateScreen(
             onNavigateBack = { appNavController.popBackStack() },
             onContractComplete = { contractSeq, roomId, opponentName ->
                 appNavController.navigateToSpecialTerms(contractSeq, roomId, opponentName)
             },
-            role = role
+            role = role,
+            initialName = initialName
         )
     }
 
@@ -156,7 +159,7 @@ fun NavGraphBuilder.appNavGraph(
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull()
 
         val viewModel: com.billage.app.ui.chat.ChatRoomViewModel = hiltViewModel()
-        LaunchedEffect(roomId) { 
+        LaunchedEffect(roomId, contractSeq) { 
             viewModel.joinRoom(roomId, opponentName, isNewContract, contractSeq) 
         }
         

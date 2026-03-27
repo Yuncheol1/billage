@@ -25,7 +25,7 @@ sealed interface AppDestination {
 
     data object Contract : AppDestination {
         override val route: String = "contract"
-        const val routeWithArg = "contract/{role}"
+        const val routeWithArg = "contract/{role}?initialName={initialName}"
     }
 
     data object ChatList : AppDestination {
@@ -139,8 +139,10 @@ class AppNavController(
         }
     }
 
-    fun navigateToContract(role: ContractRole = ContractRole.CREDITOR) {
-        navController.navigate("${AppDestination.Contract.route}/${role.name}") {
+    fun navigateToContract(role: ContractRole = ContractRole.CREDITOR, initialName: String? = null) {
+        val baseRoute = "${AppDestination.Contract.route}/${role.name}"
+        val finalRoute = if (initialName != null) "$baseRoute?initialName=$initialName" else baseRoute
+        navController.navigate(finalRoute) {
             // 이전 계약 과정(contractComplete, specialTerms 포함)이 백스택에 남지 않도록
             // saveState=false, restoreState 제거 → 항상 새 계약 1단계부터 시작
             popUpTo(AppDestination.Home.route) { saveState = false }
