@@ -296,9 +296,12 @@ class ContractCreateViewModel @Inject constructor(
         _submitState.value = ContractSubmitState.Idle
     }
 
-    fun resetForm(role: ContractRole = ContractRole.CREDITOR) {
+    fun resetForm(role: ContractRole = ContractRole.CREDITOR, initialName: String? = null) {
         _currentStep.value = 1
-        _formState.value = ContractFormState(role = role)
+        _formState.value = ContractFormState(
+            role = role,
+            debtorName = initialName ?: ""
+        )
         _submitState.value = ContractSubmitState.Idle
         _searchState.value = UserSearchState.Idle
     }

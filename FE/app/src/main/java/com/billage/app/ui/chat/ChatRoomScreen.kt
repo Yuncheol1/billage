@@ -396,6 +396,7 @@ fun ChatRoomScreen(
         com.billage.app.ui.chat.components.AiClauseSelectionDialog(
             clauses = clauses,
             selectedIndices = state.selectedClauseIndices,
+            rejectionReason = state.aiRejectionReason,
             onToggleSelection = onToggleClauseSelection,
             onDismissRequest = { onExitModificationMode() },
             onConfirm = { onApplyAiClauses() }

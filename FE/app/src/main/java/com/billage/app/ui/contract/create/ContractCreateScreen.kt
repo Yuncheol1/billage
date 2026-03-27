@@ -60,6 +60,7 @@ fun ContractCreateScreen(
     onNavigateBack: () -> Unit,
     onContractComplete: (contractSeq: Int, roomId: String, opponentName: String) -> Unit,
     role: ContractRole = ContractRole.CREDITOR,
+    initialName: String? = null,
     viewModel: ContractCreateViewModel = hiltViewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
@@ -70,8 +71,8 @@ fun ContractCreateScreen(
     }
     val searchState by viewModel.searchState.collectAsState()
 
-    // role이 바뀌거나 화면이 처음 진입할 때 항상 폼을 초기화
-    LaunchedEffect(role) { viewModel.resetForm(role) }
+    // role이 바뀌거나 화면이 처음 진입할 때 항상 폼을 초기화 (initialName 포함)
+    LaunchedEffect(role) { viewModel.resetForm(role, initialName) }
 
     // submitState 관찰 — 성공하면 contractSeq를 들고 다음 화면으로 이동
     LaunchedEffect(submitState) {
