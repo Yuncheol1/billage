@@ -955,11 +955,12 @@ public class ContractService {
         List<com.ssafy.a305.be.domain.chat.entity.ChatMessage> allHistory = 
                 chatMessageRepository.findByRoomIdOrderByCreatedAtAsc(roomId);
 
-        // 타임라인 필터링: 가장 최근의 AI_NEGOTIATION_START 마커를 찾음
+        // 타임라인 필터링: 가장 최근의 마커를 찾음 (공백/마침표 무시 위해 contains 사용)
         int startIndex = -1;
         for (int i = 0; i < allHistory.size(); i++) {
             com.ssafy.a305.be.domain.chat.entity.ChatMessage msg = allHistory.get(i);
-            if ("SYSTEM".equalsIgnoreCase(msg.getMsgType()) && "AI_NEGOTIATION_START".equals(msg.getContent())) {
+            String content = msg.getContent() != null ? msg.getContent() : "";
+            if (content.contains("AI_NEGOTIATION_START") || content.contains("AI 협의를 시작합니다")) {
                 startIndex = i;
             }
         }
@@ -968,7 +969,7 @@ public class ContractService {
                 ? allHistory 
                 : allHistory.subList(startIndex + 1, allHistory.size());
 
-        // 3. AI 요청 DTO 생성
+        // 3. AI 요청 DTO 생성 (시스템 메시지는 분석 대상에서 제외하여 소음 및 오탐 방지)
         List<AiChatMessageDto> aiMessages = relevantHistory.stream()
                 .filter(msg -> "TEXT".equalsIgnoreCase(msg.getMsgType()) || "AI_CHAT".equalsIgnoreCase(msg.getMsgType()))
                 .map(msg -> {
