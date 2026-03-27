@@ -24,6 +24,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,10 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.fragment.app.FragmentActivity
 import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.ui.common.AddContractBottomSheet
@@ -79,6 +83,7 @@ fun ContractListScreen(
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
+    val lifecycleOwner = LocalLifecycleOwner.current
     val uiState by viewModel.uiState.collectAsState()
     LaunchedEffect(Unit) {
         viewModel.refreshUnreadCount()
@@ -99,6 +104,22 @@ fun ContractListScreen(
 
     var selectedRole by rememberSaveable { mutableStateOf(ContractRoleFilter.All) }
     var selectedStatus by rememberSaveable { mutableStateOf(ContractStatusFilter.All) }
+
+    DisposableEffect(lifecycleOwner, viewModel, selectedRole, selectedStatus) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.fetchContracts(
+                    role = selectedRole.apiValue,
+                    status = null
+                )
+                viewModel.refreshUnreadCount()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(initialRole, initialStatus) {
         initialRole?.let { selectedRole = it }

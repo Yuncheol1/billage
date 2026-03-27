@@ -174,7 +174,7 @@ data class DeleteClauseResponse(
 
 @Serializable
 data class AddAiClauseRequest(
-    val naturalLanguage: String
+    val clauseContent: String
 )
 
 @Serializable

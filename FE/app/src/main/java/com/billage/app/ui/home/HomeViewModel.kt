@@ -2,6 +2,8 @@ package com.billage.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.billage.app.core.events.AppEvent
+import com.billage.app.core.events.AppEventBus
 import com.billage.app.data.remote.api.ContractApi
 import com.billage.app.data.remote.api.ContractListResponse
 import com.billage.app.data.repository.NotificationRepository
@@ -57,6 +59,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         refreshHome()
+        observeAppEvents()
         observeUnreadCount()
         refreshUnreadCount()
     }
@@ -119,6 +122,19 @@ class HomeViewModel @Inject constructor(
     fun refreshUnreadCount() {
         viewModelScope.launch {
             runCatching { notificationRepository.refreshUnreadCount() }
+        }
+    }
+
+    private fun observeAppEvents() {
+        viewModelScope.launch {
+            AppEventBus.events.collectLatest { event ->
+                when (event) {
+                    is AppEvent.ContractDeleted -> {
+                        refreshHome()
+                        refreshUnreadCount()
+                    }
+                }
+            }
         }
     }
 

@@ -75,9 +75,9 @@ class ContractSpecialTermsViewModel @Inject constructor(
     }
 
     fun addDirectInputTerm() {
-        val naturalLanguage = _uiState.value.directInputText.trim()
+        val clauseContent = _uiState.value.directInputText.trim()
 
-        if (naturalLanguage.isEmpty()) {
+        if (clauseContent.isEmpty()) {
             _uiState.value = _uiState.value.copy(errorMessage = "내용을 입력해주세요")
             return
         }
@@ -92,10 +92,10 @@ class ContractSpecialTermsViewModel @Inject constructor(
             try {
                 val response = contractApi.addClauseAI(
                     contractSeq = contractSeq,
-                    request = AddAiClauseRequest(naturalLanguage = naturalLanguage)
+                    request = AddAiClauseRequest(clauseContent = clauseContent)
                 )
                 if (response.status == 201) {
-                    val aiContent = response.data?.content ?: naturalLanguage
+                    val aiContent = response.data?.content ?: clauseContent
                     val clauseSeq = response.data?.clauseSeq ?: -1
                     val newTerm = SpecialTerm(
                         title = aiContent,
