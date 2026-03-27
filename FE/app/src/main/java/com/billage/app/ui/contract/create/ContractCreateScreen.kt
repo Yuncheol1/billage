@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.billage.app.ui.common.SecureScreen
 import com.billage.app.ui.contract.create.steps.Step1CounterpartyScreen
 import com.billage.app.ui.contract.create.steps.Step2RelationshipScreen
 import com.billage.app.ui.contract.create.steps.Step3AmountScreen
@@ -105,9 +104,7 @@ fun ContractCreateScreen(
         )
     }
 
-    // SecureScreen 적용: 차용증 생성 단계별 폼 화면에서만 화면 캡처를 방지합니다.
-    SecureScreen {
-        Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -204,7 +201,6 @@ fun ContractCreateScreen(
                 )
             }
         }
-    }
     }
 }
 

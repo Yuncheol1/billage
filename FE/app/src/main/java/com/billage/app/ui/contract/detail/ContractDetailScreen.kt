@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import com.billage.app.data.remote.api.ClauseDetailDto
 import com.billage.app.ui.auth.BiometricLoginManager
-import com.billage.app.ui.common.SecureScreen
 import com.billage.app.ui.theme.BillageBackground
 import com.billage.app.ui.theme.BillageDanger
 import com.billage.app.ui.theme.BillageDivider
@@ -136,9 +135,7 @@ fun ContractDetailScreen(
         )
     }
 
-    // SecureScreen 적용: 차용증 상세 내용 화면에서만 화면 캡처를 방지합니다.
-    SecureScreen {
-        Scaffold(
+    Scaffold(
         topBar = {
             TopAppBar(
                 title = {
@@ -356,7 +353,6 @@ fun ContractDetailScreen(
                 }
             }
         }
-    }
     }
 
     pendingAction?.let { dialogState ->

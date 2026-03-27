@@ -51,7 +51,6 @@ import com.billage.app.ui.common.AddContractBottomSheet
 import com.billage.app.ui.common.BottomBar
 import com.billage.app.ui.common.BottomBarTab
 import com.billage.app.ui.common.MenuProfileState
-import com.billage.app.ui.common.SecureScreen
 import com.billage.app.ui.common.TopBar
 import com.billage.app.ui.common.rememberLogoutUiState
 import com.billage.app.ui.contract.create.ContractRole
@@ -171,9 +170,7 @@ fun ContractListScreen(
         )
     }
 
-    // SecureScreen 적용: 차용증 목록 화면에 진입한 동안만 화면 캡처를 방지합니다.
-    SecureScreen {
-        Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = BillageBackground,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -329,7 +326,6 @@ fun ContractListScreen(
                 )
             }
         }
-    }
     }
 
     if (showContractTypeSheet) {
