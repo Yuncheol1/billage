@@ -599,11 +599,9 @@ public class ContractService {
                     .installmentNo(1)
                     .dueDt(contract.getEndDt())
                     .principalDue(request.getPrincipalAmount())
-                    .interestDue(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
-                            request.getStartDt(), request.getEndDt()))
+                    .interestDue(calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),1))
                     .totalDue(request.getPrincipalAmount()
-                            .add(calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
-                                    request.getStartDt(), request.getEndDt())))
+                            .add(calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),1)))
                     .status("NONPAID")
                     .createdDttm(LocalDateTime.now())
                     .build();
@@ -620,13 +618,10 @@ public class ContractService {
             };
 
             int installments = request.getTotalInstallments();
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments), 2,
-                    RoundingMode.DOWN);
+            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments / intervalMonths), 2, RoundingMode.DOWN);
 
             // 단순 월 분할 이자 계산 가정
-            BigDecimal totalInterest = calculateTotalInterest(request.getPrincipalAmount(), request.getInterestRate(),
-                    request.getStartDt(), request.getEndDt());
-            BigDecimal interestPerMth = totalInterest.divide(new BigDecimal(installments), 2, RoundingMode.DOWN);
+            BigDecimal interestPerMth = calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),intervalMonths);
 
             BigDecimal remainingPrincipal = request.getPrincipalAmount();
 
@@ -640,11 +635,12 @@ public class ContractService {
                 if (dueDt.isAfter(request.getEndDt())) {
                     dueDt = request.getEndDt(); // 만기일 초과 금지
                 }
-
-                // 마지막 회차에는 남은 원금을 다 털어넣도록 자투리 처리
-                BigDecimal currentPrincipalDue = (i == installments) ? remainingPrincipal : principalPerMth;
+                BigDecimal currentPrincipalDue = BigDecimal.ZERO;
+                if (i % intervalMonths == 0) {
+                    // 마지막 회차에는 자투리 방지를 위해 남은 원금을 다 털어냄
+                    currentPrincipalDue = (i == installments) ? remainingPrincipal : principalPerMth;
+                }
                 remainingPrincipal = remainingPrincipal.subtract(currentPrincipalDue);
-
                 RepaymentSchedule schedule = RepaymentSchedule.builder()
                         .contract(contract)
                         .installmentNo(i)
@@ -658,6 +654,9 @@ public class ContractService {
                         .build();
 
                 contract.addRepaymentSchedule(schedule);
+                if (i % intervalMonths == 0) {
+                    interestPerMth = calculateInterest(remainingPrincipal, request.getInterestRate(), intervalMonths);
+                }
             }
         }
     }
@@ -692,9 +691,16 @@ public class ContractService {
                 contract.getContractSeq(), debtorAccount.getAccountNo(), creditorAccount.getAccountNo(), transferDay);
     }
 
-    private BigDecimal calculateTotalInterest(BigDecimal principal, BigDecimal rate, LocalDate start, LocalDate end) {
-        // 실제 금융 로직에서는 일할 계산 등 복잡하지만 예시용 산식입니다.
-        return principal.multiply(rate);
+    private BigDecimal calculateInterest(BigDecimal principal, BigDecimal rate, Integer intervalMonths) {
+        if (principal == null || rate == null || intervalMonths == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal months = BigDecimal.valueOf(intervalMonths);
+        // 중간 계산은 정밀도를 높게 유지해야 오차가 누적되지 않아 (10자리 권장)
+        BigDecimal yearFraction = months.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP);
+
+        return principal.multiply(rate).multiply(yearFraction).setScale(0, RoundingMode.HALF_UP);
     }
 
     private String generateContractId() {
