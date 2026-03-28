@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.billage.app.ui.theme.*
+import com.billage.app.ui.contract.detail.formatRepaymentMethodFriendly
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +120,7 @@ fun ContractEditScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        ReadOnlyField(label = "상환 방법", value = detail!!.repaymentMethod ?: "알 수 없음")
+                        ReadOnlyField(label = "상환 방법", value = formatRepaymentMethodFriendly(detail!!.repaymentMethod, detail!!.totalInstallments))
                         Spacer(modifier = Modifier.height(8.dp))
                         ReadOnlyField(label = "상환일", value = detail!!.endDt ?: "알 수 없음")
                     }

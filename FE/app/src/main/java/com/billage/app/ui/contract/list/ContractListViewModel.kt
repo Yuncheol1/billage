@@ -166,8 +166,11 @@ private fun ContractListResponse.toContractCardModel(): ContractCardModel {
 
     // 상환 방식 한국어 변환
     val interestLabel = when (this.repaymentMethod) {
-        "BULLET" -> "만기일시상환"
-        "INSTALLMENT" -> "분할상환"
+        "BULLET", "LUMP_SUM" -> "만기일에 한 번에"
+        "INSTALLMENT", "MONTHLY" -> "매월"
+        "QUARTERLY" -> "3개월마다"
+        "SEMI_ANNUAL" -> "6개월마다"
+        "ANNUAL" -> "매년"
         "CUSTOM" -> "맞춤상환"
         else -> "-"
     }

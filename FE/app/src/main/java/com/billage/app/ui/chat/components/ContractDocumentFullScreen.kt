@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.billage.app.ui.theme.*
+import com.billage.app.ui.contract.detail.formatRepaymentMethodFriendly
 import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractUpdateRequest
 import kotlinx.serialization.json.Json
@@ -186,7 +187,7 @@ fun ContractDocumentFullScreen(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        AcceptanceStatusBadge(label = "나", isAccepted = isMeAccepted)
+                        AcceptanceStatusBadge(label = contractDetail.myRealName ?: "나", isAccepted = isMeAccepted)
                         AcceptanceStatusBadge(label = "상대방", isAccepted = isOpponentAccepted)
                     }
 
@@ -291,16 +292,12 @@ fun ContractSummaryHeader(detail: ContractDetailResponse) {
             Text("계약 요약 정보", fontWeight = FontWeight.Bold, color = BillagePrimary, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(12.dp))
             
-            SummaryRow("채권자", "나")
+            SummaryRow("채권자", detail.myRealName ?: "나")
             SummaryRow("채무자", detail.counterpartyName ?: "-")
             SummaryRow("차용 원금", "%,d원".format(detail.principalAmount?.toLong() ?: 0L))
             SummaryRow("이자율", "연 %.2f%%".format((detail.interestRate ?: 0.0) * 100))
             SummaryRow("차용 기간", "${detail.startDt ?: "-"} ~ ${detail.endDt ?: "-"}")
-            SummaryRow("상환 방식", when(detail.repaymentMethod) {
-                "BULLET" -> "만기 일시 상환"
-                "INSTALLMENT" -> "균등 분할 상환"
-                else -> detail.repaymentMethod ?: "-"
-            })
+            SummaryRow("상환 방식", formatRepaymentMethodFriendly(detail.repaymentMethod, detail.totalInstallments))
         }
     }
 }
@@ -326,7 +323,7 @@ fun DiffContractSummaryHeader(
             Text("계약 요약 정보 (변경사항)", fontWeight = FontWeight.Bold, color = BillagePrimary, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(12.dp))
             
-            SummaryRow("채권자", "나")
+            SummaryRow("채권자", detail.myRealName ?: "나")
             SummaryRow("채무자", detail.counterpartyName ?: "-")
 
             // Principal Diff
@@ -356,11 +353,7 @@ fun DiffContractSummaryHeader(
             }
 
             SummaryRow("차용 기간", "${detail.startDt ?: "-"} ~ ${detail.endDt ?: "-"}")
-            SummaryRow("상환 방식", when(detail.repaymentMethod) {
-                "BULLET" -> "만기 일시 상환"
-                "INSTALLMENT" -> "균등 분할 상환"
-                else -> detail.repaymentMethod ?: "-"
-            })
+            SummaryRow("상환 방식", formatRepaymentMethodFriendly(detail.repaymentMethod, detail.totalInstallments))
         }
     }
 }
