@@ -59,7 +59,9 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 fun NavGraphBuilder.appNavGraph(
-    appNavController: AppNavController
+    appNavController: AppNavController,
+    isHomeScreenProtectionEnabled: Boolean = true,
+    onHomeScreenProtectionChanged: (Boolean) -> Unit = {}
 ) {
     composable(route = AppDestination.Login.route) {
         LoginScreen(
@@ -406,7 +408,9 @@ fun NavGraphBuilder.appNavGraph(
     composable(route = AppDestination.Settings.route) {
         WithdrawalSettingsScreen(
             onBackClick = { appNavController.popBackStack() },
-            onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) }
+            onWithdrawSuccess = { appNavController.navigateToLogin(clearBackStack = true) },
+            isHomeScreenProtectionEnabled = isHomeScreenProtectionEnabled,
+            onHomeScreenProtectionChanged = onHomeScreenProtectionChanged
         )
     }
 

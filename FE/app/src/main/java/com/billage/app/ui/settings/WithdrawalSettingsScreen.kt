@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,7 +58,9 @@ private const val LOG_TAG = "WithdrawalSettings"
 @Composable
 fun WithdrawalSettingsScreen(
     onBackClick: () -> Unit = {},
-    onWithdrawSuccess: () -> Unit = {}
+    onWithdrawSuccess: () -> Unit = {},
+    isHomeScreenProtectionEnabled: Boolean = true,
+    onHomeScreenProtectionChanged: (Boolean) -> Unit = {}
 ) {
     val applicationContext = LocalContext.current.applicationContext
     val coroutineScope = rememberCoroutineScope()
@@ -139,6 +142,12 @@ fun WithdrawalSettingsScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            HomeScreenProtectionCard(
+                isEnabled = isHomeScreenProtectionEnabled,
+                onEnabledChange = onHomeScreenProtectionChanged,
+                enabled = !isWithdrawing
+            )
+
             Text(
                 text = "계정 관리",
                 color = BillageTextPrimary,
@@ -332,6 +341,77 @@ fun WithdrawalSettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun HomeScreenProtectionCard(
+    isEnabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    enabled: Boolean
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = BillageSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "홈 화면 보호",
+                color = BillageTextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "홈 화면에서 스크린샷, 화면 녹화, 일부 미러링을 차단합니다.",
+                color = BillageTextSecondary,
+                fontSize = 14.sp,
+                lineHeight = 21.sp
+            )
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFFF4F7FB)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = if (isEnabled) "보호 켜짐" else "보호 꺼짐",
+                        color = BillageTextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isEnabled) {
+                            "홈 화면 캡처와 공유 화면 노출을 막고 있습니다."
+                        } else {
+                            "미러링과 화면공유 시 홈 화면이 정상 표시됩니다."
+                        },
+                        color = BillageTextSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Switch(
+                            checked = isEnabled,
+                            onCheckedChange = onEnabledChange,
+                            enabled = enabled,
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterEnd)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

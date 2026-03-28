@@ -44,6 +44,9 @@ class AuthSessionStorage(context: Context) {
     fun isBiometricLoginEnabled(): Boolean =
         preferences.getBoolean(KEY_BIOMETRIC_LOGIN_ENABLED, false)
 
+    fun isHomeScreenProtectionEnabled(): Boolean =
+        preferences.getBoolean(KEY_HOME_SCREEN_PROTECTION_ENABLED, true)
+
     fun shouldUseBiometricLogin(): Boolean {
         return isBiometricLoginEnabled() && !getRefreshToken().isNullOrBlank()
     }
@@ -90,6 +93,12 @@ class AuthSessionStorage(context: Context) {
     fun setBiometricLoginEnabled(enabled: Boolean) {
         preferences.edit {
             putBoolean(KEY_BIOMETRIC_LOGIN_ENABLED, enabled)
+        }
+    }
+
+    fun setHomeScreenProtectionEnabled(enabled: Boolean) {
+        preferences.edit {
+            putBoolean(KEY_HOME_SCREEN_PROTECTION_ENABLED, enabled)
         }
     }
 
@@ -193,6 +202,7 @@ class AuthSessionStorage(context: Context) {
         private const val KEY_USER_SEQ = "user_seq"
         private const val KEY_USER_STATE = "user_state"
         private const val KEY_BIOMETRIC_LOGIN_ENABLED = "biometric_login_enabled"
+        private const val KEY_HOME_SCREEN_PROTECTION_ENABLED = "home_screen_protection_enabled"
         private const val KEY_FCM_TOKEN = "fcm_token"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_MIGRATION_COMPLETED = "migration_completed"
@@ -206,6 +216,7 @@ class AuthSessionStorage(context: Context) {
             KEY_USER_SEQ,
             KEY_USER_STATE,
             KEY_BIOMETRIC_LOGIN_ENABLED,
+            KEY_HOME_SCREEN_PROTECTION_ENABLED,
             KEY_FCM_TOKEN,
             KEY_USER_NAME
         )

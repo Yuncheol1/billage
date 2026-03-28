@@ -43,6 +43,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var authSessionStorage: AuthSessionStorage
     private var startDestination by mutableStateOf(AppDestination.Login.route)
     private var pendingNotificationTarget by mutableStateOf<NotificationNavigationTarget?>(null)
+    private var isHomeScreenProtectionEnabled by mutableStateOf(true)
 
     // 알림 권한 런처
     private val requestPermissionLauncher = registerForActivityResult(
@@ -58,6 +59,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authSessionStorage = AuthSessionStorage(applicationContext)
+        isHomeScreenProtectionEnabled = authSessionStorage.isHomeScreenProtectionEnabled()
         startDestination = resolveStartDestination()
         handleAuthCallback(intent)
         handleNotificationNavigation(intent)
@@ -67,6 +69,11 @@ class MainActivity : FragmentActivity() {
             BillageTheme {
                 AppNavHost(
                     startDestination = startDestination,
+                    isHomeScreenProtectionEnabled = isHomeScreenProtectionEnabled,
+                    onHomeScreenProtectionChanged = { enabled ->
+                        authSessionStorage.setHomeScreenProtectionEnabled(enabled)
+                        isHomeScreenProtectionEnabled = enabled
+                    },
                     pendingNotificationTarget = pendingNotificationTarget,
                     onNotificationTargetConsumed = { pendingNotificationTarget = null }
                 )
