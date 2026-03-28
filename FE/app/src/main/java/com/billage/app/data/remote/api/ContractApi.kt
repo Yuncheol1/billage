@@ -246,6 +246,7 @@ data class ContractDetailResponse(
     val contractId: String?,
     val family: Boolean?,
     val myRole: String?,
+    val myRealName: String? = null,
     val counterpartyName: String?,
     val counterpartyProfileImageUrl: String? = null,
     val principalAmount: Double?,

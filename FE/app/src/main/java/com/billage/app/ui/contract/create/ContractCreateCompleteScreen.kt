@@ -59,11 +59,11 @@ private fun formatDate(dateStr: String): String {
 }
 
 private fun formatRepaymentMethod(method: RepaymentMethod?): String = when (method) {
-    RepaymentMethod.LUMP_SUM -> "만기 일시 상환"
-    RepaymentMethod.MONTHLY -> "월별 분할 상환"
-    RepaymentMethod.QUARTERLY -> "분기별 분할 상환"
-    RepaymentMethod.SEMI_ANNUAL -> "반기별 분할 상환"
-    RepaymentMethod.ANNUAL -> "연별 분할 상환"
+    RepaymentMethod.LUMP_SUM -> "만기일에 한 번에"
+    RepaymentMethod.MONTHLY -> "매월"
+    RepaymentMethod.QUARTERLY -> "3개월마다"
+    RepaymentMethod.SEMI_ANNUAL -> "6개월마다"
+    RepaymentMethod.ANNUAL -> "매년"
     null -> "-"
 }
 

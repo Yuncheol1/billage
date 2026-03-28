@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.billage.app.ui.theme.*
+import com.billage.app.ui.contract.detail.formatRepaymentMethodFriendly
 import com.billage.app.data.remote.api.ContractDetailResponse
 
 /**
@@ -147,7 +148,7 @@ fun SignedContractFullScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            SignatureUnit(label = "채권자", name = "나 (본인)")
+                            SignatureUnit(label = "채권자", name = contractDetail.myRealName ?: "나")
                             SignatureUnit(label = "채무자", name = contractDetail.counterpartyName ?: "미상")
                         }
                     }
@@ -184,11 +185,7 @@ fun ContractSummaryDocTable(detail: ContractDetailResponse) {
         DocTableRow("차용 원금", "%,d원".format(detail.principalAmount?.toLong() ?: 0L))
         DocTableRow("이자율", "연 %.2f%%".format((detail.interestRate ?: 0.0) * 100))
         DocTableRow("차용 기간", "${detail.startDt ?: "-"} ~ ${detail.endDt ?: "-"}")
-        DocTableRow("상환 방식", when(detail.repaymentMethod) {
-            "BULLET" -> "만기 일시 상환"
-            "INSTALLMENT" -> "균등 분할 상환"
-            else -> detail.repaymentMethod ?: "-"
-        })
+        DocTableRow("상환 방식", formatRepaymentMethodFriendly(detail.repaymentMethod, detail.totalInstallments))
     }
 }
 
@@ -259,19 +256,6 @@ fun SignatureUnit(label: String, name: String) {
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = BillageTextPrimary
-            )
-            // 인장(Seal) 느낌의 원형 배경 (Semi-transparent red circle mockup)
-            Canvas(modifier = Modifier.size(40.dp)) {
-                drawCircle(
-                    color = Color.Red.copy(alpha = 0.1f),
-                    radius = size.minDimension / 2
-                )
-            }
-            Text(
-                text = "(인)",
-                fontSize = 12.sp,
-                color = Color.Red.copy(alpha = 0.5f),
-                modifier = Modifier.padding(start = 50.dp)
             )
         }
     }
