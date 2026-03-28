@@ -16,6 +16,7 @@ public class ContractDetailResponseDto {
     private final String contractId;
     private final Boolean family;
     private final String myRole;
+    private final String myRealName;
     private final String counterpartyName;
     private final String counterpartyProfileImageUrl;
     private final BigDecimal principalAmount;
@@ -38,6 +39,7 @@ public class ContractDetailResponseDto {
     public ContractDetailResponseDto(
             Contract contract,
             Integer myUserSeq,
+            String myRealName,
             String counterpartyName,
             String counterpartyProfileImageUrl,
             Boolean isMeSigned,
@@ -49,6 +51,7 @@ public class ContractDetailResponseDto {
         this.contractId = contract.getContractId();
         this.family = contract.getFamily();
         this.myRole = contract.getCreditor().getUserSeq().equals(myUserSeq) ? "CREDITOR" : "DEBTOR";
+        this.myRealName = myRealName;
         this.counterpartyName = counterpartyName;
         this.counterpartyProfileImageUrl = counterpartyProfileImageUrl;
         this.principalAmount = contract.getPrincipalAmount();

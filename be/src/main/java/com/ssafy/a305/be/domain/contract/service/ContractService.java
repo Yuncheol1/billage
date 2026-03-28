@@ -741,9 +741,13 @@ public class ContractService {
             log.error("Failed to get or create chat room for navigation", e);
         }
 
+        UserProfile myProfile = userProfileRepository.findByUserUserSeq(userSeq).orElse(null);
+        String myRealName = myProfile != null && myProfile.getRealName() != null ? myProfile.getRealName() : "나";
+
         return new ContractDetailResponseDto(
                 contract,
                 userSeq,
+                myRealName,
                 counterpartyName,
                 counterpartyProfileImageUrl,
                 signatureStatus.isMeSigned(),
