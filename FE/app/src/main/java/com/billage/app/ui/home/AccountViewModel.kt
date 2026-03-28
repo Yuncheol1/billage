@@ -99,10 +99,16 @@ class AccountViewModel @Inject constructor(
             val endDate = today.format(fmt)
 
             val detailResponse = bankAccountApi.getAccountDetail()
-            val txResponse = bankAccountApi.getTransactions(startDate, endDate)
+            val txResponse = bankAccountApi.getTransactions(
+                startDate = startDate,
+                endDate = endDate,
+                orderByType = "DESC"
+            )
             _state.value = AccountScreenState.HasAccount(
                 account = detailResponse.data,
-                transactions = txResponse.data.list.ifEmpty { mockTransactions }
+                transactions = txResponse.data.list
+                    .ifEmpty { mockTransactions }
+                    .sortedByDescending { "${it.transactionDate}${it.transactionTime}" }
             )
         } catch (e: Exception) {
             _state.value = AccountScreenState.Error(e.toKoreanMessage("계좌 조회"))

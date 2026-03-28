@@ -26,7 +26,8 @@ interface BankAccountApi {
     @GET("api/v1/bank/accounts/transactions")
     suspend fun getTransactions(
         @retrofit2.http.Query("startDate") startDate: String,
-        @retrofit2.http.Query("endDate") endDate: String
+        @retrofit2.http.Query("endDate") endDate: String,
+        @retrofit2.http.Query("orderByType") orderByType: String = "DESC"
     ): TransactionListBaseResponse
 
     // 거래 단건 상세
