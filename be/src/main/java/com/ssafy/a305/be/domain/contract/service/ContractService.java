@@ -373,7 +373,8 @@ public class ContractService {
         contract.setAiDraftContent(null); // 즉시 반영이므로 제안서 필드 비움
         contract.resetAgreement(); // 수락 상태 초기화
 
-
+        // 계약 변경 시 기존 AI 캐시 무효화
+        analysisCache.remove(contractSeq);
 
         // 아무런 변경이 없었다면 브로드캐스트 생략 가능
         if (dynamicModifications.isEmpty() && (roomId == null || roomId.isBlank())) {
@@ -490,6 +491,9 @@ public class ContractService {
                 .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "해당 특약을 찾을 수 없습니다."));
 
         contract.removeClause(targetClause);
+        
+        // 계약 변경 시 기존 AI 캐시 무효화
+        analysisCache.remove(contractSeq);
     }
     @Transactional(readOnly = true)
     public List<ContractListResponseDto> getContracts(Integer userSeq, String role, String status) {
@@ -544,10 +548,25 @@ public class ContractService {
             throw new CustomBusinessException(ErrorCode.INVALID_DATE, "종료일은 시작일보다 미래여야 합니다.");
         }
 
-        // 상환 방식 정합성 검증 (모든 방식은 상환 횟수 1 이상, 상환일 지정 필수)
+        // 상환 방식 정합성 검증
         if (request.getTotalInstallments() == null || request.getTotalInstallments() < 1) {
-            throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "총 상환 횟수가 1 이상이어야 합니다.");
+            throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "총 상환 기간(개월)이 1 이상이어야 합니다.");
         }
+
+        String method = request.getRepaymentMethod();
+        int intervalMonths = switch (method != null ? method : "LUMP_SUM") {
+            case "MONTHLY" -> 1;
+            case "QUARTERLY" -> 3;
+            case "SEMI_ANNUAL" -> 6;
+            case "ANNUAL" -> 12;
+            default -> 0; // LUMP_SUM 등
+        };
+
+        if (intervalMonths > 0 && request.getTotalInstallments() < intervalMonths) {
+            throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, 
+                String.format("선택하신 상환 방식(%s)은 최소 %d개월 이상의 기간이 필요합니다.", method, intervalMonths));
+        }
+
         if (request.getRepaymentDay() == null || request.getRepaymentDay() < 1 || request.getRepaymentDay() > 31) {
             throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, "매월 상환일(1~31) 설정이 누락되거나 잘못되었습니다.");
         }
@@ -618,7 +637,12 @@ public class ContractService {
             };
 
             int installments = request.getTotalInstallments();
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(installments / intervalMonths), 2, RoundingMode.DOWN);
+            int paymentCycles = installments / intervalMonths;
+            
+            // paymentCycles가 0일 경우(이미 validateBusinessRules에서 걸러지겠지만 방어적으로 처리)
+            if (paymentCycles <= 0) paymentCycles = 1;
+
+            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(paymentCycles), 2, RoundingMode.DOWN);
 
             // 단순 월 분할 이자 계산 가정
             BigDecimal interestPerMth = calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),intervalMonths);

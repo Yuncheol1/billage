@@ -14,6 +14,8 @@ public record ContractSignatureRequestDto(
 
         String userAgent,
 
+        String publicKeyPem,
+
         @NotNull(message = "signaturePayload는 필수입니다.")
         JsonNode signaturePayload
 ) {
