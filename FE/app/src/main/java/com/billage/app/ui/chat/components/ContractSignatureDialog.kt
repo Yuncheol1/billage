@@ -80,7 +80,7 @@ fun ContractSignatureDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "지문 인증이 완료되었습니다. 아래 영역에 서명한 뒤 저장해 주세요.",
+                    text = "아래 영역에 서명한 뒤 저장해 주세요. 저장 시 지문 인증이 진행됩니다.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

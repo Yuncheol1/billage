@@ -1,5 +1,6 @@
 package com.billage.app.ui.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,42 +15,42 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.billage.app.data.remote.api.ContractSignatureRequest
-import com.billage.app.ui.auth.BiometricLoginManager
 import com.billage.app.ui.chat.components.ChatBottomInputBar
 import com.billage.app.ui.chat.components.ChatTopBar
 import com.billage.app.ui.chat.components.ContractSignatureDialog
-import com.billage.app.ui.chat.components.PinnedContractBanner
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.ChatRoomMode
 import com.billage.app.data.remote.api.ContractListResponse
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.billage.app.ui.chat.components.PinnedContractBanner
 import com.billage.app.ui.chat.models.ContractSummary
 import com.billage.app.ui.theme.BillagePrimary
 import com.billage.app.ui.theme.BillageTextSecondary
 import com.billage.app.ui.chat.security.ContractSignatureUtils
+import com.billage.app.ui.theme.BillageDivider
+import com.billage.app.ui.theme.BillageTextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +74,7 @@ fun ChatRoomScreen(
     onAnalyzeNegotiation: () -> Unit = {},
     onToggleClauseSelection: (Int) -> Unit = {},
     onApplyAiClauses: () -> Unit = {},
+    onSubmitSignatureWithBiometric: (String) -> Unit = {},
     messageListContent: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -141,29 +143,13 @@ fun ChatRoomScreen(
                 com.billage.app.ui.chat.components.SignatureBanner(
                     isVisible = shouldShowSignatureBanner,
                     onSignClick = {
-                        if (activity == null) {
-                            localSignatureMessage = "전자서명을 시작할 Activity 컨텍스트를 찾을 수 없습니다."
-                            return@SignatureBanner
-                        }
-
-                        BiometricLoginManager.prompt(
-                            activity = activity,
-                            onSuccess = { showSignatureDialog = true },
-                            onError = { message ->
-                                localSignatureMessage = message.takeIf { it.isNotBlank() }
-                            },
-                            onEnrollmentRequired = {
-                                localSignatureMessage = "기기에서 지문 인증을 사용할 수 없습니다. 화면 잠금과 지문을 먼저 등록해 주세요."
-                            },
-                            title = "전자서명",
-                            subtitle = "지문 인증 후 계약 서명을 진행합니다."
-                        )
+                        showSignatureDialog = true
                     }
                 )
 
                 // 계약 협의 모드일 경우 상단에 고정되는 배너
-                if (state.mode == com.billage.app.ui.chat.models.ChatRoomMode.CONTRACT) {
-                    com.billage.app.ui.chat.components.PinnedContractBanner(
+                if (state.mode == ChatRoomMode.CONTRACT) {
+                    PinnedContractBanner(
                         selectedContract = state.selectedContract,
                         isAnalyzing = state.isAiAnalyzing,
                         onExitClick = { onExitModificationMode() },
@@ -210,7 +196,7 @@ fun ChatRoomScreen(
     if (showActionSheet) {
         androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { showActionSheet = false },
-            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -235,21 +221,21 @@ fun ChatRoomScreen(
                     )
                 } else if (actionSheetState == "MANUAL_EDIT_PICKER") {
                     // 뒤로가기 버튼 + 헤더
-                    androidx.compose.foundation.layout.Row(
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
-                        androidx.compose.material3.Icon(
+                        Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "뒤로 가기",
                             modifier = Modifier
                                 .clickable { actionSheetState = "MENU" }
                                 .padding(end = 8.dp)
                         )
-                        androidx.compose.material3.Text(
+                        Text(
                             text = "직접 수정할 차용증 선택",
-                            style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -265,10 +251,10 @@ fun ChatRoomScreen(
                         ) {
                             items(editableContracts) { contract ->
                                 Card(
-                                    colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White),
-                                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, com.billage.app.ui.theme.BillageDivider),
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    border = BorderStroke(1.dp, BillageDivider),
+                                    shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -284,45 +270,45 @@ fun ChatRoomScreen(
                                             }
                                         }
                                 ) {
-                                    androidx.compose.foundation.layout.Row(
+                                    Row(
                                         modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        androidx.compose.foundation.layout.Box(
+                                        Box(
                                             modifier = Modifier
                                                 .size(48.dp)
                                                 .background(com.billage.app.ui.theme.BillageBackground, androidx.compose.foundation.shape.CircleShape)
                                                 .padding(8.dp),
-                                            contentAlignment = androidx.compose.ui.Alignment.Center
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            androidx.compose.material3.Text("📝", fontSize = 20.sp)
+                                            Text("📝", fontSize = 20.sp)
                                         }
-                                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(16.dp))
+                                        Spacer(modifier = Modifier.width(16.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            androidx.compose.material3.Text(
+                                            Text(
                                                 text = "계약 #${contract.contractSeq}",
-                                                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                                                style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = com.billage.app.ui.theme.BillageTextPrimary
+                                                color = BillageTextPrimary
                                             )
-                                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
-                                            androidx.compose.material3.Text(
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
                                                 text = "상대방: ${contract.counterpartyName ?: "미상"}",
-                                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                                                color = com.billage.app.ui.theme.BillageTextSecondary
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = BillageTextSecondary
                                             )
-                                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(2.dp))
-                                            androidx.compose.material3.Text(
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
                                                 text = "원금: ${contract.principalAmount?.toInt() ?: 0}원",
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-                                                color = com.billage.app.ui.theme.BillagePrimary,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = BillagePrimary,
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                         }
-                                        androidx.compose.material3.Icon(
+                                        Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = "수정 아이콘",
-                                            tint = com.billage.app.ui.theme.BillageDivider,
+                                            tint = BillageDivider,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -330,17 +316,17 @@ fun ChatRoomScreen(
                             }
                         }
                     } else {
-                        androidx.compose.foundation.layout.Box(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(32.dp),
-                            contentAlignment = androidx.compose.ui.Alignment.Center
+                            contentAlignment = Alignment.Center
                         ) {
-                            androidx.compose.material3.Text(
+                            Text(
                                 text = "직접 수정할 수 있는 차용증이 없습니다.\n(진행 중인 계약만 수정 가능합니다)",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         }
                     }
@@ -373,7 +359,7 @@ fun ChatRoomScreen(
             onDismissRequest = { 
                 showAiSelectDialog = false
             },
-            onContractSelect = { contract: com.billage.app.data.remote.api.ContractListResponse ->
+            onContractSelect = { contract: ContractListResponse ->
                 showAiSelectDialog = false
                 
                 val anyAccepted = state.isMeAccepted || state.isOpponentAccepted
@@ -409,13 +395,7 @@ fun ChatRoomScreen(
             if (contractDetail == null) {
                 localSignatureMessage = "서명 대상 문서를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
             } else {
-                onSubmitSignature(
-                    ContractSignatureUtils.buildRequest(
-                        context = context,
-                        contractDetail = contractDetail,
-                        canvasDataUrl = canvasDataUrl
-                    )
-                )
+                onSubmitSignatureWithBiometric(canvasDataUrl)
             }
         }
     )
@@ -423,11 +403,11 @@ fun ChatRoomScreen(
     localSignatureMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { localSignatureMessage = null },
-            title = { androidx.compose.material3.Text("전자서명 안내") },
-            text = { androidx.compose.material3.Text(message) },
+            title = { Text("전자서명 안내") },
+            text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { localSignatureMessage = null }) {
-                    androidx.compose.material3.Text("확인")
+                    Text("확인")
                 }
             }
         )
@@ -436,11 +416,11 @@ fun ChatRoomScreen(
     state.signatureErrorMessage?.let { message ->
         AlertDialog(
             onDismissRequest = onDismissSignatureFeedback,
-            title = { androidx.compose.material3.Text("전자서명 실패") },
-            text = { androidx.compose.material3.Text(message) },
+            title = { Text("전자서명 실패") },
+            text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = onDismissSignatureFeedback) {
-                    androidx.compose.material3.Text("확인")
+                    Text("확인")
                 }
             }
         )
@@ -449,11 +429,11 @@ fun ChatRoomScreen(
     state.signatureSuccessMessage?.let { message ->
         AlertDialog(
             onDismissRequest = onDismissSignatureFeedback,
-            title = { androidx.compose.material3.Text("전자서명 완료") },
-            text = { androidx.compose.material3.Text(message) },
+            title = { Text("전자서명 완료") },
+            text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = onDismissSignatureFeedback) {
-                    androidx.compose.material3.Text("확인")
+                    Text("확인")
                 }
             }
         )
@@ -465,61 +445,61 @@ fun ProposalNotificationCard(
     contractSummary: ContractSummary?,
     onDetailClick: () -> Unit
 ) {
-    androidx.compose.material3.Card(
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = androidx.compose.ui.graphics.Color.White
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
         ),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, com.billage.app.ui.theme.BillageDivider),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        border = BorderStroke(1.dp, BillageDivider),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
             // 헤더
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                androidx.compose.material3.Text(
+                Text(
                     text = "📜 [계약 #${contractSummary?.contractId ?: ""}] 수정 제안 도착",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = com.billage.app.ui.theme.BillageTextPrimary
+                    color = BillageTextPrimary
                 )
             }
-            androidx.compose.material3.HorizontalDivider(color = com.billage.app.ui.theme.BillageDivider)
+            HorizontalDivider(color = BillageDivider)
             
             // 본문
             Column(modifier = Modifier.padding(16.dp)) {
-                androidx.compose.material3.Text(
+                Text(
                     text = "📝 문서 병합 완료",
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = com.billage.app.ui.theme.BillageTextPrimary,
+                    color = BillageTextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                androidx.compose.material3.Text(
+                Text(
                     text = "채팅 기반으로 합의된 내용을 문서에 반영했습니다.\n\n자세히 보기를 클릭해 확인해주세요.",
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = com.billage.app.ui.theme.BillageTextSecondary
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BillageTextSecondary
                 )
             }
-            androidx.compose.material3.HorizontalDivider(color = com.billage.app.ui.theme.BillageDivider)
+            HorizontalDivider(color = BillageDivider)
             
             // 버튼
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onDetailClick() }
                     .padding(16.dp),
-                contentAlignment = androidx.compose.ui.Alignment.Center
+                contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.Text(
+                Text(
                     text = "🔍 제안서 자세히 보기",
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = com.billage.app.ui.theme.BillagePrimary
+                    color = BillagePrimary
                 )
             }
         }

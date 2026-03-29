@@ -6,8 +6,9 @@ import android.provider.Settings
 import com.billage.app.BuildConfig
 import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ContractSignatureRequest
+import java.security.KeyStore
 import java.security.MessageDigest
-import kotlinx.serialization.encodeToString
+import android.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -21,19 +22,38 @@ object ContractSignatureUtils {
     fun buildRequest(
         context: Context,
         contractDetail: ContractDetailResponse,
-        canvasDataUrl: String
+        canvasDataUrl: String,
+        signatureBytes: ByteArray,
+        publicKeyPem: String? = null
     ): ContractSignatureRequest {
         val documentHash = buildDocumentHash(contractDetail)
+        val signatureBase64 = Base64.encodeToString(signatureBytes, Base64.NO_WRAP)
         return ContractSignatureRequest(
             method = "BIOMETRIC",
             deviceIdHash = buildDeviceIdHash(context),
             biometricVerified = true,
             userAgent = buildUserAgent(),
+            publicKeyPem = publicKeyPem ?: getStoredPublicKeyPem(),
             signaturePayload = buildJsonObject {
                 put("canvasDataUrl", canvasDataUrl)
                 put("documentHash", documentHash)
-            }
+            },
+            signatureValue = signatureBase64
         )
+    }
+
+    private fun getStoredPublicKeyPem(): String? {
+        return try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val certificate = keyStore.getCertificate("billage_test_key")
+            val publicKey = certificate?.publicKey
+            if (publicKey != null) {
+                // PKCS#8 or X.509 encoding to PEM-like format
+                Base64.encodeToString(publicKey.encoded, Base64.NO_WRAP)
+            } else null
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun buildDocumentHash(contractDetail: ContractDetailResponse): String {

@@ -5,20 +5,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.billage.app.data.remote.api.ContractDetailResponse
 import com.billage.app.data.remote.api.ClauseDetailDto
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
 import com.billage.app.ui.theme.*
-import com.billage.app.ui.contract.detail.formatRepaymentMethodFriendly
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,14 +186,56 @@ fun ContractEditScreen(
                         updatedList[index] = clause.copy(content = newContent)
                         clauseList = updatedList
                     },
-                    label = { Text(clause.title) },
+                    label = { Text(if (clause.title.isNotBlank()) clause.title else "특약 (제${index + 1}조)") },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = BillagePrimary,
                         focusedLabelColor = BillagePrimary
-                    )
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val updatedList = clauseList.toMutableList()
+                            updatedList.removeAt(index)
+                            clauseList = updatedList
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "특약 삭제",
+                                tint = BillageTextSecondary
+                            )
+                        }
+                    }
                 )
+            }
+            
+            // 특약 추가 버튼
+            OutlinedButton(
+                onClick = {
+                    val newClause = ClauseDetailDto(
+                        clauseSeq = 0,
+                        title = "추가 특약",
+                        content = "",
+                        orderNo = clauseList.size + 1
+                    )
+                    clauseList = clauseList + newClause
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .padding(bottom = 16.dp),
+                border = BorderStroke(1.dp, BillageDivider),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = BillageTextPrimary)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "특약 추가",
+                    tint = BillageTextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("특약 추가하기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
             
             // 키보드에 가려지지 않도록 추가 여백

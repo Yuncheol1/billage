@@ -10,17 +10,10 @@ import com.billage.app.ui.contract.list.ContractListScreen
 import com.billage.app.ui.contract.create.ContractCreateScreen
 import com.billage.app.ui.home.HomeScreen
 import com.billage.app.ui.common.MenuProfileViewModel
-import com.billage.app.ui.chat.components.ChatTopBar
-import com.billage.app.ui.chat.components.ContractSignatureDialog
-import com.billage.app.ui.chat.components.PinnedContractBanner
 import com.billage.app.ui.chat.components.SignedContractFullScreen
 import com.billage.app.ui.chat.components.ContractDocumentFullScreen
 import com.billage.app.ui.chatbot.ChatBotScreen
-import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.MessageSender
-import com.billage.app.ui.chat.models.AiProposalPayload
-import com.billage.app.ui.chat.models.AiProposalMessage
-import kotlinx.serialization.decodeFromString
 import com.billage.app.ui.chat.components.cards.BaseChatCard
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -57,6 +50,12 @@ import com.billage.app.ui.theme.BillageTextSecondary
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.billage.app.ui.chat.components.cards.AiProposalCard
+import com.billage.app.ui.chat.components.cards.ContractCompleteCard
+import com.billage.app.ui.chat.models.AiProposalMessage
+import com.billage.app.ui.chat.models.AiProposalPayload
+import com.billage.app.ui.chat.models.ContractCompleteMessage
+import kotlinx.serialization.json.Json
 
 fun NavGraphBuilder.appNavGraph(
     appNavController: AppNavController
@@ -215,6 +214,9 @@ fun NavGraphBuilder.appNavGraph(
             )
         }
 
+        val context = LocalContext.current
+        val activity = context as? androidx.fragment.app.FragmentActivity
+
         com.billage.app.ui.chat.ChatRoomScreen(
             state = chatRoomState,
             contracts = contracts,
@@ -240,6 +242,9 @@ fun NavGraphBuilder.appNavGraph(
             onExitModificationMode = { viewModel.exitModificationMode() },
             onCancelProposal = { viewModel.cancelProposal() },
             onSubmitSignature = { request -> viewModel.submitContractSignature(request) },
+            onSubmitSignatureWithBiometric = { canvasDataUrl ->
+                activity?.let { viewModel.submitSignatureWithBiometric(it, canvasDataUrl) }
+            },
             onDismissSignatureFeedback = { viewModel.clearSignatureFeedback() },
             onDirectEditClick = { seq -> appNavController.navigateToContractEdit(seq, roomId) },
             messageListContent = {
@@ -248,8 +253,8 @@ fun NavGraphBuilder.appNavGraph(
                     val map = mutableMapOf<Int, String>()
                     messages.filter { it.msgType == "AI_PROPOSAL" }.forEach { msg ->
                         try {
-                            val payload = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                .decodeFromString<com.billage.app.ui.chat.models.AiProposalPayload>(msg.content)
+                            val payload = Json { ignoreUnknownKeys = true }
+                                .decodeFromString<AiProposalPayload>(msg.content)
                             map[payload.contractSeq] = msg.id
                         } catch (e: Exception) {}
                     }
@@ -276,13 +281,13 @@ fun NavGraphBuilder.appNavGraph(
                         } else if (msg.msgType == "AI_PROPOSAL") {
                              // AI 카드 (차용증 초안 포함)
                              val payload = try {
-                                 kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                     .decodeFromString<com.billage.app.ui.chat.models.AiProposalPayload>(msg.content)
+                                 Json { ignoreUnknownKeys = true }
+                                     .decodeFromString<AiProposalPayload>(msg.content)
                              } catch (e: Exception) { null }
 
                              if (payload != null) {
-                                 com.billage.app.ui.chat.components.cards.AiProposalCard(
-                                     message = com.billage.app.ui.chat.models.AiProposalMessage(
+                                 AiProposalCard(
+                                     message = AiProposalMessage(
                                          id = msg.id,
                                          sender = if (isMe) MessageSender.ME else MessageSender.OTHER,
                                          timestamp = java.time.LocalDateTime.now(),
@@ -312,15 +317,15 @@ fun NavGraphBuilder.appNavGraph(
                         } else if (msg.msgType == "CONTRACT_COMPLETE") {
                              // 체결 완료 카드
                              val payload = try {
-                                 kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                 Json { ignoreUnknownKeys = true }
                                      .decodeFromString<com.billage.app.ui.chat.models.ContractCompletePayload>(msg.content)
                              } catch (e: Exception) { null }
 
                              if (payload != null) {
-                                 com.billage.app.ui.chat.components.cards.ContractCompleteCard(
-                                     message = com.billage.app.ui.chat.models.ContractCompleteMessage(
+                                 ContractCompleteCard(
+                                     message = ContractCompleteMessage(
                                          id = msg.id,
-                                         sender = com.billage.app.ui.chat.models.MessageSender.SYSTEM,
+                                         sender = MessageSender.SYSTEM,
                                          timestamp = java.time.LocalDateTime.now(),
                                          contractId = payload.contractId,
                                          contractTitle = payload.contractTitle,
@@ -504,8 +509,8 @@ fun NavGraphBuilder.appNavGraph(
     ) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
         val roomId = backStackEntry.arguments?.getString("roomId")
-        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = hiltViewModel(
-            checkNotNull<androidx.lifecycle.ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
+        val viewModel: ContractDetailViewModel = hiltViewModel(
+            checkNotNull(LocalViewModelStoreOwner.current) {
                     "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
                 },
             null
@@ -556,7 +561,9 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(route = AppDestination.ContractDetail.routeWithArg) { backStackEntry ->
         val contractId = backStackEntry.arguments?.getString("contractId") ?: ""
-        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+        val viewModel: ContractDetailViewModel = hiltViewModel(checkNotNull(LocalViewModelStoreOwner.current) {
+                    "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
+                }, null)
 
         androidx.compose.runtime.LaunchedEffect(contractId) {
             contractId.toIntOrNull()?.let {
@@ -580,8 +587,10 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(route = AppDestination.ContractDocument.routeWithArg) { backStackEntry ->
         val contractSeq = backStackEntry.arguments?.getString("contractSeq")?.toIntOrNull() ?: -1
-        val viewModel: com.billage.app.ui.contract.detail.ContractDetailViewModel =
-            androidx.hilt.navigation.compose.hiltViewModel()
+        val viewModel: ContractDetailViewModel =
+            hiltViewModel(checkNotNull(LocalViewModelStoreOwner.current) {
+                        "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
+                    }, null)
 
         androidx.compose.runtime.LaunchedEffect(contractSeq) {
             if (contractSeq != -1) {

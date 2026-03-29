@@ -13,7 +13,6 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
-import java.util.Base64
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.biometric.BiometricManager
@@ -112,20 +111,24 @@ object SecurityTestBed {
     // 2. 생성된 키로 지문 팝업 띄우고 서명하기
     fun startBiometricSignature(
         activity: FragmentActivity,
-        onResult: (String) -> Unit
+        onSuccess: (Signature) -> Unit,
+        onError: (String) -> Unit
     ) {
         val biometricManager = BiometricManager.from(activity)
         val authStatus = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
         if (authStatus != BiometricManager.BIOMETRIC_SUCCESS) {
-            onResult("NEEDS_ENROLLMENT. 기기에 생체 인증(지문/얼굴)이 등록되어 있지 않습니다.\n설정 앱에서 PIN 등록 후 '지문'까지 반드시 추가해주세요.")
+            onError("기기에 생체 인증(지문/얼굴)이 등록되어 있지 않습니다.\n설정 앱에서 PIN 등록 후 '지문'까지 반드시 추가해주세요.")
             return
         }
 
         try {
             val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             if (!keyStore.containsAlias(ALIAS)) {
-                onResult("❌ 키가 없습니다. 'TEE 상태 확인' 버튼을 먼저 눌러주세요.")
-                return
+                val genResult = testKeyGenerationAndHwStatus(activity)
+                if (genResult.startsWith("❌") || genResult.startsWith("NEEDS_ENROLLMENT") || genResult.startsWith("오류:")) {
+                    onError("보안 키 자동 생성 실패: $genResult")
+                    return
+                }
             }
 
             val privateKey = keyStore.getKey(ALIAS, null) as PrivateKey
@@ -137,17 +140,14 @@ object SecurityTestBed {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         val sig = result.cryptoObject?.signature
                         if (sig != null) {
-                            sig.update("차용증 더미 데이터입니다".toByteArray())
-                            val signedBytes = sig.sign()
-                            val base64Sig = Base64.getEncoder().encodeToString(signedBytes)
-                            onResult("✅ 생체인증 및 PKI 서명 성공!\n(서명값: ${base64Sig.take(30)}...)")
+                            onSuccess(sig)
                         } else {
-                            onResult("❌ 서명 객체 오류")
+                            onError("❌ 서명 객체 획득 실패")
                         }
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        onResult("❌ 인증 에러: $errString")
+                        onError("인증 에러: $errString")
                     }
                 })
 
@@ -157,13 +157,13 @@ object SecurityTestBed {
                     .setSubtitle("기기 보안 영역의 키로 서명합니다.")
                     // 에뮬레이터에서 암호/지문 설정 안 했을 때 생기는 크래시 방지 방어코드
                     // allowedAuthenticators를 명시적으로 BIOMETRIC_STRONG으로만 지정
-                    .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     .setNegativeButtonText("취소")
                     .build(),
                 cryptoObject
             )
         } catch (e: Exception) {
-            onResult("❌ 서명 실패: ${e.message}")
+            onError("❌ 서명 실패: ${e.message}")
         }
     }
 }
