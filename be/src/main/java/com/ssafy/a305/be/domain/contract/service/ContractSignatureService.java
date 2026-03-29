@@ -79,7 +79,7 @@ public class ContractSignatureService {
             throw new CustomBusinessException(ErrorCode.SIGNATURE_ALREADY_SUBMITTED);
         }
 
-        UserDeviceKey userDeviceKey = resolveUserDeviceKey(signer, requestDto.deviceIdHash());
+        UserDeviceKey userDeviceKey = resolveUserDeviceKey(signer, requestDto.deviceIdHash(), requestDto.publicKeyPem());
         SignatureRole role = resolveRole(contract, userSeq);
         LocalDateTime now = LocalDateTime.now();
 
@@ -169,7 +169,7 @@ public class ContractSignatureService {
         }
     }
 
-    private UserDeviceKey resolveUserDeviceKey(User user, String deviceIdHash) {
+    private UserDeviceKey resolveUserDeviceKey(User user, String deviceIdHash, String publicKeyPem) {
         return userDeviceKeyRepository.findFirstByUserUserSeqAndDeviceIdHashAndIsActiveTrueOrderByRegisteredDttmDesc(
                         user.getUserSeq(),
                         deviceIdHash
@@ -177,7 +177,7 @@ public class ContractSignatureService {
                 .orElseGet(() -> userDeviceKeyRepository.save(UserDeviceKey.builder()
                         .user(user)
                         .deviceIdHash(deviceIdHash)
-                        .publicKeyPem(DEVICE_KEY_PLACEHOLDER)
+                        .publicKeyPem(publicKeyPem != null ? publicKeyPem : DEVICE_KEY_PLACEHOLDER)
                         .isActive(true)
                         .registeredDttm(LocalDateTime.now())
                         .build()));
