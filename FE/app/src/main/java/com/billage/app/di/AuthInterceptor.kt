@@ -9,6 +9,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,6 +19,7 @@ class AuthInterceptor @Inject constructor(
     private val authSessionStorage: AuthSessionStorage
 ) : Interceptor {
 
+    private val tokenRefreshTimeoutMillis = TimeUnit.SECONDS.toMillis(20).toInt()
     private val refreshLock = ReentrantLock()
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -80,8 +82,8 @@ class AuthInterceptor @Inject constructor(
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
                 doOutput = true
-                connectTimeout = 10_000
-                readTimeout = 10_000
+                connectTimeout = tokenRefreshTimeoutMillis
+                readTimeout = tokenRefreshTimeoutMillis
             }
 
             val body = """{"refreshToken":"$refreshToken"}"""

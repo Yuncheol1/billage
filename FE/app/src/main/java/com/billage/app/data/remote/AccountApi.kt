@@ -10,11 +10,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 class AccountApi(
     private val baseUrl: String = BuildConfig.BACKEND_BASE_URL,
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
+
+    private val networkTimeoutMillis = TimeUnit.SECONDS.toMillis(20).toInt()
 
     suspend fun withdraw(accessToken: String): Result<WithdrawResponse> = withContext(Dispatchers.IO) {
         runCatching {
@@ -58,8 +61,8 @@ class AccountApi(
         val requestUrl = URL(baseUrl.trimEnd('/') + path)
         return (requestUrl.openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 10_000
-            readTimeout = 10_000
+            connectTimeout = networkTimeoutMillis
+            readTimeout = networkTimeoutMillis
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Authorization", "Bearer $accessToken")
         }
