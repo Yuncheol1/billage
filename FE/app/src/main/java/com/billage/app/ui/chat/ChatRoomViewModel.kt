@@ -10,21 +10,17 @@ import com.billage.app.data.remote.api.ContractSignatureRequest
 import com.billage.app.data.remote.api.ContractListResponse
 import com.billage.app.data.remote.api.ContractUpdateRequest
 import com.billage.app.data.remote.api.ClauseUpdateDto
-import com.billage.app.data.remote.api.AiClauseResponse
 import com.billage.app.data.repository.ChatRepository
 import com.billage.app.data.repository.ContractRepository
-import com.billage.app.ui.chat.models.AiProposalMessage
 import com.billage.app.ui.chat.models.AiProposalPayload
 import com.billage.app.ui.chat.models.BaseChatMessage
 import com.billage.app.ui.chat.models.ChatMessageRes
 import com.billage.app.ui.chat.models.ChatRoomMode
 import com.billage.app.ui.chat.models.ChatRoomState
 import com.billage.app.ui.chat.models.ContractSummary
-import com.billage.app.ui.chat.models.MessageSender
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -32,9 +28,10 @@ import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.headers.StompSubscribeHeaders
 import com.billage.app.data.local.AuthSessionStorage
 import retrofit2.HttpException
-import java.time.LocalDateTime
-import java.util.UUID
 import javax.inject.Inject
+import androidx.fragment.app.FragmentActivity
+import com.billage.app.ui.chat.security.ContractSignatureUtils
+import com.billage.app.ui.chat.security.SecurityTestBed
 
 @HiltViewModel
 class ChatRoomViewModel @Inject constructor(
@@ -314,8 +311,8 @@ class ChatRoomViewModel @Inject constructor(
                         val originalInterest = updatedContract.interestRate ?: 0.0
                         
                         val req = try {
-                            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                .decodeFromString<com.billage.app.data.remote.api.ContractUpdateRequest>(updatedContract.aiDraftContent)
+                            Json { ignoreUnknownKeys = true }
+                                .decodeFromString<ContractUpdateRequest>(updatedContract.aiDraftContent)
                         } catch (e: Exception) { null }
 
                         val (proposedPrincipal, proposedInterest) = if (req != null) {
@@ -368,7 +365,7 @@ class ChatRoomViewModel @Inject constructor(
                             modifications = modifications,
                             isInitial = false
                         )
-                        val contentJson = kotlinx.serialization.json.Json.encodeToString(
+                        val contentJson = Json.encodeToString(
                             AiProposalPayload.serializer(), payload
                         )
                         chatRepository.sendMessage(
@@ -657,7 +654,7 @@ class ChatRoomViewModel @Inject constructor(
                                 interestRate = detail?.interestRate ?: 0.0,
                                 contractSeq = contractSeq
                             )
-                            val contentJson = kotlinx.serialization.json.Json.encodeToString(
+                            val contentJson = Json.encodeToString(
                                 com.billage.app.ui.chat.models.ContractCompletePayload.serializer(), payload
                             )
                             chatRepository.sendMessage(
@@ -715,9 +712,67 @@ class ChatRoomViewModel @Inject constructor(
     }
     
     fun cancelProposal() {
-        _chatRoomState.update { it.copy(draftProposal = null) }
+        exitModificationMode()
     }
 
+    fun submitSignatureWithBiometric(activity: FragmentActivity, canvasDataUrl: String) {
+        val currentState = _chatRoomState.value
+        val contractDetail = currentState.draftContractDetail ?: return
+
+        _chatRoomState.update {
+            it.copy(
+                isSubmittingSignature = true,
+                signatureErrorMessage = null,
+                signatureSuccessMessage = null
+            )
+        }
+
+        try {
+            SecurityTestBed.startBiometricSignature(
+                activity = activity,
+                onSuccess = { signatureObj ->
+                    try {
+                        // 1. 문서 해시 생성
+                        val documentHash = ContractSignatureUtils.buildDocumentHash(contractDetail)
+                        // 해시를 바이트 배열로 변환해서 서명 업데이트
+                        signatureObj.update(documentHash.toByteArray(Charsets.UTF_8))
+                        
+                        // 2. TEE에 서명 요청
+                        val signatureBytes = signatureObj.sign()
+                        // 3. 서버 전송용 DTO 생성
+                        val requestDto = ContractSignatureUtils.buildRequest(activity, contractDetail, canvasDataUrl, signatureBytes)
+                        
+                        // 4. 기존 서명 API 호출
+                        submitContractSignature(requestDto)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Biometric signature error", e)
+                        _chatRoomState.update {
+                            it.copy(
+                                isSubmittingSignature = false,
+                                signatureErrorMessage = "서명 과정에서 오류가 발생했습니다: ${e.localizedMessage}"
+                            )
+                        }
+                    }
+                },
+                onError = { errorMsg ->
+                    _chatRoomState.update {
+                        it.copy(
+                            isSubmittingSignature = false,
+                            signatureErrorMessage = errorMsg
+                        )
+                    }
+                }
+            )
+        } catch (e: Exception) {
+            _chatRoomState.update {
+                it.copy(
+                    isSubmittingSignature = false,
+                    signatureErrorMessage = e.message ?: "생체 인증 초기화 실패"
+                )
+            }
+        }
+    }
+    
     fun fetchContractDetail(contractSeq: Int) {
         viewModelScope.launch {
             try {
@@ -765,7 +820,7 @@ class ChatRoomViewModel @Inject constructor(
                 val response = contractApi.getAiAnalysis(contractSeq)
                 if (response.status == 200) {
                     val parsedResult = try {
-                        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                        Json { ignoreUnknownKeys = true }
                             .decodeFromString<com.billage.app.domain.model.AiAnalysisResult>(response.data)
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to parse AI analysis JSON: ${response.data}", e)
