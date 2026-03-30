@@ -1,0 +1,34 @@
+/.idea/
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Gradle
+gradle/gradle-daemon-jvm.properties
+
+# Firebase
+google-services.json
+
+# Claude Code
+CLAUDE.md
+.claude/
+
+# Gemini CLI
+.gemini/
+.gemini_history
+.env
+gemini_credentials.json
+GEMINI.local.md
+GEMINI.md
