@@ -1,0 +1,421 @@
+package com.billage.app.ui.chat
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.LaunchedEffect
+import com.billage.app.ui.chat.security.SecurityTestBed
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.billage.app.ui.common.AddContractBottomSheet
+import com.billage.app.ui.common.BottomBar
+import com.billage.app.ui.common.BottomBarTab
+import com.billage.app.ui.common.MenuProfileState
+import com.billage.app.ui.common.ProfileAvatar
+import com.billage.app.ui.home.HomeSideMenu
+import com.billage.app.ui.theme.*
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import kotlin.collections.isNotEmpty
+
+data class ChatPreviewItem(
+    val id: String,
+    val name: String,
+    val avatar: String?,
+    val lastMessage: String,
+    val timestamp: String,
+    val unread: Int,
+    val hasContract: Boolean
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatListScreen(
+    viewModel: ChatListViewModel = hiltViewModel(),
+    onChatRoomClick: (String, String) -> Unit,
+    onHomeClick: () -> Unit,
+    onAddContractClick: (com.billage.app.ui.contract.create.ContractRole) -> Unit,
+    onContractClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
+    onInsightListClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    onChatBotClick: () -> Unit = {},
+    menuProfileState: MenuProfileState = MenuProfileState()
+) {
+    val rooms by viewModel.rooms.collectAsState()
+    val userSearchResults by viewModel.userSearchResults.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val myUserSeq = viewModel.myUserSeq
+    var showMenu by remember { mutableStateOf(false) }
+    val logoutUiState = com.billage.app.ui.common.rememberLogoutUiState(onLoggedOut = onLogoutClick)
+    val dismissInteraction = remember { MutableInteractionSource() }
+    
+    // 화면 진입 시마다 목록 새로고침
+    LaunchedEffect(Unit) {
+        viewModel.fetchRooms()
+    }
+
+    var showContractTypeSheet by remember { mutableStateOf(false) }
+
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = BillageBackground,
+            topBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BillageSurface)
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "메시지",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BillageTextPrimary
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { viewModel.fetchRooms() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "새로고침", tint = BillageTextPrimary)
+                            }
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = BillageTextPrimary)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "대화 상대와 안전하게 거래하세요",
+                        fontSize = 13.sp,
+                        color = BillageTextSecondary
+                    )
+                }
+            },
+            bottomBar = {
+                BottomBar(
+                    selectedTab = if (showMenu) BottomBarTab.Menu else BottomBarTab.ChatList,
+                    onAddContractClick = { showContractTypeSheet = true },
+                    onHomeClick = onHomeClick,
+                    onChatClick = {}, // We are already here
+                    onContractClick = onContractClick,
+                    onMenuClick = { showMenu = true }
+                )
+            }
+        ) { paddingValues ->
+            val context = LocalContext.current
+            var testResult by remember { mutableStateOf(SecurityTestBed.getDeviceSecuritySpec(context)) }
+            var showEnrollDialog by remember { mutableStateOf(false) }
+
+            if (showEnrollDialog) {
+                AlertDialog(
+                    onDismissRequest = { showEnrollDialog = false },
+                    title = { Text("화면 잠금 설정 필요", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text("전자서명(TEE/StrongBox)을 안전하게 저장하기 위해 기기에 화면 잠금(PIN, 패턴, 지문 등)이 필수로 설정되어 있어야 합니다.\n\n설정 앱에서 화면 잠금을 등록한 후 다시 시도해주세요.")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showEnrollDialog = false }) {
+                            Text("확인", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    containerColor = BillageSurface,
+                    titleContentColor = BillageTextPrimary,
+                    textContentColor = BillageTextPrimary
+                )
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                items(rooms) { room ->
+                // Map ChatRoomRes to ChatPreviewItem for UI
+                // 내 UserSeq가 아닌 참여자의 이름을 찾아서 표시 (없으면 알 수 없음)
+                val opponentName = room.participants.firstOrNull { it.userSeq != myUserSeq }?.name ?: "알 수 없음"
+                val opponent = room.participants.firstOrNull { it.userSeq != myUserSeq }
+                val chat = ChatPreviewItem(
+                    id = room.id,
+                    name = opponentName,
+                    avatar = "👤",
+                    lastMessage = room.lastMessage ?: "",
+                    timestamp = room.lastModifiedAt ?: "",
+                    unread = room.unreadCount.toInt(),
+                    hasContract = false
+                )
+                    ChatListItem(
+                        chat = chat,
+                        profileImageUrl = opponent?.profileImageUrl,
+                        onClick = { onChatRoomClick(chat.id, opponentName) }
+                    )
+                }
+                if (rooms.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 80.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(text = "💬", fontSize = 60.sp)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "아직 대화가 없어요",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BillageTextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "거래하고 싶은 친구에게 메시지를 보내보세요",
+                                fontSize = 14.sp,
+                                color = BillageTextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // AI ChatBot FAB
+        FloatingActionButton(
+            onClick = onChatBotClick,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 100.dp),
+            containerColor = BillagePrimary,
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "AI 상담",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f))
+                    .clickable(
+                        interactionSource = dismissInteraction,
+                        indication = null
+                    ) { showMenu = false }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showMenu,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                HomeSideMenu(
+                    userName = menuProfileState.realName.ifBlank { "빌리지" },
+                    email = menuProfileState.email,
+                    profileImageUrl = menuProfileState.profileImageUrl,
+                    isLoggingOut = logoutUiState.isLoggingOut,
+                    onClose = { showMenu = false },
+                    onProfileClick = { showMenu = false },
+                    onAccountClick = {
+                        showMenu = false
+                        onAccountClick()
+                    },
+                    onInsightListClick = {
+                        showMenu = false
+                        onInsightListClick()
+                    },
+                    onSettingsClick = {
+                        showMenu = false
+                        onSettingsClick()
+                    },
+                    onSupportClick = { showMenu = false },
+                    onTermsClick = { showMenu = false },
+                    onPrivacyClick = { showMenu = false },
+                    onLogoutClick = {
+                        showMenu = false
+                        logoutUiState.onLogoutClick()
+                    }
+                )
+            }
+        }
+    }
+
+    if (showContractTypeSheet) {
+        AddContractBottomSheet(
+            onDismiss = { showContractTypeSheet = false },
+            onSelect = { role ->
+                showContractTypeSheet = false
+                onAddContractClick(role)
+            }
+        )
+    }
+}
+
+@Composable
+fun ChatListItem(
+    chat: ChatPreviewItem,
+    profileImageUrl: String?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(BillageSurface)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar
+        ProfileAvatar(
+            name = chat.name,
+            imageUrl = profileImageUrl,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(BillagePrimaryLight),
+            textSize = 20.sp
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Content
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = chat.name,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = BillageTextPrimary
+                    )
+                    if (chat.hasContract) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(BillagePrimaryLight)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "계약중",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = BillagePrimary
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = chat.timestamp,
+                    fontSize = 12.sp,
+                    color = BillageTextSecondary
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = chat.lastMessage,
+                    fontSize = 14.sp,
+                    color = BillageTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (chat.unread > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(BillagePrimary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = chat.unread.toString(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = BillageDivider.copy(alpha=0.5f))
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ChatListScreenPreview() {
+    BillageTheme(dynamicColor = false) {
+        ChatListScreen(
+            onChatRoomClick = { _, _ -> },
+            onHomeClick = {},
+            onAddContractClick = {}
+        )
+    }
+}

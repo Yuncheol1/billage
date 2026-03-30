@@ -1,0 +1,507 @@
+package com.billage.app.ui.chat
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
+import com.billage.app.data.remote.api.ContractSignatureRequest
+import com.billage.app.ui.chat.components.ChatBottomInputBar
+import com.billage.app.ui.chat.components.ChatTopBar
+import com.billage.app.ui.chat.components.ContractSignatureDialog
+import com.billage.app.ui.chat.models.ChatRoomState
+import com.billage.app.ui.chat.models.ChatRoomMode
+import com.billage.app.data.remote.api.ContractListResponse
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.billage.app.ui.chat.components.PinnedContractBanner
+import com.billage.app.ui.chat.models.ContractSummary
+import com.billage.app.ui.theme.BillagePrimary
+import com.billage.app.ui.theme.BillageTextSecondary
+import com.billage.app.ui.chat.security.ContractSignatureUtils
+import com.billage.app.ui.theme.BillageDivider
+import com.billage.app.ui.theme.BillageTextPrimary
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatRoomScreen(
+    state: ChatRoomState,
+    contracts: List<ContractListResponse> = emptyList(),
+    onFetchContracts: () -> Unit = {},
+    onBackClick: () -> Unit = {},
+    onModeChange: (ChatRoomMode) -> Unit = {}, // 명시적 모드 종료(배너 닫기) 등을 처리
+    onSendMessage: (String) -> Unit = {},
+    onAddMenuClick: () -> Unit = {},
+    onRequestAiProposal: () -> Unit = {},
+    onContractSelectForModify: (ContractListResponse) -> Unit = {},
+    onAiNegotiateSelect: (ContractListResponse) -> Unit = {},
+    onExitModificationMode: () -> Unit = {},
+    onCommitProposal: () -> Unit = {},
+    onCancelProposal: () -> Unit = {},
+    onDirectEditClick: (Int) -> Unit = {},
+    onSubmitSignature: (ContractSignatureRequest) -> Unit = {},
+    onDismissSignatureFeedback: () -> Unit = {},
+    onAnalyzeNegotiation: () -> Unit = {},
+    onToggleClauseSelection: (Int) -> Unit = {},
+    onApplyAiClauses: () -> Unit = {},
+    onSubmitSignatureWithBiometric: (String) -> Unit = {},
+    messageListContent: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    // 입력창 텍스트 관리
+    var inputText by remember { mutableStateOf("") }
+    // 액션 메뉴(바텀시트) 표시 여부 관리
+    var showActionSheet by remember { mutableStateOf(false) }
+    // 바텀시트 내부 상태 관리 (MENU, MANUAL_EDIT_PICKER)
+    var actionSheetState by remember { mutableStateOf("MENU") }
+    // 제안서 모달 창 표시 여부
+    var showProposalModal by remember { mutableStateOf(false) }
+    // AI 차용증 선택 다이얼로그 표시 여부
+    var showAiSelectDialog by remember { mutableStateOf(false) }
+    var showSignatureDialog by remember { mutableStateOf(false) }
+    var localSignatureMessage by remember { mutableStateOf<String?>(null) }
+
+    val shouldShowSignatureBanner = state.isMeAccepted &&
+        state.isOpponentAccepted &&
+        !state.isMeSigned &&
+        state.draftContractDetail?.status != "SIGNED"
+    val documentHash = state.draftContractDetail?.let(ContractSignatureUtils::buildDocumentHash)
+
+    LaunchedEffect(state.signatureSuccessMessage) {
+        if (state.signatureSuccessMessage != null) {
+            showSignatureDialog = false
+        }
+    }
+
+    // 수정 확인 다이얼로그 상태
+    var showModificationConfirm by remember { mutableStateOf(false) }
+    var pendingModificationAction by remember { mutableStateOf<() -> Unit>({}) }
+
+    if (showModificationConfirm) {
+        AlertDialog(
+            onDismissRequest = { showModificationConfirm = false },
+            title = { Text("수정 시 수락 초기화 안내", fontWeight = FontWeight.Bold) },
+            text = { Text("계약 조건을 수정하면 현재의 수락 상태가 초기화되어 다시 동의를 받아야 합니다. 계속하시겠습니까?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showModificationConfirm = false
+                        pendingModificationAction()
+                    }
+                ) {
+                    Text("네, 수정할게요", color = BillagePrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showModificationConfirm = false }) {
+                    Text("아니오", color = BillageTextSecondary)
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            Column {
+                ChatTopBar(
+                    title = state.roomName,
+                    onBackClick = onBackClick
+                )
+                
+                // 양측 수락 시 상단에 고정되는 전자서명 안내 배너
+                com.billage.app.ui.chat.components.SignatureBanner(
+                    isVisible = shouldShowSignatureBanner,
+                    onSignClick = {
+                        showSignatureDialog = true
+                    }
+                )
+
+                // 계약 협의 모드일 경우 상단에 고정되는 배너
+                if (state.mode == ChatRoomMode.CONTRACT) {
+                    PinnedContractBanner(
+                        selectedContract = state.selectedContract,
+                        isAnalyzing = state.isAiAnalyzing,
+                        onExitClick = { onExitModificationMode() },
+                        onAnalyzeClick = {
+                            onAnalyzeNegotiation()
+                        }
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            ChatBottomInputBar(
+                mode = state.mode,
+                inputText = inputText,
+                onValueChange = { 
+                    if (it.length <= 255) {
+                        inputText = it 
+                    }
+                },
+                onSendClick = {
+                    if (inputText.isNotBlank() && inputText.length <= 255) {
+                        onSendMessage(inputText)
+                        inputText = ""
+                    }
+                },
+                onAddClick = {
+                    actionSheetState = "MENU"
+                    showActionSheet = true
+                    onAddMenuClick() // 기존 콜백도 유지
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            messageListContent()
+        }
+    }
+
+    // '+' 버튼 클릭 시 뜨는 바텀 시트 메뉴 (차용증 조회/수정 등)
+    if (showActionSheet) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showActionSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                if (actionSheetState == "MENU") {
+                    com.billage.app.ui.chat.components.ChatActionGrid(
+                        onAiNegotiateClick = {
+                            onFetchContracts()
+                            showAiSelectDialog = true
+                            showActionSheet = false
+                        },
+                        onManualEditClick = {
+                            onFetchContracts()
+                            actionSheetState = "MANUAL_EDIT_PICKER"
+                        },
+                        onTransferClick = {
+                            showActionSheet = false
+                            // TODO: 송금 화면 이동
+                        }
+                    )
+                } else if (actionSheetState == "MANUAL_EDIT_PICKER") {
+                    // 뒤로가기 버튼 + 헤더
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "뒤로 가기",
+                            modifier = Modifier
+                                .clickable { actionSheetState = "MENU" }
+                                .padding(end = 8.dp)
+                        )
+                        Text(
+                            text = "직접 수정할 차용증 선택",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    val editableContracts = contracts.filter { 
+                        it.status == "DRAFT" && it.counterpartyName == state.roomName 
+                    }
+                    
+                    if (editableContracts.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(bottom = 8.dp)
+                        ) {
+                            items(editableContracts) { contract ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    border = BorderStroke(1.dp, BillageDivider),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                                        .clickable {
+                                            showActionSheet = false
+                                            actionSheetState = "MENU"
+                                            val anyAccepted = state.isMeAccepted || state.isOpponentAccepted
+                                            if (anyAccepted) {
+                                                pendingModificationAction = { onDirectEditClick(contract.contractSeq) }
+                                                showModificationConfirm = true
+                                            } else {
+                                                onDirectEditClick(contract.contractSeq)
+                                            }
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(com.billage.app.ui.theme.BillageBackground, androidx.compose.foundation.shape.CircleShape)
+                                                .padding(8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("📝", fontSize = 20.sp)
+                                        }
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "계약 #${contract.contractSeq}",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BillageTextPrimary
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "상대방: ${contract.counterpartyName ?: "미상"}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = BillageTextSecondary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "원금: ${contract.principalAmount?.toInt() ?: 0}원",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = BillagePrimary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "수정 아이콘",
+                                            tint = BillageDivider,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "직접 수정할 수 있는 차용증이 없습니다.\n(진행 중인 계약만 수정 가능합니다)",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showProposalModal && state.draftContractDetail != null) {
+        com.billage.app.ui.chat.components.ContractDocumentFullScreen(
+            contractTitle = "계약 #${state.selectedContract?.contractId ?: ""} 수정 제안서",
+            contractDetail = state.draftContractDetail!!,
+            isMeAccepted = state.isMeAccepted,
+            isOpponentAccepted = state.isOpponentAccepted,
+            onDismissRequest = { showProposalModal = false },
+            onAccept = {
+                showProposalModal = false
+                onCommitProposal()
+            },
+            contractAiAnalysis = state.aiAnalysisResult,
+            rawAiAnalysisJson = state.rawAiAnalysisJson,
+            isAiAnalyzing = state.isAiAnalyzing
+        )
+    }
+
+    if (showAiSelectDialog) {
+        com.billage.app.ui.chat.components.AiContractSelectDialog(
+            contracts = contracts,
+            roomName = state.roomName,
+            onDismissRequest = { 
+                showAiSelectDialog = false
+            },
+            onContractSelect = { contract: ContractListResponse ->
+                showAiSelectDialog = false
+                
+                val anyAccepted = state.isMeAccepted || state.isOpponentAccepted
+                if (anyAccepted) {
+                    pendingModificationAction = { onAiNegotiateSelect(contract) }
+                    showModificationConfirm = true
+                } else {
+                    onAiNegotiateSelect(contract)
+                }
+            }
+        )
+    }
+
+    // AI 분석 결과(특약 제안) 선택 다이얼로그
+    state.pendingAiClauses?.let { clauses ->
+        com.billage.app.ui.chat.components.AiClauseSelectionDialog(
+            clauses = clauses,
+            selectedIndices = state.selectedClauseIndices,
+            rejectionReason = state.aiRejectionReason,
+            onToggleSelection = onToggleClauseSelection,
+            onDismissRequest = { onExitModificationMode() },
+            onConfirm = { onApplyAiClauses() }
+        )
+    }
+
+    ContractSignatureDialog(
+        isVisible = showSignatureDialog,
+        isSubmitting = state.isSubmittingSignature,
+        documentHash = documentHash,
+        onDismissRequest = { showSignatureDialog = false },
+        onSaveSignature = { canvasDataUrl ->
+            val contractDetail = state.draftContractDetail
+            if (contractDetail == null) {
+                localSignatureMessage = "서명 대상 문서를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+            } else {
+                onSubmitSignatureWithBiometric(canvasDataUrl)
+            }
+        }
+    )
+
+    localSignatureMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { localSignatureMessage = null },
+            title = { Text("전자서명 안내") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { localSignatureMessage = null }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+
+    state.signatureErrorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = onDismissSignatureFeedback,
+            title = { Text("전자서명 실패") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = onDismissSignatureFeedback) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+
+    state.signatureSuccessMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = onDismissSignatureFeedback,
+            title = { Text("전자서명 완료") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = onDismissSignatureFeedback) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ProposalNotificationCard(
+    contractSummary: ContractSummary?,
+    onDetailClick: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        border = BorderStroke(1.dp, BillageDivider),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            // 헤더
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "📜 [계약 #${contractSummary?.contractId ?: ""}] 수정 제안 도착",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = BillageTextPrimary
+                )
+            }
+            HorizontalDivider(color = BillageDivider)
+            
+            // 본문
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "📝 문서 병합 완료",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BillageTextPrimary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = "채팅 기반으로 합의된 내용을 문서에 반영했습니다.\n\n자세히 보기를 클릭해 확인해주세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BillageTextSecondary
+                )
+            }
+            HorizontalDivider(color = BillageDivider)
+            
+            // 버튼
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDetailClick() }
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔍 제안서 자세히 보기",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = BillagePrimary
+                )
+            }
+        }
+    }
+}
