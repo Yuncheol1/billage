@@ -18,40 +18,48 @@ TARGET_ENDPOINT = "/internal/v1/chat"
 class AIServiceUser(HttpUser):
     """
     EC2 AI 서비스(Billage) 성능 측정을 위한 Locust 시뮬레이터
+    (유저 1명당 채팅 1회, 특약 1회를 순차적으로 요청 후 자동 종료)
     """
     # 기본 호스트 설정 (tests/.env 또는 기본값)
     host = os.getenv("TEST_BASE_URL", "http://3.35.206.231:8000")
     
     # 쉴 틈 없이 맹공격하도록 대기 시간을 0초로 설정
     wait_time = constant(0)
-    
-    # 자동 종료를 위한 설정 (옵션 또는 인당 8회 고정)
-    max_requests = 8
-    request_count = 0
 
     def on_start(self):
         """
         테스트 시작 시 인증 토큰 및 초기 설정
         """
         self.internal_api_key = os.getenv("INTERNAL_API_KEY", "billage-ai-key-1234")
-        self.request_count = 0
-        print(f"{get_kst()} 🚀 성능 테스트 시작: 대상 호스트 - {self.host} (최대 {self.max_requests}회 요청 후 자동 종료)")
+        self.is_done = False
+        print(f"{get_kst()} 🚀 성능 테스트 시작: 대상 호스트 - {self.host} (채팅 1회, 특약 1회 순차 요청 후 자동 종료)")
         self.headers = {
             "X-Internal-API-Key": self.internal_api_key,
             "Content-Type": "application/json"
         }
 
-    @task(5)
-    def chat_performance_test(self):
-        # 지정된 요청 횟수에 도달하면 테스트 자동 종료
-        if self.request_count >= self.max_requests:
-            print(f"{get_kst()} 🏁 목표 요청 횟수({self.max_requests}회)에 도달하여 테스트를 자동 종료합니다.")
+    @task
+    def sequential_performance_test(self):
+        # 한 번 순서대로 실행한 유저는 더 이상 실행하지 않고 종료
+        if self.is_done:
             self.environment.runner.quit()
             return
+            
+        self.is_done = True
 
-        self.request_count += 1
+        # 1. 채팅 성능 테스트 우선 실행
+        self.chat_performance_test()
+        
+        # 2. 이어서 특약 생성 성능 테스트 실행
+        self.clauses_performance_test()
+        
+        # 3. 유저 역할 완료 시 이 사용자 인스턴스를 종료
+        print(f"{get_kst()} 🏁 유저 1명 목표 달성(총 2회 호출)하여 테스트를 자동 종료합니다.")
+        self.environment.runner.quit()
+
+    def chat_performance_test(self):
         """
-        핵심 기능: RAG 기반 챗봇 질의 테스트 (다중 질문 순환)
+        핵심 기능 1: RAG 기반 챗봇 질의 테스트 (다중 질문 순환)
         """
         import random
         questions = [
@@ -81,16 +89,9 @@ class AIServiceUser(HttpUser):
             else:
                 response.failure(f"Error Code {response.status_code}")
 
-    @task(3)
     def clauses_performance_test(self):
-        # 지정된 요청 횟수에 도달하면 테스트 자동 종료
-        if self.request_count >= self.max_requests:
-            self.environment.runner.quit()
-            return
-
-        self.request_count += 1
         """
-        핵심 기능: 특약사항(Clauses) 자동 생성 API 테스트
+        핵심 기능 2: 특약사항(Clauses) 자동 생성 API 테스트
         """
         payload = {
             "contract_seq": 1,
@@ -112,12 +113,11 @@ class AIServiceUser(HttpUser):
             else:
                 response.failure(f"Error Code {response.status_code}")
 
-    # @task(1)
-    def check_health(self):
-        """
-        단순 헬스체크 응답성 테스트 (채팅 부하 테스트에 집중하기 위해 비활성화)
-        """
-        self.client.get("/health")
+    # def check_health(self):
+    #     \"\"\"
+    #     단순 헬스체크 응답성 테스트 (채팅 부하 테스트에 집중하기 위해 비활성화)
+    #     \"\"\"
+    #     self.client.get("/health")
 
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
