@@ -19,7 +19,7 @@ public class ContractClause {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "clause_seq")
-    private Long clauseSeq;
+    private Integer clauseSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)
@@ -42,4 +42,9 @@ public class ContractClause {
 
     @Column(name = "updated_dttm")
     private LocalDateTime updatedDttm;
+
+    public void updateContent(String newContent) {
+        this.content = newContent;
+        this.updatedDttm = LocalDateTime.now();
+    }
 }

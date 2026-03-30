@@ -19,7 +19,7 @@ public class AutoTransferRegistration {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "registration_seq")
-    private Long registrationSeq;
+    private Integer registrationSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)

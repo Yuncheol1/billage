@@ -2,6 +2,7 @@ package com.ssafy.a305.be.domain.document.entity;
 
 import com.ssafy.a305.be.domain.enums.SignatureRole;
 import com.ssafy.a305.be.domain.user.entity.User;
+import com.ssafy.a305.be.domain.user.entity.UserDeviceKey;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -20,7 +21,11 @@ public class Signature {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "signature_seq")
-    private Long signatureSeq;
+    private Integer signatureSeq;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "key_seq")
+    private UserDeviceKey userDeviceKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_seq", nullable = false)
@@ -56,4 +61,7 @@ public class Signature {
 
     @Column(name = "signed_dttm")
     private LocalDateTime signedDttm;
+
+    @Column(name = "signature_value", columnDefinition = "TEXT")
+    private String signatureValue;
 }

@@ -1,5 +1,79 @@
 spring:
   application:
     name: be
-  profiles:
-    active: dev
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/billage?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${SPRING_DATASOURCE_USERNAME:user}
+    password: ${SPRING_DATASOURCE_PASSWORD:1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://user:1234@localhost:27017/billage?authSource=admin}
+
+auth:
+  jwt:
+    issuer: ${JWT_ISSUER:be}
+    secret: ${JWT_SECRET:}
+    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
+    refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:1209600}
+
+oauth:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    scope: ${KAKAO_SCOPE:account_email,name,gender,birthday,birthyear,phone_number,profile_image,friends,talk_message}
+    token-uri: ${KAKAO_TOKEN_URI:https://kauth.kakao.com/oauth/token}
+    user-info-uri: ${KAKAO_USER_INFO_URI:https://kapi.kakao.com/v2/user/me}
+
+ssafy:
+  api:
+    base-url: ${SSAFY_API_BASE_URL:https://finopenapi.ssafy.io}
+    api-key: ${SSAFY_API_KEY:}
+    institution-code: ${SSAFY_INSTITUTION_CODE:00100}
+    fintech-app-no: ${SSAFY_FINTECH_APP_NO:001}
+    member-search-path: ${SSAFY_MEMBER_SEARCH_PATH:/ssafy/api/v1/member/search}
+    member-create-path: ${SSAFY_MEMBER_CREATE_PATH:/ssafy/api/v1/member}
+    create-demand-deposit-account-path: ${SSAFY_CREATE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/createDemandDepositAccount}
+    inquire-demand-deposit-account-list-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_LIST_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccountList}
+    inquire-demand-deposit-account-path: ${SSAFY_INQUIRE_DEMAND_DEPOSIT_ACCOUNT_PATH:/ssafy/api/v1/edu/demandDeposit/inquireDemandDepositAccount}
+    inquire-transaction-history-list-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_LIST_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistoryList}
+    inquire-transaction-history-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistory}
+    update-demand-deposit-account-deposit-path: ${SSAFY_UPDATE_DEMAND_DEPOSIT_ACCOUNT_DEPOSIT_PATH:/ssafy/api/v1/edu/demandDeposit/updateDemandDepositAccountDeposit}
+    demand-deposit-account-type-unique-no: ${SSAFY_DEMAND_DEPOSIT_ACCOUNT_TYPE_UNIQUE_NO:001-1-f8b3869eff034c}
+
+bank:
+  deposit-allowlist-account-nos: 0016212872587134,0016174648358792,0015250126191488,0019869292635464,0014458073222474,0011986810594484,0014598703538975
+
+
+ai:
+  server:
+    url: ${AI_SERVER_URL}
+  internal:
+    api:
+      key: ${AI_INTERNAL_API_KEY}
+
+logging:
+  level:
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: INFO

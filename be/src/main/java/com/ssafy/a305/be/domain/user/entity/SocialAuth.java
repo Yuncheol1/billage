@@ -9,7 +9,12 @@ import java.time.LocalDateTime;
  * 소셜 로그인 (KAKAO, NAVER, GOOGLE 등)
  */
 @Entity
-@Table(name = "social_auth")
+@Table(
+        name = "social_auth",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_social_auth_provider_user", columnNames = {"provider", "provider_user_id"})
+        }
+)
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -19,7 +24,7 @@ public class SocialAuth {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "social_seq")
-    private Long socialSeq;
+    private Integer socialSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_seq", nullable = false)

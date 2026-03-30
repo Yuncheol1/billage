@@ -5,5 +5,6 @@ package com.ssafy.a305.be.domain.enums;
  */
 public enum BankAccountStatus {
     ACTIVE,
-    EXPIRED
+    CLOSED,
+    SUSPENDED
 }

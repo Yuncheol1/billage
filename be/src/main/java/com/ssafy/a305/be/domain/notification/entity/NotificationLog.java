@@ -54,4 +54,14 @@ public class NotificationLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)
     private Contract contract;
+
+    public void markAsRead() {
+        this.isRead = true;
+    }
+
+    public void markDispatchResult(String status, String fcmMessageId, LocalDateTime sentDttm) {
+        this.status = status;
+        this.fcmMessageId = fcmMessageId;
+        this.sentDttm = sentDttm;
+    }
 }

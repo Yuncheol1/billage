@@ -19,7 +19,10 @@ import java.time.LocalDate;
 public class ContractDraftRequestDto {
 
     @NotNull(message = "템플릿 종류는 필수입니다.")
-    private String templateType;
+    private Boolean family;
+
+    @NotNull(message = "채권자 식별자는 필수입니다.")
+    private Integer creditorUserSeq;
 
     @NotNull(message = "채무자 식별자는 필수입니다.")
     private Integer debtorUserSeq;

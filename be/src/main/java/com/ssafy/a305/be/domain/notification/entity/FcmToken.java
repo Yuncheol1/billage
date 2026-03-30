@@ -37,4 +37,30 @@ public class FcmToken {
 
     @Column(name = "invalidated_dttm")
     private LocalDateTime invalidatedDttm;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
+        if (this.createdDttm == null) {
+            this.createdDttm = now;
+        }
+        if (this.lastUsedDttm == null) {
+            this.lastUsedDttm = now;
+        }
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+        this.invalidatedDttm = LocalDateTime.now();
+    }
+
+    public void updateToken(String newToken) {
+        this.token = newToken;
+        this.isActive = true;
+        this.lastUsedDttm = LocalDateTime.now();
+        this.invalidatedDttm = null;
+    }
 }

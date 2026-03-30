@@ -4,25 +4,32 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class User {
 
+    private static final DateTimeFormatter DELETED_VALUE_TIMESTAMP_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_seq")
-    private Long userSeq;
+    private Integer userSeq;
 
     @Column(name = "email", unique = true)
     private String email;
 
     @Column(name = "phone", unique = true)
     private String phone;
+
+    @Column(name = "ssafy_user_key", unique = true, length = 100)
+    private String ssafyUserKey;
 
     /** PENDING / ACTIVE / DELETED / BLOCKED */
     @Column(name = "state")
@@ -37,20 +44,45 @@ public class User {
     @Column(name = "deleted_dttm")
     private LocalDateTime deletedDttm;
 
+    @OneToOne(mappedBy = "user")
+    private UserProfile profile;
+
     public void changeState(String state) {
         this.state = state;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void updateEmail(String email) {
         this.email = email;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void updatePhone(String phone) {
         this.phone = phone;
+        this.updatedDttm = LocalDateTime.now();
+    }
+
+    public void updateSsafyUserKey(String ssafyUserKey) {
+        this.ssafyUserKey = ssafyUserKey;
+        this.updatedDttm = LocalDateTime.now();
     }
 
     public void markDeleted() {
+        LocalDateTime deletedAt = LocalDateTime.now();
         this.state = "DELETED";
-        this.deletedDttm = LocalDateTime.now();
+        this.email = appendDeletionSuffix(this.email, deletedAt);
+        this.phone = appendDeletionSuffix(this.phone, deletedAt);
+        if (this.ssafyUserKey != null) {
+            this.ssafyUserKey = appendDeletionSuffix(this.ssafyUserKey, deletedAt);
+        }
+        this.deletedDttm = deletedAt;
+        this.updatedDttm = deletedAt;
+    }
+
+    private String appendDeletionSuffix(String value, LocalDateTime deletedAt) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value + "_del" + deletedAt.format(DELETED_VALUE_TIMESTAMP_FORMATTER);
     }
 }

@@ -1,0 +1,75 @@
+package com.ssafy.a305.be.domain.chat.controller;
+
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.ssafy.a305.be.domain.chat.dto.ChatMessageResponseDto;
+import com.ssafy.a305.be.domain.chat.dto.ChatRoomCreateRequestDto;
+import com.ssafy.a305.be.domain.chat.dto.ChatRoomResponseDto;
+import com.ssafy.a305.be.domain.chat.service.ChatService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/chats")
+@RequiredArgsConstructor
+public class ChatRoomController {
+
+    private final ChatService chatService;
+
+    // 내 채팅방 목록 조회 (임시로 헤더나 파라미터로 userSeq를 받는다고 가정)
+    @GetMapping("/rooms")
+    public ResponseEntity<List<ChatRoomResponseDto>> getMyChatRooms(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq) {
+        // 실제로는 SecurityContextHolder 등에서 추출해야 함
+        return ResponseEntity.ok(chatService.getRoomsByUserSeq(userSeq));
+    }
+
+    // 특정 채팅방의 과거 메시지 조회
+    @GetMapping("/{roomId}/messages")
+    public ResponseEntity<List<ChatMessageResponseDto>> getChatMessages(@PathVariable("roomId") String roomId) {
+        log.info("채팅 메시지 내역 조회 요청: roomId={}", roomId);
+        List<ChatMessageResponseDto> messages = chatService.getMessagesByRoomId(roomId);
+        return ResponseEntity.ok(messages);
+    }
+
+    // 이메일로 새로운 채팅방 생성 (혹은 기존 방 오픈)
+    @PostMapping("/rooms")
+    public ResponseEntity<ChatRoomResponseDto> createRoomByEmail(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @RequestBody ChatRoomCreateRequestDto request) {
+        ChatRoomResponseDto room = chatService.createRoomByEmail(userSeq, request.targetEmail());
+        return ResponseEntity.ok(room);
+    }
+
+    // 유저 시퀀스로 새로운 채팅방 생성 (계약 생성 후 사용)
+    @PostMapping("/rooms/user/{targetUserSeq}")
+    public ResponseEntity<ChatRoomResponseDto> createRoomByUserSeq(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @PathVariable("targetUserSeq") Integer targetUserSeq) {
+        ChatRoomResponseDto room = chatService.createRoomByUserSeq(userSeq, targetUserSeq);
+        return ResponseEntity.ok(room);
+    }
+
+    // 채팅방 나가기
+    @PostMapping("/{roomId}/leave")
+    public ResponseEntity<Void> leaveRoom(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @PathVariable("roomId") String roomId) {
+        chatService.leaveRoom(userSeq, roomId);
+        return ResponseEntity.ok().build();
+    }
+
+    // 메시지 읽음 처리
+    @PatchMapping("/{roomId}/read")
+    public ResponseEntity<Void> markAsRead(
+            @RequestHeader(value = "userSeq", defaultValue = "1") Integer userSeq,
+            @PathVariable("roomId") String roomId) {
+        chatService.markAsRead(roomId, userSeq);
+        return ResponseEntity.ok().build();
+    }
+}

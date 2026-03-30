@@ -19,7 +19,7 @@ public class UserConsent {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "consent_seq")
-    private Long consentSeq;
+    private Integer consentSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_seq", nullable = false)
@@ -34,4 +34,9 @@ public class UserConsent {
 
     @Column(name = "agreed_dttm", nullable = false)
     private LocalDateTime agreedDttm;
+
+    public void changeAgreement(boolean agreed) {
+        this.isAgreed = agreed;
+        this.agreedDttm = LocalDateTime.now();
+    }
 }

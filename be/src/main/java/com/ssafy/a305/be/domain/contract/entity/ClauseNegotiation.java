@@ -17,7 +17,7 @@ public class ClauseNegotiation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "negotiation_seq")
-    private Long negotiationSeq;
+    private Integer negotiationSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "clause_seq", nullable = false)

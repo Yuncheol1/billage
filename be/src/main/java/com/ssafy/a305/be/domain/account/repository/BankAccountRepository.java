@@ -1,0 +1,44 @@
+package com.ssafy.a305.be.domain.account.repository;
+
+import com.ssafy.a305.be.domain.account.entity.BankAccount;
+import com.ssafy.a305.be.domain.enums.BankAccountStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface BankAccountRepository extends JpaRepository<BankAccount, Integer> {
+    boolean existsByUserUserSeqAndStatus(Integer userSeq, BankAccountStatus status);
+    boolean existsByAccountNo(String accountNo);
+
+    /** 유저의 주 계좌(Primary Account) 조회 */
+    Optional<BankAccount> findByUserUserSeqAndIsPrimaryTrue(Integer userSeq);
+
+    List<BankAccount> findByUserUserSeq(Integer userSeq);
+
+    Optional<BankAccount> findFirstByUserUserSeqAndStatusOrderByAccountSeqAsc(
+            Integer userSeq,
+            BankAccountStatus status
+    );
+
+    Optional<BankAccount> findByAccountNo(String accountNo);
+
+    @Query("""
+            SELECT ba FROM BankAccount ba
+            JOIN FETCH ba.user u
+            LEFT JOIN FETCH u.profile
+            WHERE ba.accountNo = :accountNo
+            """)
+    Optional<BankAccount> findByAccountNoWithUserProfile(@Param("accountNo") String accountNo);
+
+    boolean existsByUserUserSeqAndAccountTypeUniqueNoAndStatus(
+            Integer userSeq,
+            String accountTypeUniqueNo,
+            BankAccountStatus status
+    );
+
+}

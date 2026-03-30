@@ -19,7 +19,7 @@ public class RepaymentSchedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "schedule_seq")
-    private Long scheduleSeq;
+    private Integer scheduleSeq;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_seq", nullable = false)
@@ -43,7 +43,7 @@ public class RepaymentSchedule {
     @Column(name = "remaining_balance_after", precision = 15, scale = 2)
     private BigDecimal remainingBalanceAfter;
 
-    /** NONPAID / SOMEPAID / PAID / WAIVED / OVERDUE */
+    /** NONPAID / SOMEPAID / PAID / MANUAL_PAID / WAIVED / OVERDUE */
     @Column(name = "status")
     private String status;
 
@@ -52,4 +52,27 @@ public class RepaymentSchedule {
 
     @Column(name = "created_dttm")
     private LocalDateTime createdDttm;
+
+    /**
+     * 상환 완료 처리
+     */
+    public void markPaid(LocalDateTime paidAt) {
+        this.status = "PAID";
+        this.paidDttm = paidAt;
+    }
+
+    /**
+     * 외부 거래 확인 기반 수동 상환 완료 처리
+     */
+    public void markManualPaid(LocalDateTime paidAt) {
+        this.status = "MANUAL_PAID";
+        this.paidDttm = paidAt;
+    }
+
+    /**
+     * 연체 처리
+     */
+    public void markOverdue() {
+        this.status = "OVERDUE";
+    }
 }
