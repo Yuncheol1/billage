@@ -2,11 +2,12 @@
 import requests
 import json
 import time
+import os
 
 BASE = "http://127.0.0.1:8000/internal/v1"
 HEADERS = {
     "Content-Type": "application/json",
-    "X-Internal-API-Key": "super-secret-key-change-me-in-production"
+    "X-Internal-API-Key": os.getenv("INTERNAL_API_KEY", "")
 }
 
 def test_analyze():

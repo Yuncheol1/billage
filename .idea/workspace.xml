@@ -5,7 +5,23 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dfbef93f-e5a5-403d-b990-9596c1c1e223" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/Jenkinsfile-ai" beforeDir="false" afterPath="$PROJECT_DIR$/AI/Jenkinsfile-ai" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/ai_service/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/ai_service/app/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/ai_service/ingest_cases.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/ai_service/ingest_cases.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/ai_service/test_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/ai_service/test_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/rag_benchmarking/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/rag_benchmarking/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/test_client/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/AI/test_client/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/tests/integration/test_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/tests/integration/test_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AI/tests/performance/load/locust_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/AI/tests/performance/load/locust_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/FE/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Jenkinsfile" beforeDir="false" afterPath="$PROJECT_DIR$/Jenkinsfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/be/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/be/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/be/src/main/java/com/ssafy/a305/be/domain/contract/service/AIService.java" beforeDir="false" afterPath="$PROJECT_DIR$/be/src/main/java/com/ssafy/a305/be/domain/contract/service/AIService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/be/src/main/java/com/ssafy/a305/be/global/external/ssafy/SsafyTransferApiClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/be/src/main/java/com/ssafy/a305/be/global/external/ssafy/SsafyTransferApiClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/be/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/be/src/main/resources/application.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exec/1_GIT소스클론후빌드및배포할수있도록정리한문서.md" beforeDir="false" afterPath="$PROJECT_DIR$/exec/1_GIT소스클론후빌드및배포할수있도록정리한문서.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,21 +52,30 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "develop-fe",
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/SSAFY/Desktop/S14P21A305/F",
+    "last_opened_file_path": "C:/Users/sol2411/Desktop/SSAFY_Projects/specialization/billage",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
     "project.structure.last.edited": "Project",
     "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0"
+    "project.structure.side.proportion": "0.0",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-26cb7f24e5b0-intellij.indexing.shared.core-IU-253.29346.240" />
+        <option value="bundled-jdk-9823dce3aa75-fdfe4dae3a2d-intellij.indexing.shared.core-IU-243.21565.193" />
+        <option value="bundled-js-predefined-d6986cc7102b-e768b9ed790e-JavaScript-IU-243.21565.193" />
       </set>
     </attachedChunks>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="애플리케이션 수준" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="dfbef93f-e5a5-403d-b990-9596c1c1e223" name="Changes" comment="" />
@@ -58,7 +83,11 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1773907972673</updated>
+      <workItem from="1781164000281" duration="1355000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
 </project>

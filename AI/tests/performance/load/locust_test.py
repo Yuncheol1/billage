@@ -12,7 +12,7 @@ def get_kst():
     return datetime.now(timezone(timedelta(hours=9))).strftime('[%Y-%m-%d %H:%M:%S KST]')
 
 # --- 설정 (환경 변수 또는 기본값) ---
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "super-secret-key-change-me-in-production")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 TARGET_ENDPOINT = "/internal/v1/chat"
 
 class AIServiceUser(HttpUser):
@@ -21,7 +21,7 @@ class AIServiceUser(HttpUser):
     (유저 1명당 채팅 1회, 특약 1회를 순차적으로 요청 후 자동 종료)
     """
     # 기본 호스트 설정 (tests/.env 또는 기본값)
-    host = os.getenv("TEST_BASE_URL", "http://3.35.206.231:8000")
+    host = os.getenv("TEST_BASE_URL", "http://localhost:8000")
     
     # 쉴 틈 없이 맹공격하도록 대기 시간을 0초로 설정
     wait_time = constant(0)
@@ -30,7 +30,7 @@ class AIServiceUser(HttpUser):
         """
         테스트 시작 시 인증 토큰 및 초기 설정
         """
-        self.internal_api_key = os.getenv("INTERNAL_API_KEY", "billage-ai-key-1234")
+        self.internal_api_key = os.getenv("INTERNAL_API_KEY", "")
         self.is_done = False
         print(f"{get_kst()} 🚀 성능 테스트 시작: 대상 호스트 - {self.host} (채팅 1회, 특약 1회 순차 요청 후 자동 종료)")
         self.headers = {

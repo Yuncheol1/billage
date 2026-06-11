@@ -5,7 +5,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/billage?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
     username: ${SPRING_DATASOURCE_USERNAME:user}
-    password: ${SPRING_DATASOURCE_PASSWORD:1234}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   batch:
@@ -29,7 +29,7 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
 
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://user:1234@localhost:27017/billage?authSource=admin}
+      uri: ${SPRING_DATA_MONGODB_URI}
 
 auth:
   jwt:
@@ -48,7 +48,7 @@ oauth:
 
 ssafy:
   api:
-    base-url: ${SSAFY_API_BASE_URL:https://finopenapi.ssafy.io}
+    base-url: ${SSAFY_API_BASE_URL}
     api-key: ${SSAFY_API_KEY:}
     institution-code: ${SSAFY_INSTITUTION_CODE:00100}
     fintech-app-no: ${SSAFY_FINTECH_APP_NO:001}
@@ -60,6 +60,7 @@ ssafy:
     inquire-transaction-history-list-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_LIST_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistoryList}
     inquire-transaction-history-path: ${SSAFY_INQUIRE_TRANSACTION_HISTORY_PATH:/ssafy/api/v1/edu/demandDeposit/inquireTransactionHistory}
     update-demand-deposit-account-deposit-path: ${SSAFY_UPDATE_DEMAND_DEPOSIT_ACCOUNT_DEPOSIT_PATH:/ssafy/api/v1/edu/demandDeposit/updateDemandDepositAccountDeposit}
+    update-demand-deposit-account-transfer-path: ${SSAFY_UPDATE_DEMAND_DEPOSIT_ACCOUNT_TRANSFER_PATH:/ssafy/api/v1/edu/demandDeposit/updateDemandDepositAccountTransfer}
     demand-deposit-account-type-unique-no: ${SSAFY_DEMAND_DEPOSIT_ACCOUNT_TYPE_UNIQUE_NO:001-1-f8b3869eff034c}
 
 bank:

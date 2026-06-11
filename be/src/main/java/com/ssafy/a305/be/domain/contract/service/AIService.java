@@ -29,12 +29,15 @@ import java.util.stream.Collectors;
 @Service
 public class AIService {
 
+    @Value("${ai.server.url}")
+    private String aiServerBaseUrl;
+
     @Value("${ai.internal.api.key}")
     private String internalApiKey;
 
     public AiClauseResponseDto generateClause(AiClauseRequestDto requestDto) {
         RestTemplate restTemplate = new RestTemplate();
-        String aiServerUrl = "http://3.35.206.231:8000/internal/v1/clauses/generate";
+        String aiServerUrl = buildAiServerUrl("/internal/v1/clauses/generate");
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -77,7 +80,7 @@ public class AIService {
 
     public String analyzeContract(Contract contract, String documentContent) {
         RestTemplate restTemplate = new RestTemplate();
-        String aiServerUrl = "http://3.35.206.231:8000/internal/v1/analyze";
+        String aiServerUrl = buildAiServerUrl("/internal/v1/analyze");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -141,7 +144,7 @@ public class AIService {
 
     public AiClauseChatResponseDto generateClausesFromChat(AiClauseChatRequestDto requestDto) {
         RestTemplate restTemplate = new RestTemplate();
-        String aiServerUrl = "http://3.35.206.231:8000/internal/v1/clauses/from-chat";
+        String aiServerUrl = buildAiServerUrl("/internal/v1/clauses/from-chat");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -172,7 +175,7 @@ public class AIService {
 
     public ChatBotResponseDto getChatResponse(ChatBotRequestDto requestDto) {
         RestTemplate restTemplate = new RestTemplate();
-        String aiServerUrl = "http://3.35.206.231:8000/internal/v1/chat";
+        String aiServerUrl = buildAiServerUrl("/internal/v1/chat");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -201,5 +204,12 @@ public class AIService {
             log.error("AI Chat Server 통신 에러: ", e);
             throw new CustomBusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 서버와 통신 중 오류가 발생했습니다.");
         }
+    }
+
+    private String buildAiServerUrl(String path) {
+        if (aiServerBaseUrl == null || aiServerBaseUrl.isBlank()) {
+            throw new CustomBusinessException(ErrorCode.AUTH_CONFIG_INVALID, "ai.server.url is required.");
+        }
+        return aiServerBaseUrl.replaceAll("/+$", "") + path;
     }
 }

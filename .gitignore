@@ -5,3 +5,21 @@
 *.ipr
 
 be/.gradle-user-home/
+
+# Local environment and secrets
+.env
+*.env
+local.properties
+google-services.json
+*firebase-adminsdk*.json
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Build outputs
+build/
+dist/
+*.apk
+*.aab

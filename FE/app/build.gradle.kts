@@ -6,8 +6,8 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 // 여기서 변수를 정의합니다.
-val kakaoKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY") ?: ""
-val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL") ?: "http://10.0.2.2:8080"
+val kakaoKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY") ?: System.getenv("KAKAO_NATIVE_APP_KEY") ?: ""
+val backendBaseUrl = localProperties.getProperty("BACKEND_BASE_URL") ?: System.getenv("BACKEND_BASE_URL") ?: "http://localhost:8080"
 
 plugins {
     alias(libs.plugins.android.application)

@@ -50,7 +50,7 @@ except Exception:
     from dotenv import load_dotenv
     load_dotenv(ROOT_DIR / ".env")
     GMS_KEY = os.getenv("GMS_KEY", "")
-    GMS_URL = os.getenv("GMS_URL", "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta")
+    GMS_URL = os.getenv("GMS_URL", "")
 
 COLLECTION_NAME = "legal_tax_db"
 

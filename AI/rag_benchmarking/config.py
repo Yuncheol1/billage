@@ -8,6 +8,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 class Settings(BaseSettings):
     # --- 1. 필수 보안 장부 (없으면 서버 구동 즉시 에러 발생 Fail-Fast) ---
     GMS_KEY: str
+    GMS_URL: str
 
     # --- 2. 동적 환경 변수 (기본값 제공, .env 로 오버라이딩 가능) ---
     LLM_MODEL_NAME: str = "gemini-2.0-flash"
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
         
     @property
     def GMS_BASE_URL(self) -> str:
-        return f"https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/{self.LLM_MODEL_NAME}:generateContent"
+        return f"{self.GMS_URL.rstrip('/')}/models/{self.LLM_MODEL_NAME}:generateContent"
 
     # [핵심] Pydantic이 서버 최상단의 .env를 자동으로 스캔하도록 맵핑
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

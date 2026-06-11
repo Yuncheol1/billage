@@ -10,7 +10,7 @@ TEST_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(TEST_ENV_PATH)
 
 # --- 설정 (환경 변수 또는 기본값) ---
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "super-secret-key-change-me-in-production")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 BASE_URL = os.getenv("TEST_BASE_URL", "http://localhost:8000")
 CHAT_ENDPOINT = f"{BASE_URL}/internal/v1/chat"
 HEALTH_ENDPOINT = f"{BASE_URL}/health"

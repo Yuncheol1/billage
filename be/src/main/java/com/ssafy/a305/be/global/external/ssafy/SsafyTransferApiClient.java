@@ -24,15 +24,18 @@ import java.util.concurrent.ThreadLocalRandom;
 @Component
 public class SsafyTransferApiClient {
 
-    private static final String TRANSFER_URL =
-            "https://finopenapi.ssafy.io/ssafy/api/v1/edu/demandDeposit/updateDemandDepositAccountTransfer";
-
     private static final String API_NAME = "updateDemandDepositAccountTransfer";
 
     private final RestTemplate restTemplate;
 
     @Value("${ssafy.api.api-key:}")
     private String apiKey;
+
+    @Value("${ssafy.api.base-url:}")
+    private String baseUrl;
+
+    @Value("${ssafy.api.update-demand-deposit-account-transfer-path:}")
+    private String transferPath;
 
     public SsafyTransferApiClient() {
         this.restTemplate = new RestTemplate();
@@ -86,7 +89,7 @@ public class SsafyTransferApiClient {
                     withdrawalAccountNo, depositAccountNo, amount);
 
             ResponseEntity<SsafyTransferResponse> response = restTemplate.exchange(
-                    TRANSFER_URL,
+                    buildTransferUrl(),
                     HttpMethod.POST,
                     entity,
                     SsafyTransferResponse.class
@@ -122,5 +125,12 @@ public class SsafyTransferApiClient {
         String timePart = now.format(DateTimeFormatter.ofPattern("HHmmss"));
         int random = ThreadLocalRandom.current().nextInt(100_000, 1_000_000);
         return datePart + timePart + random;
+    }
+
+    private String buildTransferUrl() {
+        if (baseUrl == null || baseUrl.isBlank() || transferPath == null || transferPath.isBlank()) {
+            throw new TransferFailException("SSAFY_TRANSFER_CONFIG_INVALID");
+        }
+        return baseUrl.replaceAll("/+$", "") + transferPath;
     }
 }

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     
     # AI 환경변수 (SSAFY GMS Gateway 전용)
     GMS_KEY: str = ""
-    GMS_URL: str = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta"
+    GMS_URL: str = ""
     
     CHROMA_DB_DIR: str = "./chroma_db"
     

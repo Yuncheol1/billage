@@ -24,25 +24,25 @@
 
 ### 데이터베이스 (DB / Cache)
 * **MySQL (Azure)**
-    * `URL`: `jdbc:mysql://ssafy-mysql-db.mysql.database.azure.com:3306/S14P21A305?serverTimezone=UTC&useUnicode=true&characterEncoding=utf8`
-    * `Username`: `S14P21A305`
-    * `Password`: `kjPY1Tb7DO`
+    * `URL`: `${SPRING_DATASOURCE_URL}`
+    * `Username`: `${SPRING_DATASOURCE_USERNAME}`
+    * `Password`: `${SPRING_DATASOURCE_PASSWORD}`
 * **MongoDB (Atlas)**
-    * `URI`: `mongodb+srv://S14P21A305:RYQmIeY5Xj@ssafy.ngivl.mongodb.net/S14P21A305?authSource=admin`
+    * `URI`: `${SPRING_DATA_MONGODB_URI}`
 * **Redis (Cloud)**
-    * `Host`: `redis-15456.crce284.ap-neast-2-1.ec2.cloud.redislabs.com`
-    * `Port`: `15456`
-    * `Password`: `iSaSTgzLmJnmk1VcznnXYcLNSsvbOd8R`
+    * `Host`: `${SPRING_DATA_REDIS_HOST}`
+    * `Port`: `${SPRING_DATA_REDIS_PORT}`
+    * `Password`: `${SPRING_DATA_REDIS_PASSWORD}`
 
 ### API 및 보안 키
 * **JWT Security**
-    * `Secret Key`: `gwth9MhvHtejlEWssamb35owrfQRD4VgODt/lKAWQXupwr+EN4CuV+YG1QkENQl2`
+    * `Secret Key`: `${JWT_SECRET}`
 * **External APIs**
-    * `SSAFY API KEY`: `8f70faddec9a4299aac8890acd4a261d`
+    * `SSAFY API KEY`: `${SSAFY_API_KEY}`
     * `Kakao Client ID/Secret`: (개인 보안 이슈로 비공개 - 환경 변수 설정 필요)
 * **AI Server**
-    * `URL`: `http://3.35.206.231:8000`
-    * `Internal API Key`: `super-secret-key-change-me-in-production`
+    * `URL`: `${AI_SERVER_URL}`
+    * `Internal API Key`: `${AI_INTERNAL_API_KEY}`
 
 ---
 
