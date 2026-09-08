@@ -1,5 +1,6 @@
 package com.ssafy.a305.be.domain.repayment.batch;
 
+import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
@@ -109,7 +110,6 @@ public class AutoTransferBatchConfig {
         return schedule -> {
             Integer contractSeq = schedule.getContract().getContractSeq();
             Integer scheduleSeq = schedule.getScheduleSeq();
-
             String lockToken = repaymentTransferRequestGuard.tryAcquire(scheduleSeq);
             if (lockToken == null) {
                 log.info("[자동이체] scheduleSeq={}는 이미 처리 중이어서 Skip.", scheduleSeq);
@@ -173,7 +173,7 @@ public class AutoTransferBatchConfig {
                         .build();
                 repaymentEventRepository.save(event);
 
-                notificationCommandService.sendRepaymentPaidNotifications(schedule);
+                sendRepaymentPaidNotificationsSafely(schedule);
 
                 boolean allSchedulesCompleted = schedule.getContract().getRepaymentSchedules().stream()
                         .allMatch(item -> "PAID".equals(item.getStatus())
@@ -181,7 +181,7 @@ public class AutoTransferBatchConfig {
                                 || "WAIVED".equals(item.getStatus()));
                 if (allSchedulesCompleted) {
                     schedule.getContract().markClosed(now);
-                    notificationCommandService.sendContractClosedNotifications(schedule.getContract());
+                    sendContractClosedNotificationsSafely(schedule.getContract());
                 }
 
                 log.info("[자동이체] 성공 - scheduleSeq={}, contractSeq={}, amount={}",
@@ -194,6 +194,32 @@ public class AutoTransferBatchConfig {
                 }
             }
         };
+    }
+
+    // ──────────────── 알림 (실패해도 이체 결과를 롤백하지 않는다) ────────────────
+
+    /**
+     * 알림 전송은 이체의 부수 효과일 뿐이므로 실패를 전파하지 않습니다.
+     *
+     * <p>여기서 예외가 새어나가면 {@code TransferFailException}이 아니라 Skip 대상이 아니므로,
+     * 이미 이체가 나간 청크 전체가 롤백됩니다. 즉 돈은 빠져나갔는데 스케줄은 NONPAID로
+     * 남는 상태가 되므로 반드시 삼켜야 합니다.</p>
+     */
+    private void sendRepaymentPaidNotificationsSafely(RepaymentSchedule schedule) {
+        try {
+            notificationCommandService.sendRepaymentPaidNotifications(schedule);
+        } catch (Exception e) {
+            log.error("[자동이체] 상환 완료 알림 전송 실패 - scheduleSeq={}", schedule.getScheduleSeq(), e);
+        }
+    }
+
+    /** @see #sendRepaymentPaidNotificationsSafely(RepaymentSchedule) */
+    private void sendContractClosedNotificationsSafely(Contract contract) {
+        try {
+            notificationCommandService.sendContractClosedNotifications(contract);
+        } catch (Exception e) {
+            log.error("[자동이체] 계약 종료 알림 전송 실패 - contractSeq={}", contract.getContractSeq(), e);
+        }
     }
 
     // ──────────────── Writer ────────────────
