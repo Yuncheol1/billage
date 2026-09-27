@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -37,8 +39,25 @@ public class SsafyTransferApiClient {
     @Value("${ssafy.api.update-demand-deposit-account-transfer-path:}")
     private String transferPath;
 
+    /** 연결 수립까지 기다리는 시간. 연결 자체는 빠르므로 짧게 잡는다. */
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+
+    /**
+     * 응답을 기다리는 시간.
+     *
+     * <p><b>이체 요청 락의 TTL(30초)보다 반드시 짧아야 합니다.</b> 호출이 락보다 오래 매달리면
+     * 락이 먼저 풀려 같은 회차에 다른 요청이 진입할 수 있습니다. 기본값인 무제한 대기로는
+     * 그 조건을 만족할 수 없습니다.</p>
+     *
+     * @see com.ssafy.a305.be.domain.repayment.service.RepaymentTransferRequestGuard
+     */
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+
     public SsafyTransferApiClient() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
+        factory.setReadTimeout((int) READ_TIMEOUT.toMillis());
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**
