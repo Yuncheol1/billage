@@ -101,11 +101,13 @@ public class RepaymentManualTransferService {
                 throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND, "수동 이체에 필요한 계좌 정보가 없습니다.");
             }
 
+            // 자동이체와 동일한 적요 형식을 쓴다. 정산은 두 경로를 구분하지 않고
+            // "이 회차의 이체가 나갔는가"만 판정하므로 형식이 갈라지면 안 된다.
             SsafyTransferResponse transferResponse = ssafyTransferApiClient.transfer(
                     withdrawalAccountNo,
                     depositAccountNo,
                     amount,
-                    contract.getContractId(),
+                    RepaymentTransferMemo.of(schedule),
                     debtorUserKey
             );
 
