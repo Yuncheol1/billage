@@ -9,7 +9,7 @@ import com.ssafy.a305.be.domain.contract.repository.ContractRepository;
 import com.ssafy.a305.be.domain.notification.service.RepaymentNotificationScheduler;
 import com.ssafy.a305.be.domain.notification.repository.FcmTokenRepository;
 import com.ssafy.a305.be.domain.notification.repository.NotificationLogRepository;
-import com.ssafy.a305.be.domain.repayment.batch.AutoTransferJobScheduler;
+import com.ssafy.a305.be.domain.repayment.service.AutoTransferScheduler;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.domain.user.repository.SocialAuthRepository;
@@ -90,7 +90,7 @@ class AuthServiceRedisIntegrationTest {
     private RepaymentNotificationScheduler repaymentNotificationScheduler;
 
     @MockBean
-    private AutoTransferJobScheduler autoTransferJobScheduler;
+    private AutoTransferScheduler autoTransferScheduler;
 
     @MockBean
     private TestDataInit testDataInit;

@@ -77,4 +77,33 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("scheduleSeq") Integer scheduleSeq,
             @Param("contractSeq") Integer contractSeq
     );
+
+    /**
+     * 자동이체 대상 회차의 식별자 목록.
+     *
+     * <p>엔티티가 아닌 식별자만 조회한다. 실제 처리는 건별 트랜잭션 안에서
+     * {@link #findByScheduleSeqWithContractUsers(Integer)}로 다시 읽으므로,
+     * 목록 조회 시점과 처리 시점 사이에 상태가 바뀌어도 최신 값으로 판단할 수 있다.</p>
+     */
+    @Query("""
+            select rs.scheduleSeq
+            from RepaymentSchedule rs
+            join rs.contract c
+            where rs.dueDt <= :today
+              and rs.status = 'NONPAID'
+              and c.status in ('SIGNED', 'ACTIVE', 'OVERDUE')
+            order by rs.scheduleSeq asc
+            """)
+    List<Integer> findDueScheduleSeqs(@Param("today") LocalDate today);
+
+    /** 자동이체 처리에 필요한 연관(계약·채무자·채권자)을 함께 읽는다. */
+    @Query("""
+            select rs
+            from RepaymentSchedule rs
+            join fetch rs.contract c
+            join fetch c.debtor
+            join fetch c.creditor
+            where rs.scheduleSeq = :scheduleSeq
+            """)
+    Optional<RepaymentSchedule> findByScheduleSeqWithContractUsers(@Param("scheduleSeq") Integer scheduleSeq);
 }
