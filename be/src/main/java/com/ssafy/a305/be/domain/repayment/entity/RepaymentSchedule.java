@@ -9,7 +9,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "repayment_schedule")
+@Table(
+        name = "repayment_schedule",
+        /*
+         * 자동이체 대상 조회(status = 'NONPAID' AND due_dt <= :today)를 위한 인덱스.
+         * 등치 조건인 status가 선행, 범위 조건인 due_dt가 후행이어야 한다.
+         * 순서를 바꾸면 범위 조건 뒤의 컬럼을 타지 못한다.
+         *
+         * 이 인덱스가 없으면 옵티마이저가 계약 테이블을 전체 스캔한 뒤
+         * 계약마다 회차를 되짚는 계획을 선택한다.
+         */
+        indexes = @Index(name = "idx_schedule_status_due_dt", columnList = "status, due_dt")
+)
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
