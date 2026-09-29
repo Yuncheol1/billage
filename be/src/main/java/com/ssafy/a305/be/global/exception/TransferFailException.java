@@ -8,6 +8,21 @@ package com.ssafy.a305.be.global.exception;
  */
 public class TransferFailException extends RuntimeException {
 
+    private static final String FAILED_PREFIX = "SSAFY_TRANSFER_FAILED|";
+
+    /**
+     * 은행이 준 응답코드. {@code "SSAFY_TRANSFER_FAILED|{code}|{message}"} 형식일 때만 값이 있고,
+     * 연결 실패 등 코드가 없는 경우는 {@code null}이다.
+     */
+    public String getResponseCode() {
+        String message = getMessage();
+        if (message == null || !message.startsWith(FAILED_PREFIX)) {
+            return null;
+        }
+        String[] parts = message.split("\\|", 3);
+        return parts.length >= 2 && !parts[1].isBlank() ? parts[1] : null;
+    }
+
     public TransferFailException(String message) {
         super(message);
     }
