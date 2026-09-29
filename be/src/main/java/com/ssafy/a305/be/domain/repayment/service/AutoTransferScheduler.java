@@ -18,8 +18,11 @@ import java.util.List;
  * 체크포인트</b>이므로 "어디까지 처리했는지"를 따로 저장할 필요가 없습니다.</p>
  *
  * <p>이 클래스에는 {@code @Transactional}을 붙이지 않습니다. 붙이면 전체 반복이 하나의
- * 트랜잭션이 되어 한 건의 실패가 나머지 전부를 롤백시킵니다. 트랜잭션 경계는
- * {@code AutoTransferService} 쪽에만 있어야 합니다.</p>
+ * 트랜잭션이 되어 한 건의 실패가 나머지 전부를 롤백시킵니다. 트랜잭션 경계는 회차 1건을
+ * 처리하는 {@link AutoTransferService} 안에서 구간별로 직접 관리합니다.</p>
+ *
+ * <p>결과를 알 수 없어 미해결로 남은 회차({@code UNRESOLVED})와 그 때문에 진입이 차단된 회차
+ * ({@code BLOCKED})는 자동으로 풀리지 않으므로, 로그에서 따로 세어 눈에 띄게 남깁니다.</p>
  */
 @Slf4j
 @Component
@@ -28,7 +31,7 @@ public class AutoTransferScheduler {
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
 
-    /** 별도 빈이어야 프록시를 거쳐 건별 트랜잭션이 적용된다. */
+    /** 회차 1건 처리. 트랜잭션 경계는 이 서비스가 구간별로 직접 관리한다. */
     private final AutoTransferService autoTransferService;
 
     /** 1차 이체 10시, 2·3차 재시도 14시·18시. 남은 NONPAID만 다시 대상이 된다. */
@@ -45,14 +48,18 @@ public class AutoTransferScheduler {
         long startedAt = System.currentTimeMillis();
         int succeeded = 0;
         int skipped = 0;
+        int blocked = 0;
+        int unresolved = 0;
         int failed = 0;
 
         for (Integer scheduleSeq : targets) {
             try {
-                // 건별 트랜잭션. 한 건의 실패가 다음 건으로 번지지 않도록 여기서 잡는다.
+                // 한 건의 실패가 다음 건으로 번지지 않도록 여기서 잡는다.
                 switch (autoTransferService.execute(scheduleSeq)) {
                     case SUCCEEDED -> succeeded++;
                     case SKIPPED -> skipped++;
+                    case BLOCKED -> blocked++;
+                    case UNRESOLVED -> unresolved++;
                 }
             } catch (Exception e) {
                 failed++;
@@ -64,5 +71,10 @@ public class AutoTransferScheduler {
         log.info("[자동이체] 완료 - date={}, 대상={}, 성공={}, 스킵={}, 실패={}, 소요={}ms",
                 today, targets.size(), succeeded, skipped, failed,
                 System.currentTimeMillis() - startedAt);
+
+        if (blocked > 0 || unresolved > 0) {
+            // 결과가 확정되지 않은 이체가 있다. 자동으로 풀리지 않으므로 확인이 필요하다.
+            log.warn("[자동이체] 결과 미확정 - 이번 실행에서 결과 불명={}, 미해결로 진입 차단={}", unresolved, blocked);
+        }
     }
 }
