@@ -4,10 +4,12 @@ import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -106,4 +108,50 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             where rs.scheduleSeq = :scheduleSeq
             """)
     Optional<RepaymentSchedule> findByScheduleSeqWithContractUsers(@Param("scheduleSeq") Integer scheduleSeq);
+
+    /**
+     * 이체를 시작하기 전에 회차를 REQUESTED로 선점한다.
+     *
+     * <p>조회한 상태가 그대로일 때만 바뀌므로, 같은 회차에 요청이 동시에 들어와도 DB가 한 건만
+     * 통과시킨다. 반환값이 1이면 선점에 성공한 것이고 0이면 다른 요청이 먼저 상태를 바꾼 것이다.</p>
+     *
+     * <p>벌크 UPDATE는 영속성 컨텍스트를 거치지 않으므로, 이미 읽어 둔 엔티티가 옛 상태를 들고
+     * 남지 않도록 실행 후 컨텍스트를 비운다.</p>
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update RepaymentSchedule rs
+            set rs.status = 'REQUESTED',
+                rs.transferRequestedDttm = :requestedAt
+            where rs.scheduleSeq = :scheduleSeq
+              and rs.status = :expectedStatus
+            """)
+    int claimForTransfer(
+            @Param("scheduleSeq") Integer scheduleSeq,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("requestedAt") LocalDateTime requestedAt
+    );
+
+    /** REQUESTED였던 회차를 이체 전 상태로 되돌린다. 돈이 나가지 않았음이 확실할 때만 호출한다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update RepaymentSchedule rs
+            set rs.status = :restoreStatus
+            where rs.scheduleSeq = :scheduleSeq
+              and rs.status = 'REQUESTED'
+            """)
+    int releaseTransferClaim(
+            @Param("scheduleSeq") Integer scheduleSeq,
+            @Param("restoreStatus") String restoreStatus
+    );
+
+    /** 요청한 지 충분히 지났는데도 결과가 확정되지 않은 회차. 정산 대상이다. */
+    @Query("""
+            select rs.scheduleSeq
+            from RepaymentSchedule rs
+            where rs.status = 'REQUESTED'
+              and rs.transferRequestedDttm <= :requestedBefore
+            order by rs.scheduleSeq asc
+            """)
+    List<Integer> findStaleRequestedScheduleSeqs(@Param("requestedBefore") LocalDateTime requestedBefore);
 }

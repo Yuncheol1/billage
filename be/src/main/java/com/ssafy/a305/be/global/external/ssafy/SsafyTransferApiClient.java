@@ -51,11 +51,11 @@ public class SsafyTransferApiClient {
     /**
      * 응답을 기다리는 시간.
      *
-     * <p><b>이체 요청 락의 TTL(30초)보다 반드시 짧아야 합니다.</b> 호출이 락보다 오래 매달리면
-     * 락이 먼저 풀려 같은 회차에 다른 요청이 진입할 수 있습니다. 기본값인 무제한 대기로는
-     * 그 조건을 만족할 수 없습니다.</p>
+     * <p><b>정산이 회차를 건드리기까지의 대기 시간보다 반드시 짧아야 합니다.</b> 호출이 그보다
+     * 오래 매달리면, 아직 응답을 기다리는 이체를 정산이 "나가지 않았다"고 판정해 되돌릴 수
+     * 있습니다. 기본값인 무제한 대기로는 그 조건을 만족할 수 없습니다.</p>
      *
-     * @see com.ssafy.a305.be.domain.repayment.service.RepaymentTransferRequestGuard
+     * @see com.ssafy.a305.be.domain.repayment.service.TransferReconciliationService
      */
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 

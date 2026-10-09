@@ -6,11 +6,9 @@ import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
-import com.ssafy.a305.be.domain.repayment.entity.TransferAttempt;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
-import com.ssafy.a305.be.domain.repayment.repository.TransferAttemptRepository;
 import com.ssafy.a305.be.domain.user.entity.User;
 import com.ssafy.a305.be.global.exception.TransferFailException;
 import com.ssafy.a305.be.global.exception.TransferOutcomeUnknownException;
@@ -24,7 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -32,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,24 +39,26 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 /**
  * 자동이체 1건 처리 테스트.
  *
- * <p>{@link AutoTransferService}를 직접 생성해 <b>실제 운영 코드</b>를 호출하고, DB·Redis·외부
- * API만 Mockito로 격리한다. 트랜잭션 경계는 {@link RecordingTransactionManager}로 기록해,
- * "외부 호출이 트랜잭션 밖에서 일어나는가", "시도 기록이 호출보다 먼저 커밋되는가" 같은
+ * <p>{@link AutoTransferService}를 직접 생성해 <b>실제 운영 코드</b>를 호출하고, DB·외부 API만
+ * Mockito로 격리한다. 트랜잭션 경계는 {@link RecordingTransactionManager}로 기록해,
+ * "외부 호출이 트랜잭션 밖에서 일어나는가", "선점이 호출보다 먼저 커밋되는가" 같은
  * 구조 자체를 검증한다.</p>
+ *
+ * <p>조건부 UPDATE(선점·복귀)는 저장소 목이 DB처럼 동작하도록 흉내 낸다. 조회한 상태와 같을 때만
+ * 픽스쳐 회차의 상태를 바꾸고 1을, 아니면 0을 돌려준다.</p>
  */
 @ExtendWith(MockitoExtension.class)
 class AutoTransferServiceTest {
 
     private static final Integer SCHEDULE_SEQ = 1;
     private static final Integer CONTRACT_SEQ = 100;
-    private static final Long ATTEMPT_SEQ = 77L;
-    private static final String LOCK_TOKEN = "lock-token-001";
 
     @Mock
     private RepaymentScheduleRepository repaymentScheduleRepository;
@@ -69,13 +67,9 @@ class AutoTransferServiceTest {
     @Mock
     private RepaymentEventRepository repaymentEventRepository;
     @Mock
-    private TransferAttemptRepository transferAttemptRepository;
-    @Mock
     private NotificationCommandService notificationCommandService;
     @Mock
     private SsafyTransferApiClient ssafyTransferApiClient;
-    @Mock
-    private RepaymentTransferRequestGuard guard;
 
     private RecordingTransactionManager transactionManager;
     private List<String> events;
@@ -83,9 +77,9 @@ class AutoTransferServiceTest {
 
     // ──── API 호출 시점에 관찰한 값 ────
     private boolean txActiveAtApiCall;
-    private TransferAttempt.Status attemptStatusAtApiCall;
-    /** Tx1이 저장한 시도. 이후 단계에서 상태가 바뀌는지 관찰한다. */
-    private TransferAttempt savedAttempt;
+    private String scheduleStatusAtApiCall;
+    /** 선점·복귀 UPDATE가 상태를 바꿀 대상. 조회 스터빙과 같은 객체다. */
+    private RepaymentSchedule target;
 
     // ──── 픽스쳐 ────
     private User debtor;
@@ -102,32 +96,36 @@ class AutoTransferServiceTest {
                 repaymentScheduleRepository,
                 registrationRepository,
                 repaymentEventRepository,
-                transferAttemptRepository,
                 notificationCommandService,
                 ssafyTransferApiClient,
-                guard,
                 new TransactionTemplate(transactionManager)
         );
 
         txActiveAtApiCall = true; // 호출이 일어나지 않았다면 값이 바뀌지 않아 눈에 띈다
-        attemptStatusAtApiCall = null;
-        savedAttempt = null;
+        scheduleStatusAtApiCall = null;
+        target = null;
 
-        // 락 해제도 이벤트에 남겨 "마지막 커밋 뒤에 풀리는가"를 순서로 검증한다.
-        lenient().doAnswer(inv -> {
-            events.add("RELEASE");
-            return null;
-        }).when(guard).release(any(), any());
-
-        // 시도 저장소: 저장한 객체를 기억하고, 같은 객체를 다시 돌려준다.
-        lenient().when(transferAttemptRepository.save(any(TransferAttempt.class))).thenAnswer(inv -> {
-            TransferAttempt attempt = inv.getArgument(0);
-            ReflectionTestUtils.setField(attempt, "attemptSeq", ATTEMPT_SEQ);
-            savedAttempt = attempt;
-            return attempt;
-        });
-        lenient().when(transferAttemptRepository.findById(ATTEMPT_SEQ))
-                .thenAnswer(inv -> Optional.ofNullable(savedAttempt));
+        // 선점: 조회한 상태 그대로일 때만 REQUESTED로 바꾼다.
+        lenient().when(repaymentScheduleRepository.claimForTransfer(any(), anyString(), any()))
+                .thenAnswer(inv -> {
+                    events.add("CLAIM");
+                    String expected = inv.getArgument(1);
+                    if (target == null || !expected.equals(target.getStatus())) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(target, "status", "REQUESTED");
+                    ReflectionTestUtils.setField(target, "transferRequestedDttm", inv.getArgument(2));
+                    return 1;
+                });
+        // 복귀: REQUESTED일 때만 되돌린다.
+        lenient().when(repaymentScheduleRepository.releaseTransferClaim(any(), anyString()))
+                .thenAnswer(inv -> {
+                    if (target == null || !"REQUESTED".equals(target.getStatus())) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(target, "status", inv.getArgument(1));
+                    return 1;
+                });
 
         debtor = User.builder()
                 .userSeq(1).email("debtor@test.com")
@@ -174,21 +172,21 @@ class AutoTransferServiceTest {
                 .build();
     }
 
-    /** 락 획득 + 회차 조회 성공. */
-    private void givenLockedAndFound(RepaymentSchedule schedule) {
-        given(guard.tryAcquire(SCHEDULE_SEQ)).willReturn(LOCK_TOKEN);
+    /** 회차 조회 성공. 선점·복귀도 이 회차를 대상으로 한다. */
+    private void givenFound(RepaymentSchedule schedule) {
+        target = schedule;
         given(repaymentScheduleRepository.findByScheduleSeqWithContractUsers(SCHEDULE_SEQ))
                 .willReturn(Optional.of(schedule));
     }
 
-    /** 락 + 회차 + 자동이체 등록까지 준비. */
+    /** 회차 + 자동이체 등록까지 준비. */
     private void givenReadyToTransfer(RepaymentSchedule schedule, String registrationAmount) {
-        givenLockedAndFound(schedule);
+        givenFound(schedule);
         given(registrationRepository.findActiveWithAccounts(CONTRACT_SEQ))
                 .willReturn(Optional.of(newRegistration(registrationAmount)));
     }
 
-    /** 이체 API가 성공한다. 호출 시점의 트랜잭션·시도 상태를 관찰해 둔다. */
+    /** 이체 API가 성공한다. 호출 시점의 트랜잭션·회차 상태를 관찰해 둔다. */
     private void givenApiSucceeds() {
         given(ssafyTransferApiClient.transfer(anyString(), anyString(), any(), anyString(), anyString()))
                 .willAnswer(inv -> {
@@ -209,7 +207,7 @@ class AutoTransferServiceTest {
     private void observeApiCall() {
         events.add("API");
         txActiveAtApiCall = TransactionSynchronizationManager.isActualTransactionActive();
-        attemptStatusAtApiCall = savedAttempt == null ? null : savedAttempt.getStatus();
+        scheduleStatusAtApiCall = target == null ? null : target.getStatus();
     }
 
     // ──────────────────────────────────────────────
@@ -239,6 +237,12 @@ class AutoTransferServiceTest {
 
             assertThat(schedule.getStatus()).isEqualTo("OVERDUE");
         }
+
+        @Test
+        @DisplayName("transferMemo(): 적요는 BL + 회차 PK다")
+        void transferMemo_shouldBePrefixedSchedulePk() {
+            assertThat(newSchedule(12345, "500000").transferMemo()).isEqualTo("BL12345");
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -248,7 +252,7 @@ class AutoTransferServiceTest {
     class SuccessTests {
 
         @Test
-        @DisplayName("API 성공 시 → 회차 PAID, 시도 SUCCEEDED, 상환 이벤트 저장")
+        @DisplayName("API 성공 시 → 회차 PAID, 상환 이벤트 저장, 적요는 회차 식별자")
         void execute_success_shouldMarkPaidAndSaveEvent() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             newSchedule(2, "500000"); // 남은 회차가 있어 계약은 종료되지 않는다
@@ -260,14 +264,12 @@ class AutoTransferServiceTest {
             assertThat(result).isEqualTo(AutoTransferService.Result.SUCCEEDED);
             assertThat(schedule.getStatus()).isEqualTo("PAID");
             assertThat(schedule.getPaidDttm()).isNotNull();
-            assertThat(savedAttempt.getStatus()).isEqualTo(TransferAttempt.Status.SUCCEEDED);
-            assertThat(savedAttempt.getResolvedDttm()).isNotNull();
 
             then(ssafyTransferApiClient).should().transfer(
                     eq("0012345678901234"),   // 채무자 출금 계좌
                     eq("0098765432109876"),   // 채권자 입금 계좌
                     eq(new BigDecimal("500000")),
-                    eq("BL1-1 1회차 C-20260325-TEST01"),
+                    eq("BL1"),
                     eq("debtor-ssafy-key-001")
             );
 
@@ -325,24 +327,6 @@ class AutoTransferServiceTest {
         }
 
         @Test
-        @DisplayName("시도 번호는 직전 시도 다음 번호이고 적요 마커에도 실린다")
-        void execute_shouldUseNextAttemptNo() {
-            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            newSchedule(2, "500000");
-            givenReadyToTransfer(schedule, "500000");
-            given(transferAttemptRepository.findLastAttemptNo(SCHEDULE_SEQ)).willReturn(2);
-            givenApiSucceeds();
-
-            service.execute(SCHEDULE_SEQ);
-
-            assertThat(savedAttempt.getAttemptNo()).isEqualTo(3);
-            then(ssafyTransferApiClient).should().transfer(
-                    anyString(), anyString(), any(),
-                    eq("BL1-3 1회차 C-20260325-TEST01"),
-                    anyString());
-        }
-
-        @Test
         @DisplayName("알림이 실패해도 이체 결과는 롤백되지 않는다")
         void execute_notificationFailure_shouldNotRollbackResult() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
@@ -382,8 +366,8 @@ class AutoTransferServiceTest {
         }
 
         @Test
-        @DisplayName("시도 기록은 API 호출보다 먼저 커밋된다")
-        void execute_attempt_shouldBeCommittedBeforeApiCall() {
+        @DisplayName("선점은 API 호출보다 먼저 커밋된다")
+        void execute_claim_shouldBeCommittedBeforeApiCall() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             newSchedule(2, "500000");
             givenReadyToTransfer(schedule, "500000");
@@ -391,13 +375,13 @@ class AutoTransferServiceTest {
 
             service.execute(SCHEDULE_SEQ);
 
-            // Tx1 커밋 → API → Tx2 커밋 → 락 해제
-            assertThat(events).containsExactly("BEGIN", "COMMIT", "API", "BEGIN", "COMMIT", "RELEASE");
+            // Tx1(선점) 커밋 → API → Tx2 커밋
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API", "BEGIN", "COMMIT");
         }
 
         @Test
-        @DisplayName("API를 호출하는 시점의 시도 상태는 REQUESTED다")
-        void execute_attempt_shouldBeRequestedWhileApiCall() {
+        @DisplayName("API를 호출하는 시점의 회차 상태는 REQUESTED이고 요청 시각이 남는다")
+        void execute_schedule_shouldBeRequestedWhileApiCall() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             newSchedule(2, "500000");
             givenReadyToTransfer(schedule, "500000");
@@ -405,12 +389,13 @@ class AutoTransferServiceTest {
 
             service.execute(SCHEDULE_SEQ);
 
-            assertThat(attemptStatusAtApiCall).isEqualTo(TransferAttempt.Status.REQUESTED);
+            assertThat(scheduleStatusAtApiCall).isEqualTo("REQUESTED");
+            assertThat(schedule.getTransferRequestedDttm()).isNotNull();
         }
 
         @Test
-        @DisplayName("락은 마지막 커밋이 끝난 뒤에 해제되고, 획득할 때 받은 토큰 그대로 해제된다")
-        void execute_lock_shouldBeReleasedAfterLastCommitWithSameToken() {
+        @DisplayName("선점은 조회한 상태를 조건으로 건다")
+        void execute_claim_shouldUseReadStatusAsCondition() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             newSchedule(2, "500000");
             givenReadyToTransfer(schedule, "500000");
@@ -418,9 +403,7 @@ class AutoTransferServiceTest {
 
             service.execute(SCHEDULE_SEQ);
 
-            assertThat(events.get(events.size() - 1)).isEqualTo("RELEASE");
-            assertThat(events.get(events.size() - 2)).isEqualTo("COMMIT");
-            then(guard).should().release(SCHEDULE_SEQ, LOCK_TOKEN);
+            then(repaymentScheduleRepository).should().claimForTransfer(eq(SCHEDULE_SEQ), eq("NONPAID"), any());
         }
     }
 
@@ -431,8 +414,8 @@ class AutoTransferServiceTest {
     class UnknownOutcomeTests {
 
         @Test
-        @DisplayName("타임아웃 등으로 결과를 모르면 → UNRESOLVED, 시도는 REQUESTED로 남는다")
-        void execute_unknownOutcome_shouldLeaveAttemptRequested() {
+        @DisplayName("타임아웃 등으로 결과를 모르면 → UNRESOLVED, 회차는 REQUESTED로 남는다")
+        void execute_unknownOutcome_shouldLeaveScheduleRequested() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|IO|Read timed out"));
@@ -440,27 +423,27 @@ class AutoTransferServiceTest {
             AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
 
             assertThat(result).isEqualTo(AutoTransferService.Result.UNRESOLVED);
-            assertThat(savedAttempt.getStatus())
-                    .as("결과 불명을 FAILED로 닫으면 다음 슬롯이 재시도해 이중 출금이 된다")
-                    .isEqualTo(TransferAttempt.Status.REQUESTED);
+            assertThat(schedule.getStatus())
+                    .as("결과 불명을 미납으로 되돌리면 다음 슬롯이 재시도해 이중 출금이 된다")
+                    .isEqualTo("REQUESTED");
+            then(repaymentScheduleRepository).should(never()).releaseTransferClaim(any(), anyString());
         }
 
         @Test
-        @DisplayName("결과 불명이면 회차를 PAID로도, 실패로도 바꾸지 않는다")
-        void execute_unknownOutcome_shouldNotTouchScheduleOrRecordEvent() {
+        @DisplayName("결과 불명이면 상환 이벤트도 알림도 남기지 않는다")
+        void execute_unknownOutcome_shouldNotRecordEvent() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferOutcomeUnknownException("timeout"));
 
             service.execute(SCHEDULE_SEQ);
 
-            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
             then(repaymentEventRepository).shouldHaveNoInteractions();
             then(notificationCommandService).shouldHaveNoInteractions();
         }
 
         @Test
-        @DisplayName("결과 불명이면 결과 반영 트랜잭션(Tx2)을 열지 않고 락만 해제한다")
+        @DisplayName("결과 불명이면 결과 반영 트랜잭션(Tx2)을 열지 않는다")
         void execute_unknownOutcome_shouldNotOpenSecondTransaction() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
@@ -468,7 +451,7 @@ class AutoTransferServiceTest {
 
             service.execute(SCHEDULE_SEQ);
 
-            assertThat(events).containsExactly("BEGIN", "COMMIT", "API", "RELEASE");
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API");
         }
     }
 
@@ -479,8 +462,8 @@ class AutoTransferServiceTest {
     class DefiniteFailureTests {
 
         @Test
-        @DisplayName("은행이 거절하면 → 예외를 전파하고, 시도는 FAILED와 응답코드로 닫힌다")
-        void execute_rejection_shouldCloseAttemptAsFailed() {
+        @DisplayName("은행이 거절하면 → 예외를 전파하고, 회차는 NONPAID로 돌아가 다음 슬롯에 다시 대상이 된다")
+        void execute_rejection_shouldRestoreNonpaid() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferFailException("SSAFY_TRANSFER_FAILED|A1014|잔액 부족"));
@@ -490,47 +473,34 @@ class AutoTransferServiceTest {
                     .isNotInstanceOf(TransferOutcomeUnknownException.class)
                     .hasMessageContaining("A1014");
 
-            assertThat(savedAttempt.getStatus()).isEqualTo(TransferAttempt.Status.FAILED);
-            assertThat(savedAttempt.getResponseCode()).isEqualTo("A1014");
-        }
-
-        @Test
-        @DisplayName("확정 실패 후에도 회차는 NONPAID로 남아 다음 슬롯에 다시 대상이 된다")
-        void execute_rejection_shouldKeepScheduleNonpaid() {
-            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            givenReadyToTransfer(schedule, "500000");
-            givenApiThrows(new TransferFailException("SSAFY_TRANSFER_FAILED|A1014|잔액 부족"));
-
-            assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ)).isInstanceOf(TransferFailException.class);
-
             assertThat(schedule.getStatus()).isEqualTo("NONPAID");
             assertThat(schedule.getPaidDttm()).isNull();
+            then(repaymentScheduleRepository).should().releaseTransferClaim(SCHEDULE_SEQ, "NONPAID");
             then(repaymentEventRepository).shouldHaveNoInteractions();
         }
 
         @Test
-        @DisplayName("응답코드가 없는 실패(연결 실패 등)도 FAILED로 닫히며 코드는 비어 있다")
-        void execute_failureWithoutCode_shouldCloseWithNullCode() {
+        @DisplayName("응답코드가 없는 실패(연결 실패 등)도 NONPAID로 되돌린다")
+        void execute_failureWithoutCode_shouldRestoreNonpaid() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferFailException("SSAFY 이체 API 연결 실패: Connection refused"));
 
             assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ)).isInstanceOf(TransferFailException.class);
 
-            assertThat(savedAttempt.getStatus()).isEqualTo(TransferAttempt.Status.FAILED);
-            assertThat(savedAttempt.getResponseCode()).isNull();
+            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
         }
 
         @Test
-        @DisplayName("확정 실패에서도 락은 해제된다")
-        void execute_rejection_shouldStillReleaseLock() {
+        @DisplayName("복귀는 별도의 짧은 트랜잭션으로 커밋된다")
+        void execute_rejection_shouldReleaseInOwnTransaction() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferFailException("SSAFY_TRANSFER_FAILED|A1014|잔액 부족"));
 
             assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ)).isInstanceOf(TransferFailException.class);
 
-            assertThat(events).containsExactly("BEGIN", "COMMIT", "API", "BEGIN", "COMMIT", "RELEASE");
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API", "BEGIN", "COMMIT");
         }
     }
 
@@ -541,8 +511,8 @@ class AutoTransferServiceTest {
     class CompletionFailureTests {
 
         @Test
-        @DisplayName("이체는 성공했는데 반영 트랜잭션이 실패하면 → 롤백되고 락은 해제된다")
-        void execute_completionFailure_shouldRollbackAndReleaseLock() {
+        @DisplayName("이체는 성공했는데 반영 트랜잭션이 실패하면 → Tx2만 롤백된다")
+        void execute_completionFailure_shouldRollbackOnlySecondTransaction() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             newSchedule(2, "500000");
             givenReadyToTransfer(schedule, "500000");
@@ -553,51 +523,79 @@ class AutoTransferServiceTest {
             assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ))
                     .isInstanceOf(IllegalStateException.class);
 
-            // Tx1 은 이미 커밋되어 있다. Tx2 만 롤백된다.
-            assertThat(events).containsExactly("BEGIN", "COMMIT", "API", "BEGIN", "ROLLBACK", "RELEASE");
+            // 선점(Tx1)은 이미 커밋되어 있어 회차는 REQUESTED로 남고, 정산이 바로잡는다.
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API", "BEGIN", "ROLLBACK");
+        }
+
+        @Test
+        @DisplayName("결과 반영 시점에 회차가 REQUESTED가 아니면 덮어쓰지 않는다")
+        void execute_scheduleNotRequestedAtCompletion_shouldNotOverwrite() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            givenApiSucceeds();
+            // 선점은 성공했다고 답하지만 상태는 바꾸지 않는다. 그 사이 다른 경로가 상태를 바꾼 상황이다.
+            // 이미 응답 로직이 걸린 스터빙이라 given(...) 형태로 덮으면 스터빙 중 그 로직이 실행된다.
+            willReturn(1).given(repaymentScheduleRepository).claimForTransfer(any(), anyString(), any());
+
+            assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
+            then(repaymentEventRepository).shouldHaveNoInteractions();
         }
     }
 
     // ──────────────────────────────────────────────
 
     @Nested
-    @DisplayName("진입 차단 — 게이트")
+    @DisplayName("진입 차단")
     class GateTests {
 
         @Test
-        @DisplayName("결과가 확정되지 않은 이전 시도가 있으면 → BLOCKED, API를 호출하지 않는다")
-        void execute_unresolvedAttempt_shouldBlockWithoutApiCall() {
+        @DisplayName("이전 이체의 결과가 확정되지 않은(REQUESTED) 회차면 → BLOCKED, 선점도 API도 없다")
+        void execute_requestedSchedule_shouldBlockWithoutApiCall() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            givenLockedAndFound(schedule);
-            given(transferAttemptRepository.existsByScheduleSeqAndStatus(
-                    SCHEDULE_SEQ, TransferAttempt.Status.REQUESTED)).willReturn(true);
+            ReflectionTestUtils.setField(schedule, "status", "REQUESTED");
+            givenFound(schedule);
 
             AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
 
             assertThat(result).isEqualTo(AutoTransferService.Result.BLOCKED);
             then(ssafyTransferApiClient).shouldHaveNoInteractions();
-            then(transferAttemptRepository).should(never()).save(any());
-            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
+            then(repaymentScheduleRepository).should(never()).claimForTransfer(any(), anyString(), any());
         }
 
         @Test
-        @DisplayName("이미 납부된 회차면 → SKIPPED, 시도도 이체도 없다")
+        @DisplayName("조회와 선점 사이에 다른 요청이 먼저 선점하면 → BLOCKED, API를 호출하지 않는다")
+        void execute_claimLost_shouldBlockWithoutApiCall() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            // 이미 응답 로직이 걸린 스터빙이라 given(...) 형태로 덮으면 스터빙 중 그 로직이 실행된다.
+            willReturn(0).given(repaymentScheduleRepository).claimForTransfer(any(), anyString(), any());
+
+            AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
+
+            assertThat(result).isEqualTo(AutoTransferService.Result.BLOCKED);
+            then(ssafyTransferApiClient).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("이미 납부된 회차면 → SKIPPED, 선점도 이체도 없다")
         void execute_alreadyPaid_shouldSkip() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             schedule.markPaid(LocalDateTime.now());
-            givenLockedAndFound(schedule);
+            givenFound(schedule);
 
             AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
 
             assertThat(result).isEqualTo(AutoTransferService.Result.SKIPPED);
             then(ssafyTransferApiClient).shouldHaveNoInteractions();
-            then(transferAttemptRepository).should(never()).save(any());
+            then(repaymentScheduleRepository).should(never()).claimForTransfer(any(), anyString(), any());
         }
 
         @Test
         @DisplayName("회차를 찾을 수 없으면 → SKIPPED")
         void execute_scheduleNotFound_shouldSkip() {
-            given(guard.tryAcquire(SCHEDULE_SEQ)).willReturn(LOCK_TOKEN);
             given(repaymentScheduleRepository.findByScheduleSeqWithContractUsers(SCHEDULE_SEQ))
                     .willReturn(Optional.empty());
 
@@ -606,79 +604,18 @@ class AutoTransferServiceTest {
         }
 
         @Test
-        @DisplayName("자동이체 등록이 없으면 → SKIPPED, 시도를 남기지 않는다")
-        void execute_noRegistration_shouldSkipWithoutAttempt() {
+        @DisplayName("자동이체 등록이 없으면 → SKIPPED, 선점하지 않는다")
+        void execute_noRegistration_shouldSkipWithoutClaim() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            givenLockedAndFound(schedule);
+            givenFound(schedule);
             given(registrationRepository.findActiveWithAccounts(CONTRACT_SEQ)).willReturn(Optional.empty());
 
             AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
 
             assertThat(result).isEqualTo(AutoTransferService.Result.SKIPPED);
-            then(transferAttemptRepository).should(never()).save(any());
+            then(repaymentScheduleRepository).should(never()).claimForTransfer(any(), anyString(), any());
             then(ssafyTransferApiClient).shouldHaveNoInteractions();
-        }
-
-        @Test
-        @DisplayName("유니크 제약이 동시 선점을 막으면 → BLOCKED, API를 호출하지 않는다")
-        void execute_uniqueViolation_shouldBlockWithoutApiCall() {
-            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            givenReadyToTransfer(schedule, "500000");
-            // 이미 응답 로직이 걸린 스터빙이라 given(...) 형태로 덮으면 스터빙 중 그 로직이 실행된다.
-            org.mockito.BDDMockito.willThrow(new DataIntegrityViolationException("uk_transfer_attempt_schedule_no"))
-                    .given(transferAttemptRepository).save(any(TransferAttempt.class));
-
-            AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
-
-            assertThat(result).isEqualTo(AutoTransferService.Result.BLOCKED);
-            then(ssafyTransferApiClient).shouldHaveNoInteractions();
-            assertThat(events).containsExactly("BEGIN", "ROLLBACK", "RELEASE");
-        }
-    }
-
-    // ──────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("분산락")
-    class LockTests {
-
-        @Test
-        @DisplayName("이미 다른 요청이 처리 중이면 → 아무것도 하지 않고 SKIPPED")
-        void execute_lockNotAcquired_shouldSkipWithoutSideEffect() {
-            given(guard.tryAcquire(SCHEDULE_SEQ)).willReturn(null);
-
-            AutoTransferService.Result result = service.execute(SCHEDULE_SEQ);
-
-            assertThat(result).isEqualTo(AutoTransferService.Result.SKIPPED);
-            then(repaymentScheduleRepository).shouldHaveNoInteractions();
-            then(registrationRepository).shouldHaveNoInteractions();
-            then(transferAttemptRepository).shouldHaveNoInteractions();
-            then(ssafyTransferApiClient).shouldHaveNoInteractions();
-            then(repaymentEventRepository).shouldHaveNoInteractions();
-            then(notificationCommandService).shouldHaveNoInteractions();
-            assertThat(events).as("트랜잭션도 열지 않는다").isEmpty();
-        }
-
-        @Test
-        @DisplayName("락을 잡지 못했으면 해제도 하지 않는다 (남의 락을 지우면 안 됨)")
-        void execute_lockNotAcquired_shouldNotRelease() {
-            given(guard.tryAcquire(SCHEDULE_SEQ)).willReturn(null);
-
-            service.execute(SCHEDULE_SEQ);
-
-            then(guard).should(never()).release(any(), any());
-        }
-
-        @Test
-        @DisplayName("결과 불명이어도 락은 해제된다")
-        void execute_unknownOutcome_shouldStillReleaseLock() {
-            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
-            givenReadyToTransfer(schedule, "500000");
-            givenApiThrows(new TransferOutcomeUnknownException("timeout"));
-
-            service.execute(SCHEDULE_SEQ);
-
-            then(guard).should().release(SCHEDULE_SEQ, LOCK_TOKEN);
+            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
         }
     }
 }

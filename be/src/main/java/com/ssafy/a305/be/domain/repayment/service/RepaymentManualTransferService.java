@@ -6,10 +6,8 @@ import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentSchedulePaidResp
 import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentScheduleTransferResponseDto;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
-import com.ssafy.a305.be.domain.repayment.entity.TransferAttempt;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
-import com.ssafy.a305.be.domain.repayment.repository.TransferAttemptRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.TransferFailException;
 import com.ssafy.a305.be.global.exception.TransferOutcomeUnknownException;
@@ -38,16 +36,14 @@ public class RepaymentManualTransferService {
     private final AutoTransferRegistrationRepository autoTransferRegistrationRepository;
     private final SsafyTransferApiClient ssafyTransferApiClient;
     private final NotificationCommandService notificationCommandService;
-    private final RepaymentTransferRequestGuard repaymentTransferRequestGuard;
-    private final TransferAttemptRepository transferAttemptRepository;
     private final TransactionTemplate transactionTemplate;
 
     /**
      * 채무자가 회차를 직접 이체한다.
      *
-     * <p>자동이체와 같은 3단 구조다. 시도 기록(Tx1) → 은행 API(트랜잭션 밖) → 결과 반영(Tx2).
+     * <p>자동이체와 같은 3단 구조다. 회차 선점(Tx1) → 은행 API(트랜잭션 밖) → 결과 반영(Tx2).
      * 이 메서드에 {@code @Transactional}을 붙이지 않는다. 붙이면 API 호출이 트랜잭션 안으로 들어가
-     * 커넥션을 응답 대기만큼 점유하고, 롤백 시 시도 기록까지 사라진다.</p>
+     * 커넥션을 응답 대기만큼 점유하고, 롤백 시 선점 기록까지 사라진다.</p>
      *
      * @see AutoTransferService
      */
@@ -56,53 +52,43 @@ public class RepaymentManualTransferService {
             Integer scheduleSeq,
             Integer userSeq
     ) {
-        String lockToken = repaymentTransferRequestGuard.tryAcquire(scheduleSeq);
-        if (lockToken == null) {
-            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST, "이미 처리 중인 수동 이체 요청입니다. 잠시 후 다시 시도해주세요.");
+        // ── Tx1: 검증 + 선점 ──
+        ManualTransferPlan plan = transactionTemplate.execute(
+                status -> prepareManualTransfer(contractSeq, scheduleSeq, userSeq));
+
+        // ── 은행 API 호출: 트랜잭션 밖 ──
+        SsafyTransferResponse transferResponse;
+        try {
+            transferResponse = ssafyTransferApiClient.transfer(
+                    plan.withdrawalAccountNo(),
+                    plan.depositAccountNo(),
+                    plan.amount(),
+                    plan.memo(),
+                    plan.debtorUserKey()
+            );
+        } catch (TransferOutcomeUnknownException e) {
+            // 돈이 나갔을 수 있다. 회차를 REQUESTED로 남겨 재이체를 막고, 사용자에게는 확인 중임을 알린다.
+            log.error("[수동이체] 결과 불명 - scheduleSeq={}. 회차를 REQUESTED로 남긴다. 사유={}",
+                    scheduleSeq, e.getMessage());
+            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
+                    "이체 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
+        } catch (TransferFailException e) {
+            transactionTemplate.executeWithoutResult(status ->
+                    repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()));
+            throw e;
         }
 
+        // ── Tx2: 결과 반영 ──
         try {
-            // ── Tx1: 검증 + 시도 기록 ──
-            ManualTransferPlan plan = transactionTemplate.execute(
-                    status -> prepareManualTransfer(contractSeq, scheduleSeq, userSeq));
-
-            // ── 은행 API 호출: 트랜잭션 밖 ──
-            SsafyTransferResponse transferResponse;
-            try {
-                transferResponse = ssafyTransferApiClient.transfer(
-                        plan.withdrawalAccountNo(),
-                        plan.depositAccountNo(),
-                        plan.amount(),
-                        plan.memo(),
-                        plan.debtorUserKey()
-                );
-            } catch (TransferOutcomeUnknownException e) {
-                // 돈이 나갔을 수 있다. 시도를 REQUESTED로 남겨 재이체를 막고, 사용자에게는 확인 중임을 알린다.
-                log.error("[수동이체] 결과 불명 - scheduleSeq={}, attemptNo={}. 시도를 미해결로 남긴다. 사유={}",
-                        scheduleSeq, plan.attemptNo(), e.getMessage());
-                throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
-                        "이체 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
-            } catch (TransferFailException e) {
-                transactionTemplate.executeWithoutResult(status ->
-                        markAttemptFailed(plan.attemptSeq(), e.getResponseCode()));
-                throw e;
-            }
-
-            // ── Tx2: 결과 반영 ──
-            try {
-                return transactionTemplate.execute(status -> completeManualTransfer(plan, transferResponse));
-            } catch (RuntimeException e) {
-                log.error("[수동이체] 이체 성공 후 결과 반영 실패 - scheduleSeq={}, attemptNo={}. 수동 확인 필요",
-                        scheduleSeq, plan.attemptNo(), e);
-                throw e;
-            }
-        } finally {
-            // 모든 트랜잭션이 끝난 뒤에 푼다. 미확정 상태가 다른 요청에 노출되지 않는다.
-            repaymentTransferRequestGuard.release(scheduleSeq, lockToken);
+            return transactionTemplate.execute(status -> completeManualTransfer(plan, transferResponse));
+        } catch (RuntimeException e) {
+            log.error("[수동이체] 이체 성공 후 결과 반영 실패 - scheduleSeq={}. 정산 대상으로 남긴다.",
+                    scheduleSeq, e);
+            throw e;
         }
     }
 
-    /** Tx1. 검증을 통과하면 시도를 REQUESTED로 열어 커밋될 계획을 돌려준다. */
+    /** Tx1. 검증을 통과하면 회차를 REQUESTED로 선점해 커밋될 계획을 돌려준다. */
     private ManualTransferPlan prepareManualTransfer(Integer contractSeq, Integer scheduleSeq, Integer userSeq) {
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqAndContractSeqWithContractUsers(scheduleSeq, contractSeq)
@@ -114,17 +100,17 @@ public class RepaymentManualTransferService {
             throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "채무자만 수동 이체를 실행할 수 있습니다.");
         }
 
+        // 이전 이체의 결과가 확정되지 않았다면 다시 이체하면 안 된다. 이미 나갔을 수 있다.
+        if ("REQUESTED".equals(schedule.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
+                    "이전 이체의 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
+        }
+
         if (!TRANSFER_ALLOWED_STATUSES.contains(schedule.getStatus())) {
             throw new CustomBusinessException(
                     ErrorCode.INVALID_CONTRACT_STATUS,
                     "미납(NONPAID) 또는 연체(OVERDUE) 상태의 회차만 수동 이체를 실행할 수 있습니다."
             );
-        }
-
-        // 이전 시도의 결과가 확정되지 않았다면 다시 이체하면 안 된다. 이미 나갔을 수 있다.
-        if (transferAttemptRepository.existsByScheduleSeqAndStatus(scheduleSeq, TransferAttempt.Status.REQUESTED)) {
-            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
-                    "이전 이체의 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
         }
 
         BigDecimal amount = schedule.getTotalDue();
@@ -151,17 +137,18 @@ public class RepaymentManualTransferService {
             throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND, "수동 이체에 필요한 계좌 정보가 없습니다.");
         }
 
-        // 자동이체와 동일한 적요 형식을 쓴다. 정산은 두 경로를 구분하지 않고
-        // "이 회차의 이체가 나갔는가"만 판정하므로 형식이 갈라지면 안 된다.
-        int attemptNo = transferAttemptRepository.findLastAttemptNo(scheduleSeq) + 1;
-        String memo = RepaymentTransferMemo.of(schedule, attemptNo);
+        // 선점 UPDATE가 영속성 컨텍스트를 비우므로, 엔티티에서 읽을 값은 선점 전에 모두 꺼낸다.
+        // 적요는 자동이체와 같다. 정산은 두 경로를 구분하지 않고 "이 회차의 이체가 나갔는가"만 판정한다.
+        ManualTransferPlan plan = new ManualTransferPlan(
+                contractSeq, scheduleSeq, schedule.getStatus(),
+                withdrawalAccountNo, depositAccountNo, amount, schedule.transferMemo(), debtorUserKey);
 
-        TransferAttempt attempt = transferAttemptRepository.save(
-                TransferAttempt.open(scheduleSeq, attemptNo, amount, LocalDateTime.now()));
-
-        return new ManualTransferPlan(
-                attempt.getAttemptSeq(), contractSeq, scheduleSeq, attemptNo,
-                withdrawalAccountNo, depositAccountNo, amount, memo, debtorUserKey);
+        int claimed = repaymentScheduleRepository.claimForTransfer(
+                scheduleSeq, plan.previousStatus(), LocalDateTime.now());
+        if (claimed == 0) {
+            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST, "이미 처리 중인 이체 요청입니다. 잠시 후 다시 시도해주세요.");
+        }
+        return plan;
     }
 
     /** Tx2. 은행이 성공을 확인해 준 뒤에만 호출된다. */
@@ -171,14 +158,14 @@ public class RepaymentManualTransferService {
                 .findByScheduleSeqAndContractSeqWithContractUsers(plan.scheduleSeq(), plan.contractSeq())
                 .orElseThrow(() -> new IllegalStateException(
                         "이체 후 회차를 찾을 수 없습니다. scheduleSeq=" + plan.scheduleSeq()));
-        TransferAttempt attempt = transferAttemptRepository.findById(plan.attemptSeq())
-                .orElseThrow(() -> new IllegalStateException(
-                        "시도 기록을 찾을 수 없습니다. attemptSeq=" + plan.attemptSeq()));
+        if (!"REQUESTED".equals(schedule.getStatus())) {
+            throw new IllegalStateException(
+                    "이체 후 회차가 선점 상태가 아닙니다. scheduleSeq=%d, status=%s"
+                            .formatted(plan.scheduleSeq(), schedule.getStatus()));
+        }
         Contract contract = schedule.getContract();
 
-        LocalDateTime now = LocalDateTime.now();
-        attempt.markSucceeded(now);
-        schedule.markPaid(now);
+        schedule.markPaid(LocalDateTime.now());
         sendRepaymentNotificationsSafely(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 
@@ -193,18 +180,12 @@ public class RepaymentManualTransferService {
         );
     }
 
-    private void markAttemptFailed(Long attemptSeq, String responseCode) {
-        TransferAttempt attempt = transferAttemptRepository.findById(attemptSeq)
-                .orElseThrow(() -> new IllegalStateException("시도 기록을 찾을 수 없습니다. attemptSeq=" + attemptSeq));
-        attempt.markFailed(responseCode, LocalDateTime.now());
-    }
-
     /** 트랜잭션 밖에서 API를 호출하는 데 필요한 값만 담는다. 엔티티를 들고 나가지 않는다. */
     private record ManualTransferPlan(
-            Long attemptSeq,
             Integer contractSeq,
             Integer scheduleSeq,
-            int attemptNo,
+            /* 선점 직전 상태(NONPAID/OVERDUE). 확정 실패 시 이 상태로 되돌린다. */
+            String previousStatus,
             String withdrawalAccountNo,
             String depositAccountNo,
             BigDecimal amount,
