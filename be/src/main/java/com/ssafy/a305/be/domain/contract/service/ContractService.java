@@ -537,7 +537,7 @@ public class ContractService {
         }).collect(Collectors.toList());
     }
 
-    private void validateBusinessRules(ContractDraftRequestDto request) {
+    void validateBusinessRules(ContractDraftRequestDto request) {
         // 본인 거래 방지
         if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
@@ -562,7 +562,8 @@ public class ContractService {
             default -> 0; // LUMP_SUM 등
         };
 
-        if (intervalMonths > 0 && request.getTotalInstallments() < intervalMonths) {
+        // totalInstallments는 회차 수라 개월 수와 비교하지 않는다. 계약 기간이 한 주기 이상인지 본다.
+        if (intervalMonths > 0 && request.getStartDt().plusMonths(intervalMonths).isAfter(request.getEndDt())) {
             throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, 
                 String.format("선택하신 상환 방식(%s)은 최소 %d개월 이상의 기간이 필요합니다.", method, intervalMonths));
         }
@@ -572,7 +573,7 @@ public class ContractService {
         }
     }
     //(LUMP_SUM =일시상환/ MONTHLY =1달마다/ QUARTERLY=3개월마다 / SEMI_ANNUAL=6개월마다 / ANNUAL=1년마다)
-    private void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
+    void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
         String method = request.getRepaymentMethod();
         BigDecimal interestRating=request.getInterestRate();
         if ("LUMP_SUM".equals(method)&&interestRating.compareTo(BigDecimal.ZERO) != 0) {
@@ -636,22 +637,22 @@ public class ContractService {
                 default -> throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 상환 방식입니다.");
             };
 
-            int installments = request.getTotalInstallments();
-            int paymentCycles = installments / intervalMonths;
-            
+            // totalInstallments는 상환 회차 수다. (앱은 분기 12개월이면 4를 보낸다)
+            // 회차는 주기(intervalMonths)마다 1번이고, 회차 이자는 그 주기 동안의 이자다.
+            int paymentCycles = request.getTotalInstallments();
+
             // paymentCycles가 0일 경우(이미 validateBusinessRules에서 걸러지겠지만 방어적으로 처리)
             if (paymentCycles <= 0) paymentCycles = 1;
 
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(paymentCycles), 2, RoundingMode.DOWN);
-
-            // 단순 월 분할 이자 계산 가정
-            BigDecimal interestPerMth = calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),intervalMonths);
+            BigDecimal principalPerCycle = request.getPrincipalAmount().divide(new BigDecimal(paymentCycles), 2, RoundingMode.DOWN);
 
             BigDecimal remainingPrincipal = request.getPrincipalAmount();
 
-            for (int i = 1; i <= installments; i++) {
+            for (int cycle = 1; cycle <= paymentCycles; cycle++) {
+                boolean isLastCycle = (cycle == paymentCycles);
+
                 // 납부일자 계산 (repaymentDay 기반 엣지 케이스 처리)
-                LocalDate targetMonth = request.getStartDt().plusMonths((long) i * intervalMonths);
+                LocalDate targetMonth = request.getStartDt().plusMonths((long) cycle * intervalMonths);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
                 int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
 
@@ -659,28 +660,26 @@ public class ContractService {
                 if (dueDt.isAfter(request.getEndDt())) {
                     dueDt = request.getEndDt(); // 만기일 초과 금지
                 }
-                BigDecimal currentPrincipalDue = BigDecimal.ZERO;
-                if (i % intervalMonths == 0) {
-                    // 마지막 회차에는 자투리 방지를 위해 남은 원금을 다 털어냄
-                    currentPrincipalDue = (i == installments) ? remainingPrincipal : principalPerMth;
-                }
+
+                // 이자는 남은 원금 기준, 주기 개월치
+                BigDecimal currentInterestDue = calculateInterest(remainingPrincipal, request.getInterestRate(), intervalMonths);
+                // 마지막 회차에는 자투리 방지를 위해 남은 원금을 다 털어냄
+                BigDecimal currentPrincipalDue = isLastCycle ? remainingPrincipal : principalPerCycle;
                 remainingPrincipal = remainingPrincipal.subtract(currentPrincipalDue);
+
                 RepaymentSchedule schedule = RepaymentSchedule.builder()
                         .contract(contract)
-                        .installmentNo(i)
+                        .installmentNo(cycle)
                         .dueDt(dueDt)
                         .principalDue(currentPrincipalDue)
-                        .interestDue(interestPerMth)
-                        .totalDue(currentPrincipalDue.add(interestPerMth))
+                        .interestDue(currentInterestDue)
+                        .totalDue(currentPrincipalDue.add(currentInterestDue))
                         .remainingBalanceAfter(remainingPrincipal)
                         .status("NONPAID")
                         .createdDttm(LocalDateTime.now())
                         .build();
 
                 contract.addRepaymentSchedule(schedule);
-                if (i % intervalMonths == 0) {
-                    interestPerMth = calculateInterest(remainingPrincipal, request.getInterestRate(), intervalMonths);
-                }
             }
         }
     }
