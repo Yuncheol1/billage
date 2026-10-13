@@ -1,6 +1,7 @@
 package com.ssafy.a305.be.domain.repayment.service;
 
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
+import com.ssafy.a305.be.global.exception.TransferFailException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,7 +27,8 @@ import java.util.List;
  * 회차를 먼저 거래내역과 대조해 확정하고, 그 결과 미납으로 돌아온 회차는 바로 이어지는 이체
  * 단계의 대상이 됩니다. 순서가 반대면 미납으로 돌아온 회차가 다음 슬롯까지 기다려야 합니다.</p>
  *
- * <p>정산으로도 판단하지 못한 회차는 자동으로 풀리지 않으므로, 로그에서 따로 세어 눈에 띄게 남깁니다.</p>
+ * <p>정산으로도 판단하지 못한 회차는 자동으로 풀리지 않으므로, 로그에서 따로 세어 눈에 띄게 남기고
+ * {@link TransferMonitor}로 지표를 기록해 운영 알림을 보냅니다.</p>
  */
 @Slf4j
 @Component
@@ -40,6 +42,9 @@ public class AutoTransferScheduler {
 
     /** 결과 불명 회차 1건 정산. */
     private final TransferReconciliationService transferReconciliationService;
+
+    /** 처리 결과 지표와 운영 알림. */
+    private final TransferMonitor transferMonitor;
 
     /** 1차 이체 10시, 2·3차 재시도 14시·18시. 남은 NONPAID만 다시 대상이 된다. */
     @Scheduled(cron = "0 0 10,14,18 * * *")
@@ -59,32 +64,42 @@ public class AutoTransferScheduler {
         int skipped = 0;
         int blocked = 0;
         int unresolved = 0;
+        int rejected = 0;
         int failed = 0;
 
         for (Integer scheduleSeq : targets) {
             try {
                 // 한 건의 실패가 다음 건으로 번지지 않도록 여기서 잡는다.
-                switch (autoTransferService.execute(scheduleSeq)) {
+                AutoTransferService.Result result = autoTransferService.execute(scheduleSeq);
+                transferMonitor.recordTransfer(result);
+                switch (result) {
                     case SUCCEEDED -> succeeded++;
                     case SKIPPED -> skipped++;
                     case BLOCKED -> blocked++;
                     case UNRESOLVED -> unresolved++;
                 }
+            } catch (TransferFailException e) {
+                // 은행이 거절했음이 확실하다(잔액 부족 등). 회차는 미납으로 돌아가 다음 슬롯에서 재시도된다.
+                rejected++;
+                transferMonitor.recordTransferRejected();
+                log.warn("[자동이체] 은행 거절 - scheduleSeq={}, 사유={}", scheduleSeq, e.getMessage());
             } catch (Exception e) {
                 failed++;
+                transferMonitor.recordTransferError();
                 log.error("[자동이체] 처리 실패 - scheduleSeq={}, 사유={}",
                         scheduleSeq, e.getMessage(), e);
             }
         }
 
-        log.info("[자동이체] 완료 - date={}, 대상={}, 성공={}, 스킵={}, 실패={}, 소요={}ms",
-                today, targets.size(), succeeded, skipped, failed,
+        log.info("[자동이체] 완료 - date={}, 대상={}, 성공={}, 스킵={}, 거절={}, 실패={}, 소요={}ms",
+                today, targets.size(), succeeded, skipped, rejected, failed,
                 System.currentTimeMillis() - startedAt);
 
         if (blocked > 0 || unresolved > 0) {
             // 결과가 확정되지 않은 이체가 있다. 자동으로 풀리지 않으므로 확인이 필요하다.
             log.warn("[자동이체] 결과 미확정 - 이번 실행에서 결과 불명={}, 미해결로 진입 차단={}", unresolved, blocked);
         }
+        transferMonitor.alertIfTransferUnresolved(unresolved, blocked, failed);
     }
 
     /** REQUESTED로 남은 회차를 거래내역과 대조해 확정한다. 한 건의 실패가 다음 건으로 번지지 않게 건별로 잡는다. */
@@ -101,7 +116,9 @@ public class AutoTransferScheduler {
 
         for (Integer scheduleSeq : targets) {
             try {
-                switch (transferReconciliationService.reconcile(scheduleSeq)) {
+                TransferReconciliationService.Result result = transferReconciliationService.reconcile(scheduleSeq);
+                transferMonitor.recordReconciliation(result);
+                switch (result) {
                     case CONFIRMED_PAID -> confirmedPaid++;
                     case RELEASED -> released++;
                     case NEEDS_REVIEW -> needsReview++;
@@ -109,6 +126,7 @@ public class AutoTransferScheduler {
                 }
             } catch (Exception e) {
                 needsReview++;
+                transferMonitor.recordReconciliation(TransferReconciliationService.Result.NEEDS_REVIEW);
                 log.error("[정산] 처리 실패 - scheduleSeq={}, 사유={}", scheduleSeq, e.getMessage(), e);
             }
         }
@@ -118,5 +136,6 @@ public class AutoTransferScheduler {
         if (needsReview > 0) {
             log.warn("[정산] 자동으로 판단하지 못한 회차 {}건. 거래내역 수동 확인 필요.", needsReview);
         }
+        transferMonitor.alertIfReconciliationNeedsReview(needsReview);
     }
 }

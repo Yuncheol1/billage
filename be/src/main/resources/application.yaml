@@ -68,6 +68,17 @@ ai:
     api:
       key: ${AI_INTERNAL_API_KEY}
 
+# 운영 알림 웹훅(Slack·Mattermost Incoming Webhook). 비워 두면 로그만 남긴다.
+alert:
+  webhook-url: ${ALERT_WEBHOOK_URL:}
+
+# /actuator/** 는 SecurityConfig의 anyRequest().authenticated()에 걸려 인증이 필요하다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+
 logging:
   level:
     org.hibernate.SQL: INFO

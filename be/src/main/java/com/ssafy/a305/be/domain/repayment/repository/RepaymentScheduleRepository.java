@@ -154,4 +154,7 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             order by rs.scheduleSeq asc
             """)
     List<Integer> findStaleRequestedScheduleSeqs(@Param("requestedBefore") LocalDateTime requestedBefore);
+
+    /** 요청 시각이 기준 이전인데 아직 해당 상태로 남은 회차 수. 운영 지표용이다. */
+    long countByStatusAndTransferRequestedDttmLessThanEqual(String status, LocalDateTime requestedBefore);
 }
