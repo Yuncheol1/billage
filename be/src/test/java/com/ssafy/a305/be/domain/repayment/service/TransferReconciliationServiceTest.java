@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -322,6 +323,68 @@ class TransferReconciliationServiceTest {
             assertThat(TransferReconciliationService.restoreStatusOf(today.plusDays(3), today)).isEqualTo("NONPAID");
             assertThat(TransferReconciliationService.restoreStatusOf(today, today)).isEqualTo("NONPAID");
             assertThat(TransferReconciliationService.restoreStatusOf(today.minusDays(1), today)).isEqualTo("OVERDUE");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("운영자 확인")
+    class Review {
+
+        private final LocalDateTime now = REQUESTED_AT.plusHours(1);
+
+        @Test
+        @DisplayName("출금을 확인했으면 PAID로 확정하고, 근거를 상환 이벤트에 남긴다")
+        void withdrawn_shouldConfirmPaidWithNote() {
+            TransferReconciliationService.Result result =
+                    service.resolveByReview(SCHEDULE_SEQ, true, "거래내역 출금 1건 확인", now);
+
+            assertThat(result).isEqualTo(TransferReconciliationService.Result.CONFIRMED_PAID);
+            assertThat(schedule.getStatus()).isEqualTo("PAID");
+            ArgumentCaptor<RepaymentEvent> captor = ArgumentCaptor.forClass(RepaymentEvent.class);
+            then(repaymentEventRepository).should().save(captor.capture());
+            assertThat(captor.getValue().getNote()).isEqualTo("운영자 확인: 거래내역 출금 1건 확인");
+        }
+
+        @Test
+        @DisplayName("출금이 없었으면 이체 전 상태로 되돌려 다시 이체되게 한다")
+        void notWithdrawn_shouldRelease() {
+            TransferReconciliationService.Result result =
+                    service.resolveByReview(SCHEDULE_SEQ, false, "거래내역에 출금 없음", now);
+
+            assertThat(result).isEqualTo(TransferReconciliationService.Result.RELEASED);
+            assertThat(schedule.getStatus()).isEqualTo("NONPAID");
+            then(repaymentEventRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("그 사이 다른 경로가 확정한 회차는 건드리지 않는다")
+        void alreadyResolved_shouldSkip() {
+            ReflectionTestUtils.setField(schedule, "status", "PAID");
+
+            assertThat(service.resolveByReview(SCHEDULE_SEQ, false, "확인", now))
+                    .isEqualTo(TransferReconciliationService.Result.SKIPPED);
+            assertThat(schedule.getStatus()).isEqualTo("PAID");
+            then(repaymentScheduleRepository).should(never()).releaseTransferClaim(any(), anyString());
+        }
+
+        @Test
+        @DisplayName("요청한 지 10분이 지나지 않았으면 은행이 아직 처리 중일 수 있어 거절한다")
+        void tooRecent_shouldReject() {
+            LocalDateTime justAfter = REQUESTED_AT.plusMinutes(5);
+
+            assertThatThrownBy(() -> service.resolveByReview(SCHEDULE_SEQ, false, "출금 없음", justAfter))
+                    .isInstanceOf(CustomBusinessException.class);
+            assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
+        }
+
+        @Test
+        @DisplayName("확인 근거가 없으면 거절한다")
+        void blankNote_shouldReject() {
+            assertThatThrownBy(() -> service.resolveByReview(SCHEDULE_SEQ, true, " ", now))
+                    .isInstanceOf(CustomBusinessException.class);
+            assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
         }
     }
 }

@@ -155,6 +155,17 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             """)
     List<Integer> findStaleRequestedScheduleSeqs(@Param("requestedBefore") LocalDateTime requestedBefore);
 
+    /** 요청한 지 충분히 지났는데도 결과가 확정되지 않은 회차와 계약. 운영자 확인 목록용이다. */
+    @Query("""
+            select rs
+            from RepaymentSchedule rs
+            join fetch rs.contract c
+            where rs.status = 'REQUESTED'
+              and rs.transferRequestedDttm <= :requestedBefore
+            order by rs.transferRequestedDttm asc
+            """)
+    List<RepaymentSchedule> findStaleRequestedWithContract(@Param("requestedBefore") LocalDateTime requestedBefore);
+
     /** 요청 시각이 기준 이전인데 아직 해당 상태로 남은 회차 수. 운영 지표용이다. */
     long countByStatusAndTransferRequestedDttmLessThanEqual(String status, LocalDateTime requestedBefore);
 }

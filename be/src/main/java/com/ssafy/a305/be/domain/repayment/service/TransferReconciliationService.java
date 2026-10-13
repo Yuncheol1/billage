@@ -6,12 +6,15 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyDemandDepositTrans
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransactionHistoryListRecDto;
 import com.ssafy.a305.be.domain.contract.entity.Contract;
 import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
+import com.ssafy.a305.be.domain.repayment.dto.response.UnresolvedTransferResponseDto;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
+import com.ssafy.a305.be.global.exception.CustomBusinessException;
+import com.ssafy.a305.be.global.exception.dto.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -119,7 +122,7 @@ public class TransferReconciliationService {
 
         // ── 결과 반영 ──
         if (matched == 1) {
-            transactionTemplate.executeWithoutResult(status -> confirmPaid(scheduleSeq, plan.amount()));
+            transactionTemplate.executeWithoutResult(status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인"));
             log.info("[정산] scheduleSeq={} 출금 확인 → PAID", scheduleSeq);
             return Result.CONFIRMED_PAID;
         }
@@ -133,6 +136,69 @@ public class TransferReconciliationService {
         // 같은 회차의 출금이 여러 건이면 이미 이중 출금이 일어났을 수 있다. 자동으로 처리하지 않는다.
         log.error("[정산] scheduleSeq={} 일치하는 출금이 {}건. 이중 출금 여부 수동 확인 필요.", scheduleSeq, matched);
         return Result.NEEDS_REVIEW;
+    }
+
+    /**
+     * 정산이 판단하지 못한 회차 목록. 운영자가 거래내역을 직접 확인할 대상이다.
+     * 요청한 지 {@link #RECONCILE_AFTER} 이상 지난 REQUESTED만 담는다.
+     */
+    public List<UnresolvedTransferResponseDto> findUnresolved(LocalDateTime now) {
+        return transactionTemplate.execute(status -> repaymentScheduleRepository
+                .findStaleRequestedWithContract(now.minus(RECONCILE_AFTER))
+                .stream()
+                .map(schedule -> new UnresolvedTransferResponseDto(
+                        schedule.getScheduleSeq(),
+                        schedule.getContract().getContractSeq(),
+                        schedule.getContract().getContractId(),
+                        schedule.getInstallmentNo(),
+                        schedule.getTotalDue(),
+                        schedule.getDueDt(),
+                        schedule.getTransferRequestedDttm(),
+                        schedule.transferMemo()))
+                .toList());
+    }
+
+    /**
+     * 운영자가 거래내역을 확인한 결과로 회차를 확정한다.
+     *
+     * <p>자동 정산과 같은 규칙을 따른다. 출금이 있었으면 PAID로 확정하고, 없었으면 이체 전 상태로
+     * 되돌려 다시 이체되게 한다. REQUESTED가 아닌 회차는 그 사이 다른 경로가 확정한 것이므로
+     * 건드리지 않는다.</p>
+     *
+     * <p>요청한 지 {@link #RECONCILE_AFTER}가 지나지 않은 회차는 거절한다. 은행이 아직 처리 중이라
+     * 거래내역에 보이지 않을 수 있고, 이를 "출금 없음"으로 되돌리면 이중 출금이 된다.</p>
+     *
+     * @param withdrawn 거래내역에서 이 회차의 출금을 확인했는지
+     * @param note      확인 근거. 상환 이벤트와 로그에 남긴다.
+     */
+    public Result resolveByReview(Integer scheduleSeq, boolean withdrawn, String note, LocalDateTime now) {
+        if (note == null || note.isBlank()) {
+            throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "확인 근거(note)를 입력해야 합니다.");
+        }
+        return transactionTemplate.execute(status -> {
+            RepaymentSchedule schedule = repaymentScheduleRepository.findByScheduleSeqWithContractUsers(scheduleSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "회차를 찾을 수 없습니다."));
+            if (!"REQUESTED".equals(schedule.getStatus())) {
+                log.info("[정산 확인] scheduleSeq={} 이미 {} 상태라 건너뜀", scheduleSeq, schedule.getStatus());
+                return Result.SKIPPED;
+            }
+            LocalDateTime requestedAt = schedule.getTransferRequestedDttm();
+            if (requestedAt != null && requestedAt.isAfter(now.minus(RECONCILE_AFTER))) {
+                throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "이체 요청 후 %d분이 지나지 않아 은행이 아직 처리 중일 수 있습니다."
+                                .formatted(RECONCILE_AFTER.toMinutes()));
+            }
+
+            if (withdrawn) {
+                confirmPaid(scheduleSeq, schedule.getTotalDue(), "운영자 확인: " + note);
+                log.info("[정산 확인] scheduleSeq={} 출금 확인 → PAID. 근거={}", scheduleSeq, note);
+                return Result.CONFIRMED_PAID;
+            }
+            String restoreStatus = restoreStatusOf(schedule.getDueDt(), now.toLocalDate());
+            repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, restoreStatus);
+            log.info("[정산 확인] scheduleSeq={} 출금 없음 → {}. 근거={}", scheduleSeq, restoreStatus, note);
+            return Result.RELEASED;
+        });
     }
 
     private LookupPlan prepare(Integer scheduleSeq) {
@@ -193,7 +259,7 @@ public class TransferReconciliationService {
     }
 
     /** 출금이 확인된 회차를 PAID로 확정한다. 자동이체 성공과 같은 후처리를 한다. */
-    private void confirmPaid(Integer scheduleSeq, BigDecimal amount) {
+    private void confirmPaid(Integer scheduleSeq, BigDecimal amount, String note) {
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqWithContractUsers(scheduleSeq)
                 .orElseThrow(() -> new IllegalStateException("정산 중 회차를 찾을 수 없습니다. scheduleSeq=" + scheduleSeq));
@@ -214,7 +280,7 @@ public class TransferReconciliationService {
                 .reportedByUser(contract.getDebtor())
                 .confirmedByUser(contract.getCreditor())
                 .status("AUTO_CONFIRMED")
-                .note("이체 결과 정산 확인")
+                .note(note)
                 .requestedDttm(schedule.getTransferRequestedDttm())
                 .confirmedDttm(now)
                 .build();

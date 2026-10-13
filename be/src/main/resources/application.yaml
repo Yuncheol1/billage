@@ -72,6 +72,10 @@ ai:
 alert:
   webhook-url: ${ALERT_WEBHOOK_URL:}
 
+# 운영자 API(/api/v1/ops/**) 인증 키. 비워 두면 운영자 API는 모든 요청을 거절한다.
+ops:
+  api-key: ${OPS_API_KEY:}
+
 # /actuator/** 는 SecurityConfig의 anyRequest().authenticated()에 걸려 인증이 필요하다.
 management:
   endpoints:
