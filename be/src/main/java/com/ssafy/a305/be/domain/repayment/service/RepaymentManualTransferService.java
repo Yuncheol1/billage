@@ -217,7 +217,13 @@ public class RepaymentManualTransferService {
             );
         }
 
-        schedule.markManualPaid(LocalDateTime.now());
+        // 위 확인과 이 UPDATE 사이에 이체가 선점했을 수 있다. 조건부로 바꿔 선점된 회차를 덮어쓰지 않는다.
+        LocalDateTime paidAt = LocalDateTime.now();
+        if (repaymentScheduleRepository.markManualPaidIfUnpaid(scheduleSeq, paidAt) == 0) {
+            throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
+                    "이 회차의 상태가 방금 바뀌었습니다. 상환 내역을 다시 확인해주세요.");
+        }
+        schedule.markManualPaid(paidAt);
         sendRepaymentNotificationsSafely(schedule);
         closeContractIfAllSchedulesCompleted(contract);
 

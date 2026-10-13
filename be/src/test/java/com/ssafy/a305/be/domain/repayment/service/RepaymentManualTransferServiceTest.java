@@ -277,6 +277,28 @@ class RepaymentManualTransferServiceTest {
                     .as("이체가 나갔을 수 있는 회차를 현금 수령으로 처리하면 채무자가 두 번 낸 셈이 된다")
                     .isEqualTo("REQUESTED");
         }
+
+        @Test
+        @DisplayName("확인 직후 이체가 회차를 선점했으면 수동 완료 처리가 덮어쓰지 않는다")
+        void claimedRightAfterCheck_shouldNotOverwrite() {
+            givenFound();
+            given(repaymentScheduleRepository.markManualPaidIfUnpaid(eq(SCHEDULE_SEQ), any())).willReturn(0);
+
+            assertThatThrownBy(() -> service.markRepaymentScheduleManualPaid(CONTRACT_SEQ, SCHEDULE_SEQ, CREDITOR_SEQ))
+                    .isInstanceOf(CustomBusinessException.class)
+                    .satisfies(e -> assertErrorCode(e, ErrorCode.DUPLICATE_REQUEST));
+            then(notificationCommandService).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("미납 회차는 조건부 UPDATE를 통과해 MANUAL_PAID가 된다")
+        void unpaid_shouldBeMarkedManualPaid() {
+            givenFound();
+            given(repaymentScheduleRepository.markManualPaidIfUnpaid(eq(SCHEDULE_SEQ), any())).willReturn(1);
+
+            assertThat(service.markRepaymentScheduleManualPaid(CONTRACT_SEQ, SCHEDULE_SEQ, CREDITOR_SEQ).status())
+                    .isEqualTo("MANUAL_PAID");
+        }
     }
 
     // ──────────────────────────────────────────────

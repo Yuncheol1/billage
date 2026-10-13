@@ -155,6 +155,41 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             """)
     List<Integer> findStaleRequestedScheduleSeqs(@Param("requestedBefore") LocalDateTime requestedBefore);
 
+    /**
+     * 채권자의 수동 완료 처리. 미납·연체일 때만 MANUAL_PAID로 바꾼다.
+     *
+     * <p>읽고 확인한 뒤 엔티티를 바꾸면, 그 사이 이체가 회차를 REQUESTED로 선점해도 덮어쓴다.
+     * 그러면 이체로 나간 돈과 현금 수령이 둘 다 남아 채무자가 두 번 낸 셈이 된다.
+     * 조건부 UPDATE로 바꿔, 선점과 동시에 들어와도 한쪽만 통과하게 한다.</p>
+     *
+     * <p>성공하면 이 트랜잭션이 행 락을 쥐므로, 이후 같은 값으로 엔티티를 맞추는 것은 안전하다.
+     * 그래서 영속성 컨텍스트를 비우지 않는다.</p>
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update RepaymentSchedule rs
+            set rs.status = 'MANUAL_PAID',
+                rs.paidDttm = :paidAt
+            where rs.scheduleSeq = :scheduleSeq
+              and rs.status in ('NONPAID', 'OVERDUE')
+            """)
+    int markManualPaidIfUnpaid(@Param("scheduleSeq") Integer scheduleSeq, @Param("paidAt") LocalDateTime paidAt);
+
+    /**
+     * 연체 전환. NONPAID일 때만 OVERDUE로 바꾼다.
+     *
+     * <p>연체 스케줄러가 NONPAID로 읽은 뒤 그 사이 수동 이체가 REQUESTED로 선점하면, 엔티티 변경으로는
+     * REQUESTED를 OVERDUE로 덮어쓴다. 그러면 돈은 나갔는데 회차는 연체로 남고, 다시 이체할 수 있게 된다.</p>
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update RepaymentSchedule rs
+            set rs.status = 'OVERDUE'
+            where rs.scheduleSeq = :scheduleSeq
+              and rs.status = 'NONPAID'
+            """)
+    int markOverdueIfNonpaid(@Param("scheduleSeq") Integer scheduleSeq);
+
     /** 요청한 지 충분히 지났는데도 결과가 확정되지 않은 회차와 계약. 운영자 확인 목록용이다. */
     @Query("""
             select rs
