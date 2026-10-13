@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
@@ -117,6 +118,16 @@ class TransferReconciliationServiceTest {
                         .debtorAccount(BankAccount.builder().accountSeq(10).accountNo(DEBTOR_ACCOUNT_NO).build())
                         .creditorAccount(BankAccount.builder().accountSeq(20).accountNo("0098765432109876").build())
                         .amount(new BigDecimal("5000000")).transferDay(15).isActive(true).build()));
+        // 확정: REQUESTED일 때만 PAID로 바꾼다.
+        lenient().when(repaymentScheduleRepository.markPaidIfRequested(any(), any()))
+                .thenAnswer(inv -> {
+                    if (schedule == null || !"REQUESTED".equals(schedule.getStatus())) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(schedule, "status", "PAID");
+                    ReflectionTestUtils.setField(schedule, "paidDttm", inv.getArgument(1));
+                    return 1;
+                });
         // 복귀 UPDATE를 DB처럼 흉내 낸다.
         lenient().when(repaymentScheduleRepository.releaseTransferClaim(any(), anyString()))
                 .thenAnswer(inv -> {
@@ -148,6 +159,17 @@ class TransferReconciliationServiceTest {
     @Nested
     @DisplayName("판정 결과에 따른 처리")
     class Outcome {
+
+        @Test
+        @DisplayName("출금 1건이어도 이체 결과 반영이 먼저 확정했으면 → 이벤트를 다시 만들지 않는다")
+        void oneMatch_butConfirmedFirst_shouldSkip() {
+            givenHistory(row("BL12", "500000"));
+            willReturn(0).given(repaymentScheduleRepository).markPaidIfRequested(any(), any());
+
+            assertThat(service.reconcile(SCHEDULE_SEQ)).isEqualTo(TransferReconciliationService.Result.SKIPPED);
+            then(repaymentEventRepository).should(never()).save(any());
+            then(notificationCommandService).shouldHaveNoInteractions();
+        }
 
         @Test
         @DisplayName("일치하는 출금이 1건이면 → PAID로 확정하고 상환 이벤트를 남긴다")

@@ -100,6 +100,16 @@ class RepaymentManualTransferServiceTest {
                     ReflectionTestUtils.setField(schedule, "status", "REQUESTED");
                     return 1;
                 });
+        // 확정: REQUESTED일 때만 PAID로 바꾼다.
+        lenient().when(repaymentScheduleRepository.markPaidIfRequested(any(), any()))
+                .thenAnswer(inv -> {
+                    if (schedule == null || !"REQUESTED".equals(schedule.getStatus())) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(schedule, "status", "PAID");
+                    ReflectionTestUtils.setField(schedule, "paidDttm", inv.getArgument(1));
+                    return 1;
+                });
         lenient().when(repaymentScheduleRepository.releaseTransferClaim(any(), anyString()))
                 .thenAnswer(inv -> {
                     if (!"REQUESTED".equals(schedule.getStatus())) {
@@ -169,6 +179,22 @@ class RepaymentManualTransferServiceTest {
     @Nested
     @DisplayName("성공")
     class Success {
+
+        @Test
+        @DisplayName("결과 반영 전에 정산이 먼저 PAID로 확정했으면 → 알림 없이 PAID 응답만 돌려준다")
+        void transfer_reconciledFirst_shouldSkipSideEffects() {
+            givenFound();
+            givenRegistration();
+            given(ssafyTransferApiClient.transfer(anyString(), anyString(), any(), anyString(), anyString()))
+                    .willAnswer(inv -> {
+                        ReflectionTestUtils.setField(schedule, "status", "PAID");
+                        return new SsafyTransferResponse();
+                    });
+
+            assertThat(service.transferRepaymentSchedule(CONTRACT_SEQ, SCHEDULE_SEQ, DEBTOR_SEQ).status())
+                    .isEqualTo("PAID");
+            then(notificationCommandService).shouldHaveNoInteractions();
+        }
 
         @Test
         @DisplayName("채무자가 이체하면 → 회차 PAID, 응답에 계좌 정보")

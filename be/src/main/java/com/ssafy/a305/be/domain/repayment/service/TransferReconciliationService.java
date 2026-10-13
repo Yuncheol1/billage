@@ -122,7 +122,11 @@ public class TransferReconciliationService {
 
         // ── 결과 반영 ──
         if (matched == 1) {
-            transactionTemplate.executeWithoutResult(status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인"));
+            Boolean confirmed = transactionTemplate.execute(
+                    status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인"));
+            if (!Boolean.TRUE.equals(confirmed)) {
+                return Result.SKIPPED;
+            }
             log.info("[정산] scheduleSeq={} 출금 확인 → PAID", scheduleSeq);
             return Result.CONFIRMED_PAID;
         }
@@ -190,7 +194,9 @@ public class TransferReconciliationService {
             }
 
             if (withdrawn) {
-                confirmPaid(scheduleSeq, schedule.getTotalDue(), "운영자 확인: " + note);
+                if (!confirmPaid(scheduleSeq, schedule.getTotalDue(), "운영자 확인: " + note)) {
+                    return Result.SKIPPED;
+                }
                 log.info("[정산 확인] scheduleSeq={} 출금 확인 → PAID. 근거={}", scheduleSeq, note);
                 return Result.CONFIRMED_PAID;
             }
@@ -258,19 +264,22 @@ public class TransferReconciliationService {
         return dueDt != null && dueDt.isBefore(today) ? "OVERDUE" : "NONPAID";
     }
 
-    /** 출금이 확인된 회차를 PAID로 확정한다. 자동이체 성공과 같은 후처리를 한다. */
-    private void confirmPaid(Integer scheduleSeq, BigDecimal amount, String note) {
+    /**
+     * 출금이 확인된 회차를 PAID로 확정한다. 자동이체 성공과 같은 후처리를 한다.
+     *
+     * @return 이 호출이 확정했으면 true. 그 사이 다른 경로가 먼저 확정했으면 false이고 아무것도 하지 않는다.
+     */
+    private boolean confirmPaid(Integer scheduleSeq, BigDecimal amount, String note) {
+        // 확인과 변경을 한 번에 한다. 이체 결과 반영이 먼저 확정했다면 0건이 되어 이벤트·알림을 다시 만들지 않는다.
+        LocalDateTime now = LocalDateTime.now();
+        if (repaymentScheduleRepository.markPaidIfRequested(scheduleSeq, now) == 0) {
+            log.info("[정산] scheduleSeq={} 다른 경로가 먼저 확정해 건너뜀", scheduleSeq);
+            return false;
+        }
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqWithContractUsers(scheduleSeq)
                 .orElseThrow(() -> new IllegalStateException("정산 중 회차를 찾을 수 없습니다. scheduleSeq=" + scheduleSeq));
-        if (!"REQUESTED".equals(schedule.getStatus())) {
-            // 조회하는 사이 다른 경로가 확정했다. 덮어쓰지 않는다.
-            return;
-        }
         Contract contract = schedule.getContract();
-
-        LocalDateTime now = LocalDateTime.now();
-        schedule.markPaid(now);
 
         RepaymentEvent event = RepaymentEvent.builder()
                 .repaymentSchedule(schedule)
@@ -304,6 +313,7 @@ public class TransferReconciliationService {
                 log.error("[정산] 계약 종료 알림 전송 실패 - contractSeq={}", contract.getContractSeq(), e);
             }
         }
+        return true;
     }
 
     /** 트랜잭션 밖에서 거래내역을 조회하고 판정하는 데 필요한 값만 담는다. */

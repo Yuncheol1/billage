@@ -117,6 +117,16 @@ class AutoTransferServiceTest {
                     ReflectionTestUtils.setField(target, "transferRequestedDttm", inv.getArgument(2));
                     return 1;
                 });
+        // 확정: REQUESTED일 때만 PAID로 바꾼다.
+        lenient().when(repaymentScheduleRepository.markPaidIfRequested(any(), any()))
+                .thenAnswer(inv -> {
+                    if (target == null || !"REQUESTED".equals(target.getStatus())) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(target, "status", "PAID");
+                    ReflectionTestUtils.setField(target, "paidDttm", inv.getArgument(1));
+                    return 1;
+                });
         // 복귀: REQUESTED일 때만 되돌린다.
         lenient().when(repaymentScheduleRepository.releaseTransferClaim(any(), anyString()))
                 .thenAnswer(inv -> {
@@ -509,6 +519,24 @@ class AutoTransferServiceTest {
     @Nested
     @DisplayName("이체 성공 후 결과 반영 실패")
     class CompletionFailureTests {
+
+        @Test
+        @DisplayName("결과 반영 전에 정산이 먼저 PAID로 확정했으면 → 이벤트·알림 없이 조용히 끝난다")
+        void execute_reconciledFirst_shouldSkipQuietly() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            // 이체 API 응답을 기다리는 사이 정산이 같은 회차를 확정한 상황이다.
+            given(ssafyTransferApiClient.transfer(anyString(), anyString(), any(), anyString(), anyString()))
+                    .willAnswer(inv -> {
+                        ReflectionTestUtils.setField(schedule, "status", "PAID");
+                        return new SsafyTransferResponse();
+                    });
+
+            assertThat(service.execute(SCHEDULE_SEQ)).isEqualTo(AutoTransferService.Result.SUCCEEDED);
+
+            then(repaymentEventRepository).shouldHaveNoInteractions();
+            then(notificationCommandService).shouldHaveNoInteractions();
+        }
 
         @Test
         @DisplayName("이체는 성공했는데 반영 트랜잭션이 실패하면 → Tx2만 롤백된다")

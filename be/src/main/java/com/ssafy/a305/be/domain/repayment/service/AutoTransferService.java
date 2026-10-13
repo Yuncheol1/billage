@@ -172,19 +172,24 @@ public class AutoTransferService {
 
     /** Tx2. 은행이 성공을 확인해 준 뒤에만 호출된다. */
     private void complete(TransferPlan plan) {
+        // 확인과 변경을 한 번에 한다. 정산이 먼저 확정했다면 0건이 되어 이벤트·알림을 다시 만들지 않는다.
+        LocalDateTime now = LocalDateTime.now();
+        int updated = repaymentScheduleRepository.markPaidIfRequested(plan.scheduleSeq(), now);
+
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqWithContractUsers(plan.scheduleSeq())
                 .orElseThrow(() -> new IllegalStateException(
                         "이체 후 회차를 찾을 수 없습니다. scheduleSeq=" + plan.scheduleSeq()));
-        if (!"REQUESTED".equals(schedule.getStatus())) {
+        if (updated == 0) {
+            if ("PAID".equals(schedule.getStatus())) {
+                log.info("[자동이체] scheduleSeq={} 정산이 먼저 확정해 결과 반영을 건너뜀", plan.scheduleSeq());
+                return;
+            }
             throw new IllegalStateException(
                     "이체 후 회차가 선점 상태가 아닙니다. scheduleSeq=%d, status=%s"
                             .formatted(plan.scheduleSeq(), schedule.getStatus()));
         }
         Contract contract = schedule.getContract();
-
-        LocalDateTime now = LocalDateTime.now();
-        schedule.markPaid(now);
 
         // 상환 이벤트 기록 (evidenceGrade=GOLD, status=AUTO_CONFIRMED)
         RepaymentEvent event = RepaymentEvent.builder()

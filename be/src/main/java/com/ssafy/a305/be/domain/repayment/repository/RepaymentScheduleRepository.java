@@ -156,6 +156,25 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
     List<Integer> findStaleRequestedScheduleSeqs(@Param("requestedBefore") LocalDateTime requestedBefore);
 
     /**
+     * 이체 결과 확정. REQUESTED일 때만 PAID로 바꾼다.
+     *
+     * <p>이체 결과 반영과 정산은 서로 다른 경로로 같은 회차를 확정할 수 있다. 읽고 확인한 뒤 엔티티를 바꾸면
+     * 둘이 동시에 REQUESTED를 읽어 둘 다 확정하고, 상환 이벤트와 알림이 두 번 생긴다.
+     * 조건부 UPDATE로 확인과 변경을 한 번에 해 한쪽만 통과시킨다. 진 쪽은 0건을 받고 부수 효과 없이 끝난다.</p>
+     *
+     * <p>호출 뒤 회차를 다시 읽어 최신 상태로 후처리하도록 영속성 컨텍스트를 비운다.</p>
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update RepaymentSchedule rs
+            set rs.status = 'PAID',
+                rs.paidDttm = :paidAt
+            where rs.scheduleSeq = :scheduleSeq
+              and rs.status = 'REQUESTED'
+            """)
+    int markPaidIfRequested(@Param("scheduleSeq") Integer scheduleSeq, @Param("paidAt") LocalDateTime paidAt);
+
+    /**
      * 채권자의 수동 완료 처리. 미납·연체일 때만 MANUAL_PAID로 바꾼다.
      *
      * <p>읽고 확인한 뒤 엔티티를 바꾸면, 그 사이 이체가 회차를 REQUESTED로 선점해도 덮어쓴다.

@@ -154,20 +154,25 @@ public class RepaymentManualTransferService {
     /** Tx2. 은행이 성공을 확인해 준 뒤에만 호출된다. */
     private RepaymentScheduleTransferResponseDto completeManualTransfer(
             ManualTransferPlan plan, SsafyTransferResponse transferResponse) {
+        // 확인과 변경을 한 번에 한다. 정산이 먼저 확정했다면 0건이 된다.
+        int updated = repaymentScheduleRepository.markPaidIfRequested(plan.scheduleSeq(), LocalDateTime.now());
+
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqAndContractSeqWithContractUsers(plan.scheduleSeq(), plan.contractSeq())
                 .orElseThrow(() -> new IllegalStateException(
                         "이체 후 회차를 찾을 수 없습니다. scheduleSeq=" + plan.scheduleSeq()));
-        if (!"REQUESTED".equals(schedule.getStatus())) {
+        if (updated == 0 && !"PAID".equals(schedule.getStatus())) {
             throw new IllegalStateException(
                     "이체 후 회차가 선점 상태가 아닙니다. scheduleSeq=%d, status=%s"
                             .formatted(plan.scheduleSeq(), schedule.getStatus()));
         }
         Contract contract = schedule.getContract();
 
-        schedule.markPaid(LocalDateTime.now());
-        sendRepaymentNotificationsSafely(schedule);
-        closeContractIfAllSchedulesCompleted(contract);
+        // 정산이 먼저 확정했다면(updated == 0) 알림·계약 종료는 그쪽에서 이미 했다. 응답만 돌려준다.
+        if (updated == 1) {
+            sendRepaymentNotificationsSafely(schedule);
+            closeContractIfAllSchedulesCompleted(contract);
+        }
 
         return new RepaymentScheduleTransferResponseDto(
                 plan.contractSeq(),
