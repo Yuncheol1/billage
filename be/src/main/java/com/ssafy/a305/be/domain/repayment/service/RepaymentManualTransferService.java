@@ -6,6 +6,7 @@ import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentSchedulePaidResp
 import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentScheduleTransferResponseDto;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
@@ -37,6 +38,7 @@ public class RepaymentManualTransferService {
     private final SsafyTransferApiClient ssafyTransferApiClient;
     private final NotificationCommandService notificationCommandService;
     private final TransactionTemplate transactionTemplate;
+    private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     /**
      * 채무자가 회차를 직접 이체한다.
@@ -70,11 +72,16 @@ public class RepaymentManualTransferService {
             // 돈이 나갔을 수 있다. 회차를 REQUESTED로 남겨 재이체를 막고, 사용자에게는 확인 중임을 알린다.
             log.error("[수동이체] 결과 불명 - scheduleSeq={}. 회차를 REQUESTED로 남긴다. 사유={}",
                     scheduleSeq, e.getMessage());
+            recordOutcomeUnknownSafely(plan, e);
             throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
                     "이체 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
         } catch (TransferFailException e) {
-            transactionTemplate.executeWithoutResult(status ->
-                    repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()));
+            transactionTemplate.executeWithoutResult(status -> {
+                if (repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()) == 1) {
+                    historyRecorder.record(scheduleSeq, "REQUESTED", plan.previousStatus(),
+                            RepaymentScheduleChangeReason.TRANSFER_REJECTED, plan.userSeq(), e.getMessage());
+                }
+            });
             throw e;
         }
 
@@ -140,7 +147,7 @@ public class RepaymentManualTransferService {
         // 선점 UPDATE가 영속성 컨텍스트를 비우므로, 엔티티에서 읽을 값은 선점 전에 모두 꺼낸다.
         // 적요는 자동이체와 같다. 정산은 두 경로를 구분하지 않고 "이 회차의 이체가 나갔는가"만 판정한다.
         ManualTransferPlan plan = new ManualTransferPlan(
-                contractSeq, scheduleSeq, schedule.getStatus(),
+                contractSeq, scheduleSeq, userSeq, schedule.getStatus(),
                 withdrawalAccountNo, depositAccountNo, amount, schedule.transferMemo(), debtorUserKey);
 
         int claimed = repaymentScheduleRepository.claimForTransfer(
@@ -148,6 +155,8 @@ public class RepaymentManualTransferService {
         if (claimed == 0) {
             throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST, "이미 처리 중인 이체 요청입니다. 잠시 후 다시 시도해주세요.");
         }
+        historyRecorder.record(scheduleSeq, plan.previousStatus(), "REQUESTED",
+                RepaymentScheduleChangeReason.MANUAL_TRANSFER_REQUESTED, userSeq, null);
         return plan;
     }
 
@@ -170,6 +179,8 @@ public class RepaymentManualTransferService {
 
         // 정산이 먼저 확정했다면(updated == 0) 알림·계약 종료는 그쪽에서 이미 했다. 응답만 돌려준다.
         if (updated == 1) {
+            historyRecorder.record(plan.scheduleSeq(), "REQUESTED", "PAID",
+                    RepaymentScheduleChangeReason.TRANSFER_SUCCEEDED, plan.userSeq(), null);
             sendRepaymentNotificationsSafely(schedule);
             closeContractIfAllSchedulesCompleted(contract);
         }
@@ -189,6 +200,8 @@ public class RepaymentManualTransferService {
     private record ManualTransferPlan(
             Integer contractSeq,
             Integer scheduleSeq,
+            /* 이체를 요청한 채무자. 이력에 남긴다. */
+            Integer userSeq,
             /* 선점 직전 상태(NONPAID/OVERDUE). 확정 실패 시 이 상태로 되돌린다. */
             String previousStatus,
             String withdrawalAccountNo,
@@ -224,10 +237,13 @@ public class RepaymentManualTransferService {
 
         // 위 확인과 이 UPDATE 사이에 이체가 선점했을 수 있다. 조건부로 바꿔 선점된 회차를 덮어쓰지 않는다.
         LocalDateTime paidAt = LocalDateTime.now();
+        String previousStatus = schedule.getStatus();
         if (repaymentScheduleRepository.markManualPaidIfUnpaid(scheduleSeq, paidAt) == 0) {
             throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
                     "이 회차의 상태가 방금 바뀌었습니다. 상환 내역을 다시 확인해주세요.");
         }
+        historyRecorder.record(scheduleSeq, previousStatus, "MANUAL_PAID",
+                RepaymentScheduleChangeReason.CREDITOR_MARKED_PAID, userSeq, null);
         schedule.markManualPaid(paidAt);
         sendRepaymentNotificationsSafely(schedule);
         closeContractIfAllSchedulesCompleted(contract);
@@ -238,6 +254,17 @@ public class RepaymentManualTransferService {
                 contract.getContractId(),
                 schedule.getStatus()
         );
+    }
+
+    /** 결과 불명은 상태가 바뀌지 않아 따로 남긴다. 실패해도 회차는 REQUESTED로 남으므로 전파하지 않는다. */
+    private void recordOutcomeUnknownSafely(ManualTransferPlan plan, TransferOutcomeUnknownException e) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> historyRecorder.record(
+                    plan.scheduleSeq(), "REQUESTED", "REQUESTED",
+                    RepaymentScheduleChangeReason.TRANSFER_OUTCOME_UNKNOWN, plan.userSeq(), e.getMessage()));
+        } catch (RuntimeException recordFailure) {
+            log.error("[수동이체] 결과 불명 이력 기록 실패 - scheduleSeq={}", plan.scheduleSeq(), recordFailure);
+        }
     }
 
     private String extractTransactionDate(SsafyTransferResponse response) {

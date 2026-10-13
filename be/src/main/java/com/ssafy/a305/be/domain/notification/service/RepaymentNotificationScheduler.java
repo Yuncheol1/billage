@@ -1,7 +1,9 @@
 package com.ssafy.a305.be.domain.notification.service;
 
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
+import com.ssafy.a305.be.domain.repayment.service.RepaymentScheduleHistoryRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,6 +24,7 @@ public class RepaymentNotificationScheduler {
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final NotificationCommandService notificationCommandService;
+    private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     @Transactional
     @Scheduled(cron = "0 0 9 * * *")
@@ -62,6 +65,8 @@ public class RepaymentNotificationScheduler {
                     return;
                 }
                 schedule.markOverdue();
+                historyRecorder.record(schedule.getScheduleSeq(), "NONPAID", "OVERDUE",
+                        RepaymentScheduleChangeReason.OVERDUE, null, null);
             }
             notificationCommandService.sendOverdueNotifications(schedule, today);
         });

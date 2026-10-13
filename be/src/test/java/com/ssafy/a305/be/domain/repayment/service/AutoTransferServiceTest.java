@@ -6,6 +6,7 @@ import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
@@ -74,6 +75,7 @@ class AutoTransferServiceTest {
     private RecordingTransactionManager transactionManager;
     private List<String> events;
     private AutoTransferService service;
+    private RecordingHistoryRecorder historyRecorder;
 
     // ──── API 호출 시점에 관찰한 값 ────
     private boolean txActiveAtApiCall;
@@ -92,13 +94,15 @@ class AutoTransferServiceTest {
     void setUp() {
         transactionManager = new RecordingTransactionManager();
         events = transactionManager.events;
+        historyRecorder = new RecordingHistoryRecorder();
         service = new AutoTransferService(
                 repaymentScheduleRepository,
                 registrationRepository,
                 repaymentEventRepository,
                 notificationCommandService,
                 ssafyTransferApiClient,
-                new TransactionTemplate(transactionManager)
+                new TransactionTemplate(transactionManager),
+                historyRecorder
         );
 
         txActiveAtApiCall = true; // 호출이 일어나지 않았다면 값이 바뀌지 않아 눈에 띈다
@@ -453,15 +457,17 @@ class AutoTransferServiceTest {
         }
 
         @Test
-        @DisplayName("결과 불명이면 결과 반영 트랜잭션(Tx2)을 열지 않는다")
-        void execute_unknownOutcome_shouldNotOpenSecondTransaction() {
+        @DisplayName("결과 불명이면 결과 반영 없이, 이력만 짧은 트랜잭션으로 남긴다")
+        void execute_unknownOutcome_shouldOnlyRecordHistory() {
             RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
             givenReadyToTransfer(schedule, "500000");
             givenApiThrows(new TransferOutcomeUnknownException("timeout"));
 
             service.execute(SCHEDULE_SEQ);
 
-            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API");
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API", "BEGIN", "COMMIT");
+            then(repaymentScheduleRepository).should(never()).markPaidIfRequested(any(), any());
+            then(repaymentScheduleRepository).should(never()).releaseTransferClaim(any(), anyString());
         }
     }
 
@@ -644,6 +650,113 @@ class AutoTransferServiceTest {
             then(repaymentScheduleRepository).should(never()).claimForTransfer(any(), anyString(), any());
             then(ssafyTransferApiClient).shouldHaveNoInteractions();
             assertThat(schedule.getStatus()).isEqualTo("NONPAID");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("상태 변경 이력")
+    class HistoryTests {
+
+        @Test
+        @DisplayName("성공하면 → 선점과 확정이 각각 상태 변경과 같은 트랜잭션에서 남는다")
+        void execute_success_shouldRecordClaimAndSuccess() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            newSchedule(2, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            givenApiSucceeds();
+
+            service.execute(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).containsExactly(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "NONPAID", "REQUESTED",
+                            RepaymentScheduleChangeReason.AUTO_TRANSFER_REQUESTED, null, null, true),
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "PAID",
+                            RepaymentScheduleChangeReason.TRANSFER_SUCCEEDED, null, null, true));
+        }
+
+        @Test
+        @DisplayName("은행이 거절하면 → 되돌린 상태와 은행 응답을 남긴다")
+        void execute_rejection_shouldRecordRejectionWithResponse() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            givenApiThrows(new TransferFailException("SSAFY_TRANSFER_FAILED|A1014|잔액 부족"));
+
+            assertThatThrownBy(() -> service.execute(SCHEDULE_SEQ)).isInstanceOf(TransferFailException.class);
+
+            assertThat(historyRecorder.entries.get(1)).isEqualTo(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "NONPAID",
+                            RepaymentScheduleChangeReason.TRANSFER_REJECTED, null,
+                            "SSAFY_TRANSFER_FAILED|A1014|잔액 부족", true));
+        }
+
+        @Test
+        @DisplayName("결과를 모르면 → 상태는 그대로 두고 결과 불명 사실과 사유를 남긴다")
+        void execute_unknownOutcome_shouldRecordUnknown() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            givenApiThrows(new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|IO|Read timed out"));
+
+            service.execute(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries.get(1)).isEqualTo(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "REQUESTED",
+                            RepaymentScheduleChangeReason.TRANSFER_OUTCOME_UNKNOWN, null,
+                            "SSAFY_TRANSFER_UNKNOWN|IO|Read timed out", true));
+        }
+
+        @Test
+        @DisplayName("결과 불명 이력 기록이 실패해도 → 결과는 UNRESOLVED, 회차는 REQUESTED로 남는다")
+        void execute_unknownOutcomeHistoryFailure_shouldNotChangeResult() {
+            RecordingHistoryRecorder failingOnUnknown = new RecordingHistoryRecorder() {
+                @Override
+                public void record(Integer scheduleSeq, String fromStatus, String toStatus,
+                                   RepaymentScheduleChangeReason reason, Integer changedByUserSeq, String detail) {
+                    if (reason == RepaymentScheduleChangeReason.TRANSFER_OUTCOME_UNKNOWN) {
+                        throw new IllegalStateException("DB down");
+                    }
+                    super.record(scheduleSeq, fromStatus, toStatus, reason, changedByUserSeq, detail);
+                }
+            };
+            service = new AutoTransferService(repaymentScheduleRepository, registrationRepository,
+                    repaymentEventRepository, notificationCommandService, ssafyTransferApiClient,
+                    new TransactionTemplate(transactionManager), failingOnUnknown);
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            givenApiThrows(new TransferOutcomeUnknownException("timeout"));
+
+            assertThat(service.execute(SCHEDULE_SEQ)).isEqualTo(AutoTransferService.Result.UNRESOLVED);
+            assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
+        }
+
+        @Test
+        @DisplayName("다른 요청이 먼저 선점했으면 → 이력을 남기지 않는다 (그 요청이 남긴다)")
+        void execute_claimLost_shouldNotRecord() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            willReturn(0).given(repaymentScheduleRepository).claimForTransfer(any(), anyString(), any());
+
+            service.execute(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).isEmpty();
+        }
+
+        @Test
+        @DisplayName("정산이 먼저 확정했으면 → 확정 이력을 다시 남기지 않는다")
+        void execute_reconciledFirst_shouldNotRecordSuccess() {
+            RepaymentSchedule schedule = newSchedule(SCHEDULE_SEQ, "500000");
+            givenReadyToTransfer(schedule, "500000");
+            given(ssafyTransferApiClient.transfer(anyString(), anyString(), any(), anyString(), anyString()))
+                    .willAnswer(inv -> {
+                        ReflectionTestUtils.setField(schedule, "status", "PAID");
+                        return new SsafyTransferResponse();
+                    });
+
+            service.execute(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.reasons())
+                    .containsExactly(RepaymentScheduleChangeReason.AUTO_TRANSFER_REQUESTED);
         }
     }
 }

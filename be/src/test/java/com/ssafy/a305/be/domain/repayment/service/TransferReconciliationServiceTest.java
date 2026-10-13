@@ -9,6 +9,7 @@ import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
@@ -72,6 +73,7 @@ class TransferReconciliationServiceTest {
 
     private RecordingTransactionManager transactionManager;
     private TransferReconciliationService service;
+    private RecordingHistoryRecorder historyRecorder;
 
     private Contract contract;
     private RepaymentSchedule schedule;
@@ -79,13 +81,15 @@ class TransferReconciliationServiceTest {
     @BeforeEach
     void setUp() {
         transactionManager = new RecordingTransactionManager();
+        historyRecorder = new RecordingHistoryRecorder();
         service = new TransferReconciliationService(
                 repaymentScheduleRepository,
                 registrationRepository,
                 repaymentEventRepository,
                 notificationCommandService,
                 ssafyDemandDepositClient,
-                new TransactionTemplate(transactionManager)
+                new TransactionTemplate(transactionManager),
+                historyRecorder
         );
 
         User debtor = User.builder().userSeq(1).email("debtor@test.com")
@@ -407,6 +411,78 @@ class TransferReconciliationServiceTest {
             assertThatThrownBy(() -> service.resolveByReview(SCHEDULE_SEQ, true, " ", now))
                     .isInstanceOf(CustomBusinessException.class);
             assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("상태 변경 이력")
+    class History {
+
+        @Test
+        @DisplayName("정산이 출금을 찾으면 → 정산 확정으로 남긴다")
+        void reconcilePaid_shouldRecord() {
+            givenHistory(row("BL12", "500000"));
+
+            service.reconcile(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).containsExactly(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "PAID",
+                            RepaymentScheduleChangeReason.RECONCILED_PAID, null, "이체 결과 정산 확인", true));
+        }
+
+        @Test
+        @DisplayName("정산이 출금이 없다고 판정하면 → 되돌린 상태와 함께 남긴다")
+        void reconcileNotWithdrawn_shouldRecordRestoredStatus() {
+            ReflectionTestUtils.setField(schedule, "dueDt", LocalDate.now().minusDays(1));
+            givenHistory();
+
+            service.reconcile(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).containsExactly(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "OVERDUE",
+                            RepaymentScheduleChangeReason.RECONCILED_NOT_WITHDRAWN, null,
+                            "거래내역에 일치하는 출금 없음", true));
+        }
+
+        @Test
+        @DisplayName("판단하지 못하면 → 상태가 그대로라 이력을 남기지 않는다")
+        void needsReview_shouldNotRecord() {
+            givenHistory(row("BL12", "500000"), row("BL12", "500000"));
+
+            service.reconcile(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).isEmpty();
+        }
+
+        @Test
+        @DisplayName("이체 결과 반영이 먼저 확정했으면 → 이력을 다시 남기지 않는다")
+        void confirmedFirst_shouldNotRecord() {
+            givenHistory(row("BL12", "500000"));
+            willReturn(0).given(repaymentScheduleRepository).markPaidIfRequested(any(), any());
+
+            service.reconcile(SCHEDULE_SEQ);
+
+            assertThat(historyRecorder.entries).isEmpty();
+        }
+
+        @Test
+        @DisplayName("운영자가 확인하면 → 확인 근거를 이력에 남긴다")
+        void review_shouldRecordNote() {
+            LocalDateTime now = REQUESTED_AT.plusHours(1);
+
+            service.resolveByReview(SCHEDULE_SEQ, true, "거래내역 출금 1건 확인", now);
+            ReflectionTestUtils.setField(schedule, "status", "REQUESTED");
+            service.resolveByReview(SCHEDULE_SEQ, false, "거래내역에 출금 없음", now);
+
+            assertThat(historyRecorder.entries)
+                    .extracting(RecordingHistoryRecorder.Entry::reason, RecordingHistoryRecorder.Entry::detail)
+                    .containsExactly(
+                            org.assertj.core.groups.Tuple.tuple(
+                                    RepaymentScheduleChangeReason.REVIEWED_PAID, "운영자 확인: 거래내역 출금 1건 확인"),
+                            org.assertj.core.groups.Tuple.tuple(
+                                    RepaymentScheduleChangeReason.REVIEWED_NOT_WITHDRAWN, "운영자 확인: 거래내역에 출금 없음"));
         }
     }
 }

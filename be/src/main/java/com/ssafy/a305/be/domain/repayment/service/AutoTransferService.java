@@ -5,6 +5,7 @@ import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
@@ -66,6 +67,7 @@ public class AutoTransferService {
     private final NotificationCommandService notificationCommandService;
     private final SsafyTransferApiClient ssafyTransferApiClient;
     private final TransactionTemplate transactionTemplate;
+    private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     /**
      * 상환 회차 1건에 대해 자동이체를 실행한다.
@@ -93,11 +95,16 @@ public class AutoTransferService {
             // 돈이 나갔을 수 있다. 실패로 단정하지 않고 REQUESTED로 남겨 새 이체를 막는다.
             log.error("[자동이체] 결과 불명 - scheduleSeq={}. 회차를 REQUESTED로 남긴다. 사유={}",
                     scheduleSeq, e.getMessage());
+            recordOutcomeUnknownSafely(scheduleSeq, e);
             return Result.UNRESOLVED;
         } catch (TransferFailException e) {
             // 은행이 거절했음이 확실하다. 이체 전 상태로 되돌려 다음 슬롯의 재시도를 허용한다.
-            transactionTemplate.executeWithoutResult(status ->
-                    repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()));
+            transactionTemplate.executeWithoutResult(status -> {
+                if (repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()) == 1) {
+                    historyRecorder.record(scheduleSeq, "REQUESTED", plan.previousStatus(),
+                            RepaymentScheduleChangeReason.TRANSFER_REJECTED, null, e.getMessage());
+                }
+            });
             throw e;
         }
 
@@ -167,6 +174,8 @@ public class AutoTransferService {
             log.warn("[자동이체] scheduleSeq={} 다른 요청이 먼저 선점해 진입 차단.", scheduleSeq);
             return Prepared.skip(Result.BLOCKED);
         }
+        historyRecorder.record(scheduleSeq, plan.previousStatus(), "REQUESTED",
+                RepaymentScheduleChangeReason.AUTO_TRANSFER_REQUESTED, null, null);
         return Prepared.ready(plan);
     }
 
@@ -189,6 +198,8 @@ public class AutoTransferService {
                     "이체 후 회차가 선점 상태가 아닙니다. scheduleSeq=%d, status=%s"
                             .formatted(plan.scheduleSeq(), schedule.getStatus()));
         }
+        historyRecorder.record(plan.scheduleSeq(), "REQUESTED", "PAID",
+                RepaymentScheduleChangeReason.TRANSFER_SUCCEEDED, null, null);
         Contract contract = schedule.getContract();
 
         // 상환 이벤트 기록 (evidenceGrade=GOLD, status=AUTO_CONFIRMED)
@@ -215,6 +226,21 @@ public class AutoTransferService {
         if (allSchedulesCompleted) {
             contract.markClosed(now);
             sendContractClosedNotificationsSafely(contract);
+        }
+    }
+
+    /**
+     * 결과 불명은 상태가 바뀌지 않아 묶을 트랜잭션이 없으므로 따로 남긴다.
+     *
+     * <p>기록에 실패해도 회차는 REQUESTED로 남아 재이체가 막히고 정산이 확정하므로, 실패를 전파하지 않는다.</p>
+     */
+    private void recordOutcomeUnknownSafely(Integer scheduleSeq, TransferOutcomeUnknownException e) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> historyRecorder.record(
+                    scheduleSeq, "REQUESTED", "REQUESTED",
+                    RepaymentScheduleChangeReason.TRANSFER_OUTCOME_UNKNOWN, null, e.getMessage()));
+        } catch (RuntimeException recordFailure) {
+            log.error("[자동이체] 결과 불명 이력 기록 실패 - scheduleSeq={}", scheduleSeq, recordFailure);
         }
     }
 

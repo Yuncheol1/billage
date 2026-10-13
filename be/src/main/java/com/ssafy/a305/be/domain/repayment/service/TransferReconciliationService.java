@@ -10,6 +10,7 @@ import com.ssafy.a305.be.domain.repayment.dto.response.UnresolvedTransferRespons
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentEvent;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentEventRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
@@ -80,6 +81,7 @@ public class TransferReconciliationService {
     private final NotificationCommandService notificationCommandService;
     private final SsafyDemandDepositClient ssafyDemandDepositClient;
     private final TransactionTemplate transactionTemplate;
+    private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     /** 정산할 회차 목록. 요청한 지 {@link #RECONCILE_AFTER} 이상 지난 REQUESTED만 담는다. */
     public List<Integer> findTargets(LocalDateTime now) {
@@ -123,7 +125,8 @@ public class TransferReconciliationService {
         // ── 결과 반영 ──
         if (matched == 1) {
             Boolean confirmed = transactionTemplate.execute(
-                    status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인"));
+                    status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인",
+                            RepaymentScheduleChangeReason.RECONCILED_PAID));
             if (!Boolean.TRUE.equals(confirmed)) {
                 return Result.SKIPPED;
             }
@@ -133,7 +136,8 @@ public class TransferReconciliationService {
         if (matched == 0) {
             String restoreStatus = restoreStatusOf(plan.dueDt(), LocalDate.now());
             transactionTemplate.executeWithoutResult(status ->
-                    repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, restoreStatus));
+                    release(scheduleSeq, restoreStatus, RepaymentScheduleChangeReason.RECONCILED_NOT_WITHDRAWN,
+                            "거래내역에 일치하는 출금 없음"));
             log.info("[정산] scheduleSeq={} 출금 없음 → {}", scheduleSeq, restoreStatus);
             return Result.RELEASED;
         }
@@ -194,14 +198,16 @@ public class TransferReconciliationService {
             }
 
             if (withdrawn) {
-                if (!confirmPaid(scheduleSeq, schedule.getTotalDue(), "운영자 확인: " + note)) {
+                if (!confirmPaid(scheduleSeq, schedule.getTotalDue(), "운영자 확인: " + note,
+                        RepaymentScheduleChangeReason.REVIEWED_PAID)) {
                     return Result.SKIPPED;
                 }
                 log.info("[정산 확인] scheduleSeq={} 출금 확인 → PAID. 근거={}", scheduleSeq, note);
                 return Result.CONFIRMED_PAID;
             }
             String restoreStatus = restoreStatusOf(schedule.getDueDt(), now.toLocalDate());
-            repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, restoreStatus);
+            release(scheduleSeq, restoreStatus, RepaymentScheduleChangeReason.REVIEWED_NOT_WITHDRAWN,
+                    "운영자 확인: " + note);
             log.info("[정산 확인] scheduleSeq={} 출금 없음 → {}. 근거={}", scheduleSeq, restoreStatus, note);
             return Result.RELEASED;
         });
@@ -264,18 +270,27 @@ public class TransferReconciliationService {
         return dueDt != null && dueDt.isBefore(today) ? "OVERDUE" : "NONPAID";
     }
 
+    /** REQUESTED를 되돌리고, 실제로 되돌렸을 때만 이력을 남긴다. */
+    private void release(Integer scheduleSeq, String restoreStatus, RepaymentScheduleChangeReason reason, String detail) {
+        if (repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, restoreStatus) == 1) {
+            historyRecorder.record(scheduleSeq, "REQUESTED", restoreStatus, reason, null, detail);
+        }
+    }
+
     /**
      * 출금이 확인된 회차를 PAID로 확정한다. 자동이체 성공과 같은 후처리를 한다.
      *
      * @return 이 호출이 확정했으면 true. 그 사이 다른 경로가 먼저 확정했으면 false이고 아무것도 하지 않는다.
      */
-    private boolean confirmPaid(Integer scheduleSeq, BigDecimal amount, String note) {
+    private boolean confirmPaid(Integer scheduleSeq, BigDecimal amount, String note,
+                                RepaymentScheduleChangeReason reason) {
         // 확인과 변경을 한 번에 한다. 이체 결과 반영이 먼저 확정했다면 0건이 되어 이벤트·알림을 다시 만들지 않는다.
         LocalDateTime now = LocalDateTime.now();
         if (repaymentScheduleRepository.markPaidIfRequested(scheduleSeq, now) == 0) {
             log.info("[정산] scheduleSeq={} 다른 경로가 먼저 확정해 건너뜀", scheduleSeq);
             return false;
         }
+        historyRecorder.record(scheduleSeq, "REQUESTED", "PAID", reason, null, note);
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqWithContractUsers(scheduleSeq)
                 .orElseThrow(() -> new IllegalStateException("정산 중 회차를 찾을 수 없습니다. scheduleSeq=" + scheduleSeq));

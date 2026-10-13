@@ -6,6 +6,7 @@ import com.ssafy.a305.be.domain.notification.service.NotificationCommandService;
 import com.ssafy.a305.be.domain.repayment.dto.response.RepaymentScheduleTransferResponseDto;
 import com.ssafy.a305.be.domain.repayment.entity.AutoTransferRegistration;
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.AutoTransferRegistrationRepository;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
 import com.ssafy.a305.be.domain.user.entity.User;
@@ -69,6 +70,7 @@ class RepaymentManualTransferServiceTest {
     private RecordingTransactionManager transactionManager;
     private List<String> events;
     private RepaymentManualTransferService service;
+    private RecordingHistoryRecorder historyRecorder;
 
     private boolean txActiveAtApiCall;
 
@@ -80,12 +82,14 @@ class RepaymentManualTransferServiceTest {
     void setUp() {
         transactionManager = new RecordingTransactionManager();
         events = transactionManager.events;
+        historyRecorder = new RecordingHistoryRecorder();
         service = new RepaymentManualTransferService(
                 repaymentScheduleRepository,
                 registrationRepository,
                 ssafyTransferApiClient,
                 notificationCommandService,
-                new TransactionTemplate(transactionManager)
+                new TransactionTemplate(transactionManager),
+                historyRecorder
         );
 
         txActiveAtApiCall = true;
@@ -346,7 +350,9 @@ class RepaymentManualTransferServiceTest {
                     .satisfies(e -> assertErrorCode(e, ErrorCode.DUPLICATE_REQUEST));
 
             assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
-            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API");
+            // 마지막 트랜잭션은 결과 불명 이력만 남긴다. 결과 반영은 하지 않는다.
+            assertThat(events).containsExactly("BEGIN", "CLAIM", "COMMIT", "API", "BEGIN", "COMMIT");
+            then(repaymentScheduleRepository).should(never()).markPaidIfRequested(any(), any());
         }
 
         @Test
@@ -408,6 +414,89 @@ class RepaymentManualTransferServiceTest {
                     .isInstanceOf(CustomBusinessException.class);
 
             then(ssafyTransferApiClient).shouldHaveNoInteractions();
+        }
+    }
+
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("상태 변경 이력")
+    class History {
+
+        @Test
+        @DisplayName("채무자가 이체에 성공하면 → 선점과 확정이 요청한 채무자와 함께 남는다")
+        void transfer_success_shouldRecordWithDebtor() {
+            givenFound();
+            givenRegistration();
+            givenApiSucceeds();
+
+            service.transferRepaymentSchedule(CONTRACT_SEQ, SCHEDULE_SEQ, DEBTOR_SEQ);
+
+            assertThat(historyRecorder.entries).containsExactly(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "NONPAID", "REQUESTED",
+                            RepaymentScheduleChangeReason.MANUAL_TRANSFER_REQUESTED, DEBTOR_SEQ, null, true),
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "PAID",
+                            RepaymentScheduleChangeReason.TRANSFER_SUCCEEDED, DEBTOR_SEQ, null, true));
+        }
+
+        @Test
+        @DisplayName("연체 회차가 거절되면 → OVERDUE로 되돌린 사실과 은행 응답을 남긴다")
+        void transfer_rejectionOnOverdue_shouldRecordRestoredStatus() {
+            ReflectionTestUtils.setField(schedule, "status", "OVERDUE");
+            givenFound();
+            givenRegistration();
+            givenApiThrows(new TransferFailException("SSAFY_TRANSFER_FAILED|A1014|잔액 부족"));
+
+            assertThatThrownBy(() -> service.transferRepaymentSchedule(CONTRACT_SEQ, SCHEDULE_SEQ, DEBTOR_SEQ))
+                    .isInstanceOf(TransferFailException.class);
+
+            assertThat(historyRecorder.entries.get(1)).isEqualTo(
+                    new RecordingHistoryRecorder.Entry(SCHEDULE_SEQ, "REQUESTED", "OVERDUE",
+                            RepaymentScheduleChangeReason.TRANSFER_REJECTED, DEBTOR_SEQ,
+                            "SSAFY_TRANSFER_FAILED|A1014|잔액 부족", true));
+        }
+
+        @Test
+        @DisplayName("결과를 모르면 → 결과 불명 사실을 남긴다")
+        void transfer_unknownOutcome_shouldRecordUnknown() {
+            givenFound();
+            givenRegistration();
+            givenApiThrows(new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|IO|Read timed out"));
+
+            assertThatThrownBy(() -> service.transferRepaymentSchedule(CONTRACT_SEQ, SCHEDULE_SEQ, DEBTOR_SEQ))
+                    .isInstanceOf(CustomBusinessException.class);
+
+            assertThat(historyRecorder.reasons()).containsExactly(
+                    RepaymentScheduleChangeReason.MANUAL_TRANSFER_REQUESTED,
+                    RepaymentScheduleChangeReason.TRANSFER_OUTCOME_UNKNOWN);
+        }
+
+        @Test
+        @DisplayName("채권자가 수동 완료하면 → 이전 상태와 처리한 채권자를 남긴다")
+        void manualPaid_shouldRecordWithCreditor() {
+            ReflectionTestUtils.setField(schedule, "status", "OVERDUE");
+            givenFound();
+            given(repaymentScheduleRepository.markManualPaidIfUnpaid(eq(SCHEDULE_SEQ), any())).willReturn(1);
+
+            service.markRepaymentScheduleManualPaid(CONTRACT_SEQ, SCHEDULE_SEQ, CREDITOR_SEQ);
+
+            RecordingHistoryRecorder.Entry entry = historyRecorder.entries.get(0);
+            assertThat(entry.fromStatus()).isEqualTo("OVERDUE");
+            assertThat(entry.toStatus()).isEqualTo("MANUAL_PAID");
+            assertThat(entry.reason()).isEqualTo(RepaymentScheduleChangeReason.CREDITOR_MARKED_PAID);
+            assertThat(entry.changedByUserSeq()).isEqualTo(CREDITOR_SEQ);
+        }
+
+        @Test
+        @DisplayName("수동 완료가 조건부 UPDATE에서 지면 → 이력을 남기지 않는다")
+        void manualPaidLost_shouldNotRecord() {
+            givenFound();
+            given(repaymentScheduleRepository.markManualPaidIfUnpaid(eq(SCHEDULE_SEQ), any())).willReturn(0);
+
+            assertThatThrownBy(() -> service.markRepaymentScheduleManualPaid(CONTRACT_SEQ, SCHEDULE_SEQ, CREDITOR_SEQ))
+                    .isInstanceOf(CustomBusinessException.class);
+
+            assertThat(historyRecorder.entries).isEmpty();
         }
     }
 }

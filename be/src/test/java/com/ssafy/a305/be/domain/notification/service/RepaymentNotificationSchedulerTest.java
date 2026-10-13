@@ -1,7 +1,9 @@
 package com.ssafy.a305.be.domain.notification.service;
 
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
+import com.ssafy.a305.be.domain.repayment.service.RepaymentScheduleHistoryRecorder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,8 @@ class RepaymentNotificationSchedulerTest {
     private RepaymentScheduleRepository repaymentScheduleRepository;
     @Mock
     private NotificationCommandService notificationCommandService;
+    @Mock
+    private RepaymentScheduleHistoryRecorder historyRecorder;
 
     @InjectMocks
     private RepaymentNotificationScheduler scheduler;
@@ -48,6 +52,8 @@ class RepaymentNotificationSchedulerTest {
 
         assertThat(schedule.getStatus()).isEqualTo("OVERDUE");
         then(notificationCommandService).should().sendOverdueNotifications(any(), any(LocalDate.class));
+        then(historyRecorder).should().record(1, "NONPAID", "OVERDUE",
+                RepaymentScheduleChangeReason.OVERDUE, null, null);
     }
 
     @Test
@@ -64,6 +70,7 @@ class RepaymentNotificationSchedulerTest {
                 .as("엔티티를 바꾸면 커밋 시 REQUESTED를 덮어쓴다")
                 .isEqualTo("NONPAID");
         then(notificationCommandService).should(never()).sendOverdueNotifications(any(), any());
+        then(historyRecorder).shouldHaveNoInteractions();
     }
 
     private RepaymentSchedule schedule(int seq) {
