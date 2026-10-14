@@ -183,6 +183,11 @@ public class SsafyTransferApiClient {
             // 5xx, 응답 해석 실패 등. 요청이 은행에 도달했을 수 있다.
             log.error("[SSAFY 이체] 통신 오류 - 결과 불명. {}", e.getMessage());
             throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|HTTP|" + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            // HTTP가 아닌 응답을 받으면 상태코드를 읽다가 RestClientException이 아닌 예외가 난다.
+            // 요청을 보낸 뒤이므로 은행이 처리했을 수 있다. 모르는 것은 실패로 단정하지 않는다.
+            log.error("[SSAFY 이체] 예상하지 못한 오류 - 결과 불명. {}", e.toString());
+            throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|UNEXPECTED|" + e, e);
         }
     }
 
