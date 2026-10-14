@@ -18,18 +18,19 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransaction
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyUpdateDemandDepositAccountDepositResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
-import lombok.RequiredArgsConstructor;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 public class SsafyDemandDepositClient {
 
     private static final String CREATE_ACCOUNT_API_NAME = "createDemandDepositAccount";
@@ -39,9 +40,46 @@ public class SsafyDemandDepositClient {
     private static final String INQUIRE_TRANSACTION_HISTORY_API_NAME = "inquireTransactionHistory";
     private static final String UPDATE_ACCOUNT_DEPOSIT_API_NAME = "updateDemandDepositAccountDeposit";
 
-    private final RestClient.Builder restClientBuilder;
+    /** 연결 수립까지 기다리는 시간. 이체 클라이언트와 같다. */
+    private static final Duration INQUIRY_CONNECT_TIMEOUT = Duration.ofSeconds(3);
+
+    /**
+     * 조회 응답을 기다리는 시간.
+     *
+     * <p>조회는 은행 쪽 상태를 바꾸지 않으므로, 타임아웃이 나도 잃는 것은 "이번에 못 봤다"뿐이다.
+     * 정산은 조회에 실패하면 회차를 처리 중으로 둔 채 다음 실행에서 다시 보므로, 이체(10초)처럼
+     * 은행에 기회를 넉넉히 줄 이유가 없다. 반대로 정산은 자동이체와 같은 스케줄러 스레드에서
+     * 이체보다 먼저 돌기 때문에, 조회가 매달리는 만큼 그날의 자동이체가 밀린다.</p>
+     */
+    private static final Duration INQUIRY_READ_TIMEOUT = Duration.ofSeconds(5);
+
     private final SsafyApiProperties ssafyApiProperties;
     private final SsafyApiHeaderFactory ssafyApiHeaderFactory;
+
+    /**
+     * 계좌 생성·입금용. 은행 쪽 상태를 바꾸는 요청이라 타임아웃을 걸지 않는다. 응답 전에 끊으면
+     * 처리됐는지 모르는 상태가 되는데, 호출부가 그 경우를 다루지 않아 실패로 보고 다시 요청하게 된다.
+     */
+    private final RestClient restClient;
+
+    /** 계좌·거래내역 조회용. 상태를 바꾸지 않으므로 무한정 기다리지 않는다. */
+    private final RestClient inquiryRestClient;
+
+    public SsafyDemandDepositClient(
+            RestClient.Builder restClientBuilder,
+            SsafyApiProperties ssafyApiProperties,
+            SsafyApiHeaderFactory ssafyApiHeaderFactory
+    ) {
+        this.ssafyApiProperties = ssafyApiProperties;
+        this.ssafyApiHeaderFactory = ssafyApiHeaderFactory;
+        this.inquiryRestClient = restClientBuilder.clone()
+                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(
+                        ClientHttpRequestFactorySettings.defaults()
+                                .withConnectTimeout(INQUIRY_CONNECT_TIMEOUT)
+                                .withReadTimeout(INQUIRY_READ_TIMEOUT)))
+                .build();
+        this.restClient = restClientBuilder.build();
+    }
 
     public SsafyCreateDemandDepositAccountResponseDto.Rec createDemandDepositAccount(String userKey, String accountTypeUniqueNo) {
         SsafyCreateDemandDepositAccountRequestDto request = new SsafyCreateDemandDepositAccountRequestDto(
@@ -49,6 +87,7 @@ public class SsafyDemandDepositClient {
                 accountTypeUniqueNo
         );
         SsafyCreateDemandDepositAccountResponseDto response = post(
+                restClient,
                 request,
                 ssafyApiProperties.getCreateDemandDepositAccountPath(),
                 SsafyCreateDemandDepositAccountResponseDto.class,
@@ -66,6 +105,7 @@ public class SsafyDemandDepositClient {
                 ssafyApiHeaderFactory.create(INQUIRE_ACCOUNT_LIST_API_NAME, userKey)
         );
         SsafyInquireDemandDepositAccountListResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountListPath(),
                 SsafyInquireDemandDepositAccountListResponseDto.class,
@@ -81,6 +121,7 @@ public class SsafyDemandDepositClient {
                 accountNo
         );
         SsafyInquireDemandDepositAccountResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountPath(),
                 SsafyInquireDemandDepositAccountResponseDto.class,
@@ -113,6 +154,7 @@ public class SsafyDemandDepositClient {
                 orderByType
         );
         SsafyInquireTransactionHistoryListResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireTransactionHistoryListPath(),
                 SsafyInquireTransactionHistoryListResponseDto.class,
@@ -133,6 +175,7 @@ public class SsafyDemandDepositClient {
                 transactionUniqueNo
         );
         SsafyInquireTransactionHistoryResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireTransactionHistoryPath(),
                 SsafyInquireTransactionHistoryResponseDto.class,
@@ -158,6 +201,7 @@ public class SsafyDemandDepositClient {
                 transactionSummary
         );
         SsafyUpdateDemandDepositAccountDepositResponseDto response = post(
+                restClient,
                 request,
                 ssafyApiProperties.getUpdateDemandDepositAccountDepositPath(),
                 SsafyUpdateDemandDepositAccountDepositResponseDto.class,
@@ -171,6 +215,7 @@ public class SsafyDemandDepositClient {
     }
 
     private <T> T post(
+            RestClient client,
             Object requestBody,
             String path,
             Class<T> responseType,
@@ -180,7 +225,7 @@ public class SsafyDemandDepositClient {
         validateCommonConfiguration(path, pathPropertyKey);
 
         try {
-            T response = restClientBuilder.build()
+            T response = client
                     .post()
                     .uri(buildUrl(path))
                     .contentType(MediaType.APPLICATION_JSON)

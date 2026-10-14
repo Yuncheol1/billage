@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -43,6 +44,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.then;
@@ -293,6 +295,27 @@ class BankOutageScenarioTest {
         bankTransferSucceeds();
         assertThat(autoTransferService.execute(SCHEDULE_SEQ)).isEqualTo(AutoTransferService.Result.BLOCKED);
         assertThat(transferRequestsReceived()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("거래내역 조회가 응답하지 않으면 무한정 기다리지 않고 포기 → 처리 중으로 둔 채 사람에게 넘긴다")
+    void historyLookupHangs_shouldGiveUpAndKeepBlocking() {
+        bank.stubFor(post(TRANSFER_PATH).willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        assertThat(autoTransferService.execute(SCHEDULE_SEQ)).isEqualTo(AutoTransferService.Result.UNRESOLVED);
+
+        // 은행은 출금을 처리했지만 조회 응답이 조회 타임아웃(5초)보다 늦게 온다
+        bank.stubFor(post(HISTORY_PATH).willReturn(okJson(
+                "{\"Header\":{\"responseCode\":\"H0000\",\"responseMessage\":\"ok\"},"
+                        + "\"REC\":{\"totalCount\":\"1\",\"list\":[{\"transactionSummary\":\"BL1\","
+                        + "\"transactionBalance\":\"" + AMOUNT + "\"}]}}").withFixedDelay(8_000)));
+
+        // 조회가 매달리면 같은 스레드에서 뒤이어 돌 자동이체가 전부 밀린다. 타임아웃이 없으면 8초 뒤 응답을 받아 깨진다.
+        TransferReconciliationService.Result result = assertTimeoutPreemptively(Duration.ofSeconds(7),
+                () -> reconciliationService.reconcile(SCHEDULE_SEQ));
+
+        // 늦은 응답을 못 봤을 뿐이다. 출금이 없다고 단정해 되돌리지 않는다.
+        assertThat(result).isEqualTo(TransferReconciliationService.Result.NEEDS_REVIEW);
+        assertThat(schedule.getStatus()).isEqualTo("REQUESTED");
     }
 
     @Test
