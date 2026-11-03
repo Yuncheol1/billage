@@ -18,10 +18,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
 
 /**
- * 자동이체 스케줄러 테스트.
- *
- * <p>정산이 이체보다 먼저 돌아야, 정산으로 미납에 돌아온 회차가 같은 실행에서 다시 이체된다.
- * 또 한 건의 정산 실패가 이체 단계를 막지 않아야 한다.</p>
+ * 자동이체 스케줄러 테스트. 정산이 이체보다 먼저 도는지, 정산 실패가 이체를 막지 않는지 확인
  */
 @ExtendWith(MockitoExtension.class)
 class AutoTransferSchedulerTest {

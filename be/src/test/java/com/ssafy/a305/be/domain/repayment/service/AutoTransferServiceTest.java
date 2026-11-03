@@ -45,15 +45,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 /**
- * 자동이체 1건 처리 테스트.
- *
- * <p>{@link AutoTransferService}를 직접 생성해 <b>실제 운영 코드</b>를 호출하고, DB·외부 API만
- * Mockito로 격리한다. 트랜잭션 경계는 {@link RecordingTransactionManager}로 기록해,
- * "외부 호출이 트랜잭션 밖에서 일어나는가", "선점이 호출보다 먼저 커밋되는가" 같은
- * 구조 자체를 검증한다.</p>
- *
- * <p>조건부 UPDATE(선점·복귀)는 저장소 목이 DB처럼 동작하도록 흉내 낸다. 조회한 상태와 같을 때만
- * 픽스쳐 회차의 상태를 바꾸고 1을, 아니면 0을 돌려준다.</p>
+ * 자동이체 1건 처리 테스트
+ * DB·외부 API는 목으로 두고, 트랜잭션 경계는 RecordingTransactionManager로 기록한다.
  */
 @ExtendWith(MockitoExtension.class)
 class AutoTransferServiceTest {
@@ -162,10 +155,7 @@ class AutoTransferServiceTest {
 
     // ──── 픽스쳐 헬퍼 ────
 
-    /**
-     * 스케줄을 만들면서 계약의 스케줄 목록에도 등록한다. 완납 판단이 allMatch라
-     * 목록이 비어 있으면 계약이 종료 처리되므로 반드시 채워야 한다.
-     */
+    // 완납 판단이 allMatch라 목록이 비면 계약이 종료 처리된다. 계약 목록에도 등록한다.
     private RepaymentSchedule newSchedule(Integer scheduleSeq, String totalDue) {
         RepaymentSchedule schedule = RepaymentSchedule.builder()
                 .scheduleSeq(scheduleSeq)

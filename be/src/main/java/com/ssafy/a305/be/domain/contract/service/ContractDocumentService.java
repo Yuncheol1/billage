@@ -29,9 +29,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * 차용증 문서 생성 서비스.
- *
- * <p>계약 데이터를 기반으로 HTML 전문보기와 PDF 다운로드를 제공합니다.</p>
+ * 차용증 HTML 전문보기, PDF 생성
  */
 @Slf4j
 @Service
@@ -99,8 +97,6 @@ public class ContractDocumentService {
             throw new RuntimeException("PDF 생성 중 오류가 발생했습니다.", e);
         }
     }
-
-    // ──────────────── Private Helpers ────────────────
 
     /**
      * 계약을 조회하고 요청자가 당사자인지 권한 검증합니다.

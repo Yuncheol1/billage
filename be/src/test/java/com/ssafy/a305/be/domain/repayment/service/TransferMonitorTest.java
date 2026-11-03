@@ -21,10 +21,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 /**
- * 자동이체 운영 지표·알림 테스트.
- *
- * <p>결과별 건수가 지표로 쌓이고, 정산 대기 시간이 지난 REQUESTED 회차 수가 게이지로 보이며,
- * 사람이 봐야 할 건이 있을 때만 알림이 나가는지 고정한다.</p>
+ * 자동이체 지표·알림 테스트
  */
 @ExtendWith(MockitoExtension.class)
 class TransferMonitorTest {

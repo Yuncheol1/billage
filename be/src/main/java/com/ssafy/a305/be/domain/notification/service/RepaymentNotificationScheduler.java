@@ -59,7 +59,7 @@ public class RepaymentNotificationScheduler {
 
         schedules.forEach(schedule -> {
             if ("NONPAID".equals(schedule.getStatus())) {
-                // 조회 뒤 이체가 회차를 선점했을 수 있다. 조건부로 바꿔 진행 중인 이체 상태를 덮어쓰지 않는다.
+                // 조회 뒤 이체가 선점했을 수 있어 조건부로 바꾼다.
                 if (repaymentScheduleRepository.markOverdueIfNonpaid(schedule.getScheduleSeq()) == 0) {
                     log.info("[알림 스케줄러] scheduleSeq={} 조회 후 상태가 바뀌어 연체 처리하지 않음", schedule.getScheduleSeq());
                     return;

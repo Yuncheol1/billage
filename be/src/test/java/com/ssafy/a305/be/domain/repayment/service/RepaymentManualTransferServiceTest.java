@@ -44,11 +44,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 /**
- * 수동 이체 테스트.
- *
- * <p>자동이체와 같은 3단 구조를 따르는지, 그리고 <b>자동이체가 결과를 모른 채 남긴 회차를
- * 우회하지 못하는지</b>를 검증한다. 후자가 없으면 자동이체가 타임아웃으로 결과를 모르는 상태에서
- * 사용자가 수동 이체 버튼을 눌러 이중 출금이 될 수 있다.</p>
+ * 수동 이체 테스트. 결과 불명으로 남은 회차를 수동 이체가 우회하지 못하는지도 확인
  */
 @ExtendWith(MockitoExtension.class)
 class RepaymentManualTransferServiceTest {

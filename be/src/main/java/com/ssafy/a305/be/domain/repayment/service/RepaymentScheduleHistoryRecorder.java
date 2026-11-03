@@ -11,12 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 /**
- * 회차 상태 변경 이력을 남긴다.
- *
- * <p>트랜잭션을 직접 열지 않고 호출자의 트랜잭션에 참여한다. 상태를 바꾼 조건부 UPDATE가
- * 1건을 바꿨을 때만 부른다. 0건이면 다른 경로가 먼저 바꾼 것이고, 그 경로가 이력을 남긴다.</p>
- *
- * <p>회차·사용자는 프록시 참조로만 연결해 이력 한 줄을 남기려고 다시 조회하지 않는다.</p>
+ * 회차 상태 변경 이력. 호출자 트랜잭션에 참여하고, 조건부 UPDATE가 1건일 때만 호출한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -28,10 +23,7 @@ public class RepaymentScheduleHistoryRecorder {
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final UserRepository userRepository;
 
-    /**
-     * @param changedByUserSeq 바꾼 사용자. 스케줄러·정산·운영자 API면 null
-     * @param detail           은행 응답, 확인 근거 등. 길면 잘라서 남긴다
-     */
+    // changedByUserSeq: 스케줄러·정산·운영자 API면 null
     public void record(
             Integer scheduleSeq,
             String fromStatus,

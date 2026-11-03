@@ -22,10 +22,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 /**
- * 연체 전환 테스트.
- *
- * <p>연체 스케줄러가 NONPAID로 읽은 뒤 이체가 회차를 REQUESTED로 선점했다면, 연체로 덮어쓰면 안 된다.
- * 덮어쓰면 돈은 나갔는데 회차는 연체로 남고 다시 이체할 수 있게 된다.</p>
+ * 연체 전환 테스트. 이체 중(REQUESTED)인 회차를 연체로 덮어쓰지 않는지 확인
  */
 @ExtendWith(MockitoExtension.class)
 class RepaymentNotificationSchedulerTest {

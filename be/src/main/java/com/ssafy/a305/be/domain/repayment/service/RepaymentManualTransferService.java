@@ -41,24 +41,19 @@ public class RepaymentManualTransferService {
     private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     /**
-     * 채무자가 회차를 직접 이체한다.
-     *
-     * <p>자동이체와 같은 3단 구조다. 회차 선점(Tx1) → 은행 API(트랜잭션 밖) → 결과 반영(Tx2).
-     * 이 메서드에 {@code @Transactional}을 붙이지 않는다. 붙이면 API 호출이 트랜잭션 안으로 들어가
-     * 커넥션을 응답 대기만큼 점유하고, 롤백 시 선점 기록까지 사라진다.</p>
-     *
-     * @see AutoTransferService
+     * 채무자가 회차를 직접 이체한다. 자동이체와 같은 3단계 구조
+     * API 호출이 트랜잭션 안에 들어가지 않도록 @Transactional을 붙이지 않는다.
      */
     public RepaymentScheduleTransferResponseDto transferRepaymentSchedule(
             Integer contractSeq,
             Integer scheduleSeq,
             Integer userSeq
     ) {
-        // ── Tx1: 검증 + 선점 ──
+        // 1. 검증 + 선점 (Tx1)
         ManualTransferPlan plan = transactionTemplate.execute(
                 status -> prepareManualTransfer(contractSeq, scheduleSeq, userSeq));
 
-        // ── 은행 API 호출: 트랜잭션 밖 ──
+        // 2. 은행 API 호출 (트랜잭션 밖)
         SsafyTransferResponse transferResponse;
         try {
             transferResponse = ssafyTransferApiClient.transfer(
@@ -69,7 +64,7 @@ public class RepaymentManualTransferService {
                     plan.debtorUserKey()
             );
         } catch (TransferOutcomeUnknownException e) {
-            // 돈이 나갔을 수 있다. 회차를 REQUESTED로 남겨 재이체를 막고, 사용자에게는 확인 중임을 알린다.
+            // 돈이 나갔을 수 있다. REQUESTED로 남기고 사용자에게는 확인 중이라고 알린다.
             log.error("[수동이체] 결과 불명 - scheduleSeq={}. 회차를 REQUESTED로 남긴다. 사유={}",
                     scheduleSeq, e.getMessage());
             recordOutcomeUnknownSafely(plan, e);
@@ -85,7 +80,7 @@ public class RepaymentManualTransferService {
             throw e;
         }
 
-        // ── Tx2: 결과 반영 ──
+        // 3. 결과 반영 (Tx2)
         try {
             return transactionTemplate.execute(status -> completeManualTransfer(plan, transferResponse));
         } catch (RuntimeException e) {
@@ -95,7 +90,6 @@ public class RepaymentManualTransferService {
         }
     }
 
-    /** Tx1. 검증을 통과하면 회차를 REQUESTED로 선점해 커밋될 계획을 돌려준다. */
     private ManualTransferPlan prepareManualTransfer(Integer contractSeq, Integer scheduleSeq, Integer userSeq) {
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqAndContractSeqWithContractUsers(scheduleSeq, contractSeq)
@@ -107,7 +101,7 @@ public class RepaymentManualTransferService {
             throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "채무자만 수동 이체를 실행할 수 있습니다.");
         }
 
-        // 이전 이체의 결과가 확정되지 않았다면 다시 이체하면 안 된다. 이미 나갔을 수 있다.
+        // 이전 이체가 미확정이면 이미 나갔을 수 있다.
         if ("REQUESTED".equals(schedule.getStatus())) {
             throw new CustomBusinessException(ErrorCode.DUPLICATE_REQUEST,
                     "이전 이체의 결과를 확인하는 중입니다. 다시 이체하지 말고 잠시 후 상환 내역을 확인해주세요.");
@@ -144,8 +138,7 @@ public class RepaymentManualTransferService {
             throw new CustomBusinessException(ErrorCode.BANK_ACCOUNT_NOT_FOUND, "수동 이체에 필요한 계좌 정보가 없습니다.");
         }
 
-        // 선점 UPDATE가 영속성 컨텍스트를 비우므로, 엔티티에서 읽을 값은 선점 전에 모두 꺼낸다.
-        // 적요는 자동이체와 같다. 정산은 두 경로를 구분하지 않고 "이 회차의 이체가 나갔는가"만 판정한다.
+        // 선점 UPDATE가 영속성 컨텍스트를 비우므로 값은 미리 꺼내 둔다. 적요는 자동이체와 같다.
         ManualTransferPlan plan = new ManualTransferPlan(
                 contractSeq, scheduleSeq, userSeq, schedule.getStatus(),
                 withdrawalAccountNo, depositAccountNo, amount, schedule.transferMemo(), debtorUserKey);
@@ -160,10 +153,9 @@ public class RepaymentManualTransferService {
         return plan;
     }
 
-    /** Tx2. 은행이 성공을 확인해 준 뒤에만 호출된다. */
     private RepaymentScheduleTransferResponseDto completeManualTransfer(
             ManualTransferPlan plan, SsafyTransferResponse transferResponse) {
-        // 확인과 변경을 한 번에 한다. 정산이 먼저 확정했다면 0건이 된다.
+        // 정산이 먼저 확정했다면 0건
         int updated = repaymentScheduleRepository.markPaidIfRequested(plan.scheduleSeq(), LocalDateTime.now());
 
         RepaymentSchedule schedule = repaymentScheduleRepository
@@ -177,7 +169,7 @@ public class RepaymentManualTransferService {
         }
         Contract contract = schedule.getContract();
 
-        // 정산이 먼저 확정했다면(updated == 0) 알림·계약 종료는 그쪽에서 이미 했다. 응답만 돌려준다.
+        // 정산이 먼저 확정했으면 알림·계약 종료는 이미 처리됨
         if (updated == 1) {
             historyRecorder.record(plan.scheduleSeq(), "REQUESTED", "PAID",
                     RepaymentScheduleChangeReason.TRANSFER_SUCCEEDED, plan.userSeq(), null);
@@ -196,14 +188,11 @@ public class RepaymentManualTransferService {
         );
     }
 
-    /** 트랜잭션 밖에서 API를 호출하는 데 필요한 값만 담는다. 엔티티를 들고 나가지 않는다. */
     private record ManualTransferPlan(
             Integer contractSeq,
             Integer scheduleSeq,
-            /* 이체를 요청한 채무자. 이력에 남긴다. */
-            Integer userSeq,
-            /* 선점 직전 상태(NONPAID/OVERDUE). 확정 실패 시 이 상태로 되돌린다. */
-            String previousStatus,
+            Integer userSeq,       // 이력에 남길 채무자
+            String previousStatus, // 거절 시 되돌릴 상태
             String withdrawalAccountNo,
             String depositAccountNo,
             BigDecimal amount,
@@ -235,7 +224,7 @@ public class RepaymentManualTransferService {
             );
         }
 
-        // 위 확인과 이 UPDATE 사이에 이체가 선점했을 수 있다. 조건부로 바꿔 선점된 회차를 덮어쓰지 않는다.
+        // 확인 직후 이체가 선점했을 수 있어 조건부로 바꾼다.
         LocalDateTime paidAt = LocalDateTime.now();
         String previousStatus = schedule.getStatus();
         if (repaymentScheduleRepository.markManualPaidIfUnpaid(scheduleSeq, paidAt) == 0) {
@@ -256,7 +245,7 @@ public class RepaymentManualTransferService {
         );
     }
 
-    /** 결과 불명은 상태가 바뀌지 않아 따로 남긴다. 실패해도 회차는 REQUESTED로 남으므로 전파하지 않는다. */
+    // 이력 기록이 실패해도 회차는 REQUESTED로 남아 있으므로 예외를 넘기지 않는다.
     private void recordOutcomeUnknownSafely(ManualTransferPlan plan, TransferOutcomeUnknownException e) {
         try {
             transactionTemplate.executeWithoutResult(status -> historyRecorder.record(

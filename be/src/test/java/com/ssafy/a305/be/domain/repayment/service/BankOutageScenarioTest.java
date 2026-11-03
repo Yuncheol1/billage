@@ -52,14 +52,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 /**
- * 은행 장애 시나리오 테스트. 이체부터 정산까지 한 회차가 겪는 흐름을 처음부터 끝까지 따라간다.
- *
- * <p>은행만 가짜다. 이체 API와 거래내역 조회 API를 가짜 은행 서버(WireMock) 하나가 흉내 내고,
- * 우리 쪽은 {@link AutoTransferService}·{@link TransferReconciliationService}와 두 HTTP
- * 클라이언트를 <b>실제 운영 코드 그대로</b> 쓴다. DB는 저장소 목이 조건부 UPDATE를 흉내 낸다.</p>
- *
- * <p>확인하려는 것은 하나다. <b>은행이 무슨 장애를 내도 같은 회차에 출금이 두 번 나가지 않고,
- * 확신할 수 없는 경우에는 사람에게 넘긴다.</b></p>
+ * 은행 장애 시나리오 테스트 (이체 → 정산)
+ * 은행만 WireMock으로 대체하고 서비스와 HTTP 클라이언트는 실제 코드를 쓴다. DB는 목으로 조건부 UPDATE를 흉내 낸다.
  */
 @ExtendWith(MockitoExtension.class)
 class BankOutageScenarioTest {
@@ -148,7 +142,7 @@ class BankOutageScenarioTest {
                         .amount(new BigDecimal(AMOUNT)).transferDay(15).isActive(true).build()));
     }
 
-    /** 선점·확정·복귀 UPDATE를 "기대한 상태일 때만 바꾸고 바꾼 건수를 돌려주는" DB처럼 흉내 낸다. */
+    // 조건부 UPDATE처럼 기대한 상태일 때만 바꾸고 바꾼 건수를 돌려준다.
     private void givenDatabaseBehavesLikeConditionalUpdates() {
         lenient().when(repaymentScheduleRepository.claimForTransfer(any(), anyString(), any()))
                 .thenAnswer(inv -> {
@@ -188,7 +182,7 @@ class BankOutageScenarioTest {
         bank.stubFor(post(TRANSFER_PATH).willReturn(okJson(transferResponse("H0000"))));
     }
 
-    /** 채무자 계좌 거래내역. 각 원소는 {적요, 금액}이다. */
+    // 채무자 거래내역. {적요, 금액}
     private void bankHistoryShows(String[]... withdrawals) {
         StringBuilder list = new StringBuilder();
         for (int i = 0; i < withdrawals.length; i++) {

@@ -45,27 +45,11 @@ public class SsafyTransferApiClient {
     @Value("${ssafy.api.update-demand-deposit-account-transfer-path:}")
     private String transferPath;
 
-    /** 연결 수립까지 기다리는 시간. 연결 자체는 빠르므로 짧게 잡는다. */
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
-
-    /**
-     * 응답을 기다리는 시간.
-     *
-     * <p><b>정산이 회차를 건드리기까지의 대기 시간보다 반드시 짧아야 합니다.</b> 호출이 그보다
-     * 오래 매달리면, 아직 응답을 기다리는 이체를 정산이 "나가지 않았다"고 판정해 되돌릴 수
-     * 있습니다. 기본값인 무제한 대기로는 그 조건을 만족할 수 없습니다.</p>
-     *
-     * @see com.ssafy.a305.be.domain.repayment.service.TransferReconciliationService
-     */
+    // 정산 대기 시간(RECONCILE_AFTER)보다 짧아야 응답 대기 중인 이체를 정산이 되돌리지 않는다.
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 
-    /**
-     * 은행이 요청을 <b>처리하지 않고 거절했다</b>는 것이 확실한 응답코드.
-     *
-     * <p>의미가 문서화된 코드만 넣는다. 여기에 없는 코드는 "처리 중"이나 "이미 처리됨"일 수도
-     * 있으므로 실패로 단정하지 않고 결과 불명으로 다룬다. 모르는 것을 실패로 보고 재시도하면
-     * 이미 나간 이체가 한 번 더 나간다.</p>
-     */
+    // 은행이 처리하지 않았다고 확실한 코드만 넣는다. 나머지는 결과 불명으로 본다.
     private static final Set<String> DEFINITE_REJECTION_CODES = Set.of(
             "A1003",  // 계좌번호가 유효하지 않음
             "A1011",  // 거래 금액이 유효하지 않음
@@ -84,17 +68,9 @@ public class SsafyTransferApiClient {
     }
 
     /**
-     * 계좌 이체를 요청합니다.
-     *
-     * @param withdrawalAccountNo 출금계좌번호 (채무자)
-     * @param depositAccountNo    입금계좌번호 (채권자)
-     * @param amount              이체 금액
-     * @param memo                거래 요약 메모
-     * @param userKey             SSAFY 사용자 키
-     * @return 이체 응답
-     * @throws TransferOutcomeUnknownException 결과를 알 수 없을 때(타임아웃·본문 없음·미분류 응답코드).
-     *         돈이 나갔을 수 있으므로 호출자는 실패로 단정하면 안 된다.
-     * @throws TransferFailException 은행이 거절했거나 요청이 도달하지 못했음이 확실할 때
+     * 계좌 이체 요청
+     * TransferFailException: 은행이 거절했거나 요청이 닿지 않은 게 확실할 때
+     * TransferOutcomeUnknownException: 돈이 나갔는지 알 수 없을 때
      */
     public SsafyTransferResponse transfer(String withdrawalAccountNo,
                                           String depositAccountNo,
@@ -142,7 +118,6 @@ public class SsafyTransferApiClient {
             SsafyTransferResponse body = response.getBody();
 
             if (body == null || body.getHeader() == null) {
-                // 응답은 받았지만 결과를 읽을 수 없다. 처리됐는지 알 수 없다.
                 log.error("[SSAFY 이체] 응답 본문 없음 - 결과 불명");
                 throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|NO_BODY|응답 본문 없음");
             }
@@ -160,43 +135,37 @@ public class SsafyTransferApiClient {
                 throw new TransferFailException("SSAFY_TRANSFER_FAILED|" + responseCode + "|" + errorMsg);
             }
 
-            // 분류하지 못한 코드. 명세를 확인해 위 집합에 추가하기 전까지는 결과 불명으로 둔다.
+            // 모르는 코드는 결과 불명
             log.error("[SSAFY 이체] 미분류 응답코드 - code={}, 사유={}. 결과 불명으로 처리", responseCode, errorMsg);
             throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|" + responseCode + "|" + errorMsg);
 
         } catch (TransferFailException e) {
             throw e;
         } catch (HttpClientErrorException e) {
-            // 4xx — 요청이 받아들여지지 않았다. 처리되지 않은 것이 확실하다.
+            // 4xx: 요청이 받아들여지지 않음
             log.error("[SSAFY 이체] 요청 거부 - status={}", e.getStatusCode());
             throw new TransferFailException("SSAFY 이체 API 요청 거부: " + e.getStatusCode(), e);
         } catch (ResourceAccessException e) {
             if (isRequestNeverReachedBank(e)) {
-                // 연결 자체가 안 됐다. 요청이 도달하지 못했으므로 돈이 나갔을 수 없다.
+                // 요청이 은행에 닿지 않음
                 log.error("[SSAFY 이체] 연결 실패 - {}", e.getMessage());
                 throw new TransferFailException("SSAFY 이체 API 연결 실패: " + e.getMessage(), e);
             }
-            // 읽기 타임아웃 등. 은행이 요청을 받은 뒤일 수 있다.
+            // 응답 타임아웃 등: 은행이 받은 뒤일 수 있다
             log.error("[SSAFY 이체] 응답 대기 중 오류 - 결과 불명. {}", e.getMessage());
             throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|IO|" + e.getMessage(), e);
         } catch (RestClientException e) {
-            // 5xx, 응답 해석 실패 등. 요청이 은행에 도달했을 수 있다.
+            // 5xx, 응답 해석 실패
             log.error("[SSAFY 이체] 통신 오류 - 결과 불명. {}", e.getMessage());
             throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|HTTP|" + e.getMessage(), e);
         } catch (RuntimeException e) {
-            // HTTP가 아닌 응답을 받으면 상태코드를 읽다가 RestClientException이 아닌 예외가 난다.
-            // 요청을 보낸 뒤이므로 은행이 처리했을 수 있다. 모르는 것은 실패로 단정하지 않는다.
+            // HTTP가 아닌 응답을 받으면 RestClientException이 아닌 예외가 난다. 요청은 보낸 뒤다.
             log.error("[SSAFY 이체] 예상하지 못한 오류 - 결과 불명. {}", e.toString());
             throw new TransferOutcomeUnknownException("SSAFY_TRANSFER_UNKNOWN|UNEXPECTED|" + e, e);
         }
     }
 
-    /**
-     * 요청이 은행에 도달하지 못했음이 확실한 연결 실패인지.
-     *
-     * <p>연결 거부·호스트 미확인만 인정한다. 연결 타임아웃도 도달 전이지만 읽기 타임아웃과
-     * 예외 타입이 같아 구분이 취약하므로, 확신할 수 없는 쪽(결과 불명)으로 둔다.</p>
-     */
+    // 연결 거부, 호스트 없음만 인정한다. 연결 타임아웃은 응답 타임아웃과 구분이 어려워 제외.
     private boolean isRequestNeverReachedBank(ResourceAccessException e) {
         Throwable cause = e.getCause();
         return cause instanceof ConnectException || cause instanceof UnknownHostException;

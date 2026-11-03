@@ -23,9 +23,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 /**
- * 운영자 이체 확인 API의 인증 테스트.
- *
- * <p>회차를 PAID나 미납으로 바꿀 수 있는 API이므로, 키가 없거나 틀리면 서비스까지 가지 않아야 한다.</p>
+ * 운영자 이체 확인 API 인증 테스트
  */
 @ExtendWith(MockitoExtension.class)
 class TransferReviewControllerTest {

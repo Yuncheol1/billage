@@ -29,12 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
- * 실제 HTTP로 가짜 은행에 붙여 보는 이체 응답 분류 테스트.
- *
- * <p>{@link SsafyTransferApiClientTest}는 예외를 직접 던져 분류 규칙을 고정한다. 이 테스트는
- * 그 예외가 <b>실제 네트워크에서도 그 모양으로 오는지</b>를 확인한다. 설정한 읽기 타임아웃이
- * 정말 걸리는지, 연결 거부와 연결 끊김이 서로 다른 쪽으로 분류되는지, 은행에 실제로 무엇을
- * 보내는지는 진짜 소켓으로만 확인할 수 있다.</p>
+ * 가짜 은행 서버(WireMock)로 실제 HTTP 응답 분류를 확인하는 테스트
  */
 class SsafyTransferApiClientWireMockTest {
 

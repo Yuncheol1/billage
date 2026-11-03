@@ -20,13 +20,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 상환 스케줄 생성 테스트.
- *
- * <p>totalInstallments는 앱이 보내는 대로 <b>상환 회차 수</b>다. (분기 12개월이면 4)
- * 회차 수·납기·회차별 원금과 이자·원금 합계를 고정한다.
- * 분기·반기·연간 회차 이자는 그 주기 동안의 이자여야 한다.</p>
- *
- * <p>공통 조건: 원금 1,200,000원, 연 12%, 2026-01-10 시작, 매월 10일 상환.</p>
+ * 상환 스케줄 생성 테스트
+ * 공통 조건: 원금 1,200,000원, 연 12%, 2026-01-10 시작, 매월 10일 상환. totalInstallments는 회차 수
  */
 @ExtendWith(MockitoExtension.class)
 class ContractServiceRepaymentScheduleTest {

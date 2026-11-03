@@ -14,9 +14,7 @@ package com.ssafy.a305.be.domain.bank.dto.response;
  * @param transactionAccountNo  상대 계좌번호(SSAFY 제공, 없으면 빈 문자열)
  * @param transactionBalance    거래 금액(부호 제거한 절댓값 문자열)
  * @param transactionAfterBalance 이 거래 반영 후 잔액
- * @param transactionSummary    거래 적요·요약(SSAFY 문자열 그대로).
- *                              상환 이체는 회차 식별자 {@code BL{scheduleSeq}} 형식이다
- *                              (예: {@code BL12345}). 형식 정의는 {@code RepaymentSchedule#transferMemo} 참고.
+ * @param transactionSummary    거래 적요·요약(SSAFY 문자열 그대로). 상환 이체는 BL+회차번호
  * @param transactionMemo       거래 메모(SSAFY)
  * @param counterpartName       {@code transactionAccountNo}로 우리 DB에서 찾은 사용자 실명, 없으면 {@code null}
  */

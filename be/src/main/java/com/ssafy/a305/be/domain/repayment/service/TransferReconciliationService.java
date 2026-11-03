@@ -30,49 +30,24 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * 결과를 모른 채 REQUESTED로 남은 회차를 거래내역과 대조해 확정한다.
- *
- * <p>은행 응답을 받지 못한 이체는 돈이 나갔는지 우리 쪽에서 알 수 없다. 은행이 멱등성을
- * 보장하지 않으므로 다시 보내 볼 수도 없다. 남은 확인 수단은 채무자 계좌의 거래내역뿐이고,
- * 이체할 때 적요에 실어 보낸 회차 식별자({@link RepaymentSchedule#transferMemo()})로
- * 그 회차의 이체를 찾는다.</p>
- *
- * <ul>
- *   <li>일치하는 출금이 1건 → 돈이 나갔다. PAID로 확정한다.</li>
- *   <li>0건 → 나가지 않았다. 이체 전 상태로 되돌려 다음 이체가 다시 시도하게 한다.</li>
- *   <li>2건 이상, 조회 실패 → 판단할 수 없다. REQUESTED로 두고 사람이 확인한다.</li>
- * </ul>
- *
- * <p>거래내역 조회는 외부 호출이므로 트랜잭션 밖에서 하고, 상태 반영만 짧은 트랜잭션으로 묶는다.</p>
- *
- * @see AutoTransferScheduler
+ * 결과를 모르는 이체(REQUESTED)를 채무자 거래내역과 대조해 확정한다.
+ * 적요의 회차 표식과 금액이 맞는 출금이 1건이면 PAID, 0건이면 되돌림, 그 외는 수동 확인.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TransferReconciliationService {
 
-    /**
-     * 요청 후 이 시간이 지나야 정산 대상이 된다.
-     *
-     * <p>막 요청한 이체는 아직 은행이 처리 중이라 거래내역에 보이지 않을 수 있다. 이를 "나가지
-     * 않았다"로 판정해 되돌리면, 직후 이체가 완료되고 다음 이체가 또 나가 이중 출금이 된다.
-     * 이체 API의 응답 대기 시간보다 충분히 길어야 한다.</p>
-     */
+    // 막 보낸 이체는 거래내역에 아직 안 보일 수 있다. 이체 응답 대기(10초)보다 충분히 길게 둔다.
     public static final Duration RECONCILE_AFTER = Duration.ofMinutes(10);
 
     private static final DateTimeFormatter SSAFY_DATE = DateTimeFormatter.BASIC_ISO_DATE;
 
-    /** 처리 1건의 결과. */
     public enum Result {
-        /** 일치하는 출금을 찾아 PAID로 확정했다. */
         CONFIRMED_PAID,
-        /** 출금이 없어 이체 전 상태로 되돌렸다. */
         RELEASED,
-        /** 자동으로 판단할 수 없어 REQUESTED로 남겼다. 사람이 확인해야 한다. */
-        NEEDS_REVIEW,
-        /** 그 사이 상태가 바뀌어 정산할 필요가 없다. */
-        SKIPPED
+        NEEDS_REVIEW, // REQUESTED 유지, 사람이 확인
+        SKIPPED       // 그 사이 다른 경로가 상태를 바꿈
     }
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
@@ -83,14 +58,11 @@ public class TransferReconciliationService {
     private final TransactionTemplate transactionTemplate;
     private final RepaymentScheduleHistoryRecorder historyRecorder;
 
-    /** 정산할 회차 목록. 요청한 지 {@link #RECONCILE_AFTER} 이상 지난 REQUESTED만 담는다. */
     public List<Integer> findTargets(LocalDateTime now) {
         return repaymentScheduleRepository.findStaleRequestedScheduleSeqs(now.minus(RECONCILE_AFTER));
     }
 
-    /** 회차 1건을 정산한다. */
     public Result reconcile(Integer scheduleSeq) {
-        // ── 조회에 필요한 값 읽기 ──
         LookupPlan plan = transactionTemplate.execute(status -> prepare(scheduleSeq));
         if (plan == null) {
             return Result.SKIPPED;
@@ -100,7 +72,7 @@ public class TransferReconciliationService {
             return Result.NEEDS_REVIEW;
         }
 
-        // ── 거래내역 조회: 트랜잭션 밖 ──
+        // 외부 조회는 트랜잭션 밖에서
         long matched;
         try {
             SsafyInquireTransactionHistoryListRecDto rec = ssafyDemandDepositClient.inquireTransactionHistoryList(
@@ -122,7 +94,6 @@ public class TransferReconciliationService {
             return Result.NEEDS_REVIEW;
         }
 
-        // ── 결과 반영 ──
         if (matched == 1) {
             Boolean confirmed = transactionTemplate.execute(
                     status -> confirmPaid(scheduleSeq, plan.amount(), "이체 결과 정산 확인",
@@ -141,15 +112,12 @@ public class TransferReconciliationService {
             log.info("[정산] scheduleSeq={} 출금 없음 → {}", scheduleSeq, restoreStatus);
             return Result.RELEASED;
         }
-        // 같은 회차의 출금이 여러 건이면 이미 이중 출금이 일어났을 수 있다. 자동으로 처리하지 않는다.
+        // 2건 이상이면 이중 출금일 수 있어 자동으로 처리하지 않는다.
         log.error("[정산] scheduleSeq={} 일치하는 출금이 {}건. 이중 출금 여부 수동 확인 필요.", scheduleSeq, matched);
         return Result.NEEDS_REVIEW;
     }
 
-    /**
-     * 정산이 판단하지 못한 회차 목록. 운영자가 거래내역을 직접 확인할 대상이다.
-     * 요청한 지 {@link #RECONCILE_AFTER} 이상 지난 REQUESTED만 담는다.
-     */
+    /** 운영자가 직접 확인할 미해결 회차 목록 */
     public List<UnresolvedTransferResponseDto> findUnresolved(LocalDateTime now) {
         return transactionTemplate.execute(status -> repaymentScheduleRepository
                 .findStaleRequestedWithContract(now.minus(RECONCILE_AFTER))
@@ -166,19 +134,7 @@ public class TransferReconciliationService {
                 .toList());
     }
 
-    /**
-     * 운영자가 거래내역을 확인한 결과로 회차를 확정한다.
-     *
-     * <p>자동 정산과 같은 규칙을 따른다. 출금이 있었으면 PAID로 확정하고, 없었으면 이체 전 상태로
-     * 되돌려 다시 이체되게 한다. REQUESTED가 아닌 회차는 그 사이 다른 경로가 확정한 것이므로
-     * 건드리지 않는다.</p>
-     *
-     * <p>요청한 지 {@link #RECONCILE_AFTER}가 지나지 않은 회차는 거절한다. 은행이 아직 처리 중이라
-     * 거래내역에 보이지 않을 수 있고, 이를 "출금 없음"으로 되돌리면 이중 출금이 된다.</p>
-     *
-     * @param withdrawn 거래내역에서 이 회차의 출금을 확인했는지
-     * @param note      확인 근거. 상환 이벤트와 로그에 남긴다.
-     */
+    /** 운영자 확인 결과로 확정한다. withdrawn이면 PAID, 아니면 되돌림. */
     public Result resolveByReview(Integer scheduleSeq, boolean withdrawn, String note, LocalDateTime now) {
         if (note == null || note.isBlank()) {
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "확인 근거(note)를 입력해야 합니다.");
@@ -190,6 +146,7 @@ public class TransferReconciliationService {
                 log.info("[정산 확인] scheduleSeq={} 이미 {} 상태라 건너뜀", scheduleSeq, schedule.getStatus());
                 return Result.SKIPPED;
             }
+            // 은행이 아직 처리 중일 수 있는 이체를 "출금 없음"으로 되돌리면 이중 출금이 된다.
             LocalDateTime requestedAt = schedule.getTransferRequestedDttm();
             if (requestedAt != null && requestedAt.isAfter(now.minus(RECONCILE_AFTER))) {
                 throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE,
@@ -238,7 +195,6 @@ public class TransferReconciliationService {
         );
     }
 
-    /** 거래내역 한 건이 이 회차의 이체인지 판정한다. */
     private boolean isTransferOf(SsafyDemandDepositTransactionRecDto row, Pattern memoPattern, BigDecimal expectedAmount) {
         String summary = row.transactionSummary();
         if (summary == null || !memoPattern.matcher(summary).find()) {
@@ -248,7 +204,7 @@ public class TransferReconciliationService {
         return amount != null && expectedAmount != null && amount.compareTo(expectedAmount) == 0;
     }
 
-    /** 출금 금액은 부호가 붙어 올 수 있어 절댓값으로 비교한다. */
+    // 출금 금액에 부호가 붙어 올 수 있어 절댓값으로 비교
     private BigDecimal parseAmount(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -260,31 +216,20 @@ public class TransferReconciliationService {
         }
     }
 
-    /**
-     * 출금이 없었을 때 되돌릴 상태.
-     *
-     * <p>정산 시점에는 이체 전 상태를 알 수 없다. REQUESTED가 아니었다면 연체 스케줄러가 했을
-     * 처리와 같게 맞춘다. 납부 기한이 지났으면 연체, 아니면 미납이다.</p>
-     */
+    // 이체 전 상태는 남아 있지 않으므로 연체 스케줄러와 같은 기준으로 정한다.
     static String restoreStatusOf(LocalDate dueDt, LocalDate today) {
         return dueDt != null && dueDt.isBefore(today) ? "OVERDUE" : "NONPAID";
     }
 
-    /** REQUESTED를 되돌리고, 실제로 되돌렸을 때만 이력을 남긴다. */
     private void release(Integer scheduleSeq, String restoreStatus, RepaymentScheduleChangeReason reason, String detail) {
         if (repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, restoreStatus) == 1) {
             historyRecorder.record(scheduleSeq, "REQUESTED", restoreStatus, reason, null, detail);
         }
     }
 
-    /**
-     * 출금이 확인된 회차를 PAID로 확정한다. 자동이체 성공과 같은 후처리를 한다.
-     *
-     * @return 이 호출이 확정했으면 true. 그 사이 다른 경로가 먼저 확정했으면 false이고 아무것도 하지 않는다.
-     */
+    /** 다른 경로가 먼저 확정했으면 false를 반환하고 아무것도 하지 않는다. */
     private boolean confirmPaid(Integer scheduleSeq, BigDecimal amount, String note,
                                 RepaymentScheduleChangeReason reason) {
-        // 확인과 변경을 한 번에 한다. 이체 결과 반영이 먼저 확정했다면 0건이 되어 이벤트·알림을 다시 만들지 않는다.
         LocalDateTime now = LocalDateTime.now();
         if (repaymentScheduleRepository.markPaidIfRequested(scheduleSeq, now) == 0) {
             log.info("[정산] scheduleSeq={} 다른 경로가 먼저 확정해 건너뜀", scheduleSeq);
@@ -331,7 +276,6 @@ public class TransferReconciliationService {
         return true;
     }
 
-    /** 트랜잭션 밖에서 거래내역을 조회하고 판정하는 데 필요한 값만 담는다. */
     private record LookupPlan(
             Integer scheduleSeq,
             LocalDateTime requestedAt,
@@ -341,12 +285,7 @@ public class TransferReconciliationService {
             String accountNo,
             String userKey
     ) {
-        /**
-         * 적요 안에서 회차 식별자를 찾는 패턴.
-         *
-         * <p>뒤에 숫자가 이어지면 다른 회차다({@code BL12}와 {@code BL123}). 은행이 적요 앞뒤에
-         * 자체 문구를 붙일 수 있어 완전 일치가 아니라 포함 여부로 찾는다.</p>
-         */
+        // BL12가 BL123에 걸리지 않게 뒤에 숫자가 오면 제외. 은행이 문구를 덧붙일 수 있어 포함 여부로 찾는다.
         Pattern memoPattern() {
             return Pattern.compile(Pattern.quote(memo) + "(?!\\d)");
         }

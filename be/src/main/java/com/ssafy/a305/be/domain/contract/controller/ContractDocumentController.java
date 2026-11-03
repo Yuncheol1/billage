@@ -10,9 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 차용증 문서 Controller.
- *
- * <p>HTML 전문보기 및 PDF 다운로드 엔드포인트를 제공합니다.</p>
+ * 차용증 문서 Controller
  */
 @RestController
 @RequestMapping("/api/v1/contracts/{contractSeq}/document")
@@ -22,10 +20,7 @@ public class ContractDocumentController {
     private final ContractDocumentService contractDocumentService;
 
     /**
-     * 차용증 HTML 전문보기 (WebView 렌더링용).
-     *
-     * @param contractSeq 계약 식별자
-     * @return text/html 문자열
+     * 차용증 HTML 전문보기 (WebView용)
      */
     @GetMapping("/html")
     public ResponseEntity<String> getContractHtml(
@@ -41,10 +36,7 @@ public class ContractDocumentController {
     }
 
     /**
-     * 차용증 PDF 다운로드 (바이트 스트림).
-     *
-     * @param contractSeq 계약 식별자
-     * @return application/pdf 바이트 배열
+     * 차용증 PDF 다운로드
      */
     @GetMapping("/pdf")
     public ResponseEntity<byte[]> downloadContractPdf(

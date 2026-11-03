@@ -21,44 +21,20 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 자동이체 1건을 처리한다.
- *
- * <p>이체는 은행에서 일어나는 되돌릴 수 없는 부수 효과이므로, DB 트랜잭션으로 감싸는 대신
- * <b>세 구간으로 나눈다.</b></p>
- *
- * <pre>
- *  Tx1  회차를 REQUESTED로 선점·커밋   ← 이후 죽어도 "요청했다"는 흔적이 남는다
- *       ────────────────────────
- *       은행 API 호출 (트랜잭션 밖)   ← 커넥션·row 락을 응답 대기 동안 붙잡지 않는다
- *       ────────────────────────
- *  Tx2  결과 반영 커밋               ← 확정된 사실만 기록한다
- * </pre>
- *
- * <p>선점은 "조회한 상태 그대로일 때만 REQUESTED로 바꾸는" 조건부 UPDATE다. 같은 회차에
- * 자동이체와 수동 이체가 동시에 들어와도 DB가 한 건만 통과시키므로 별도의 락이 필요 없다.</p>
- *
- * <p><b>결과를 알 수 없는 회차는 REQUESTED로 남고, 새 이체가 차단된다.</b>
- * 은행이 멱등성을 보장하지 않으므로, 이미 나갔을지도 모르는 이체를 다시 보내지 않는 것이
- * 유일한 안전장치이기 때문이다. 확정은 {@link TransferReconciliationService}가 거래내역을
- * 대조해 맡는다.</p>
- *
- * @see AutoTransferScheduler
+ * 자동이체 1건 처리.
+ * Tx1(REQUESTED 선점 커밋) → 은행 API 호출(트랜잭션 밖) → Tx2(결과 반영) 순서로 나눈다.
+ * 결과를 모르면 REQUESTED로 남겨 재이체를 막고, 확정은 TransferReconciliationService가 한다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AutoTransferService {
 
-    /** 처리 1건의 결과. */
     public enum Result {
-        /** 이체와 후처리까지 정상 완료. */
         SUCCEEDED,
-        /** 처리 대상이 아니어서 건너뜀(등록 없음, 이미 납부됨 등). */
-        SKIPPED,
-        /** 이전 이체의 결과가 확정되지 않았거나, 다른 요청이 먼저 선점해 진입을 막음. */
-        BLOCKED,
-        /** 이체를 보냈지만 결과를 알 수 없음. 회차가 REQUESTED로 남았다. */
-        UNRESOLVED
+        SKIPPED,    // 등록 없음, 이미 납부됨 등
+        BLOCKED,    // 이전 이체가 미확정이거나 다른 요청이 먼저 선점
+        UNRESOLVED  // 이체 결과 불명, REQUESTED 유지
     }
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
@@ -69,20 +45,16 @@ public class AutoTransferService {
     private final TransactionTemplate transactionTemplate;
     private final RepaymentScheduleHistoryRecorder historyRecorder;
 
-    /**
-     * 상환 회차 1건에 대해 자동이체를 실행한다.
-     *
-     * @throws TransferFailException 은행이 거절했음이 확실할 때. 호출자가 건별로 잡아 격리한다.
-     */
+    // 은행이 확실히 거절하면 TransferFailException을 던진다.
     public Result execute(Integer scheduleSeq) {
-        // ── Tx1: 검증 + 선점 ──
+        // 1. 검증 + 선점 (Tx1)
         Prepared prepared = transactionTemplate.execute(status -> prepare(scheduleSeq));
         if (prepared.plan() == null) {
             return prepared.skipResult();
         }
         TransferPlan plan = prepared.plan();
 
-        // ── 은행 API 호출: 트랜잭션 밖 ──
+        // 2. 은행 API 호출 (트랜잭션 밖)
         try {
             ssafyTransferApiClient.transfer(
                     plan.withdrawalAccountNo(),
@@ -92,13 +64,13 @@ public class AutoTransferService {
                     plan.debtorUserKey()
             );
         } catch (TransferOutcomeUnknownException e) {
-            // 돈이 나갔을 수 있다. 실패로 단정하지 않고 REQUESTED로 남겨 새 이체를 막는다.
+            // 돈이 나갔을 수 있으므로 실패로 처리하지 않는다.
             log.error("[자동이체] 결과 불명 - scheduleSeq={}. 회차를 REQUESTED로 남긴다. 사유={}",
                     scheduleSeq, e.getMessage());
             recordOutcomeUnknownSafely(scheduleSeq, e);
             return Result.UNRESOLVED;
         } catch (TransferFailException e) {
-            // 은행이 거절했음이 확실하다. 이체 전 상태로 되돌려 다음 슬롯의 재시도를 허용한다.
+            // 확실한 거절 → 되돌려서 다음 실행에서 재시도
             transactionTemplate.executeWithoutResult(status -> {
                 if (repaymentScheduleRepository.releaseTransferClaim(scheduleSeq, plan.previousStatus()) == 1) {
                     historyRecorder.record(scheduleSeq, "REQUESTED", plan.previousStatus(),
@@ -108,11 +80,11 @@ public class AutoTransferService {
             throw e;
         }
 
-        // ── Tx2: 결과 반영 ──
+        // 3. 결과 반영 (Tx2)
         try {
             transactionTemplate.executeWithoutResult(status -> complete(plan));
         } catch (RuntimeException e) {
-            // 이체는 나갔는데 반영에 실패했다. 회차는 REQUESTED로 남아 재이체를 막고, 정산이 바로잡는다.
+            // 이체는 됐는데 반영 실패. REQUESTED로 남아 정산이 바로잡는다.
             log.error("[자동이체] 이체 성공 후 결과 반영 실패 - scheduleSeq={}. 정산 대상으로 남긴다.",
                     scheduleSeq, e);
             throw e;
@@ -122,7 +94,6 @@ public class AutoTransferService {
         return Result.SUCCEEDED;
     }
 
-    /** Tx1. 검증하고 회차를 REQUESTED로 선점해 커밋될 계획을 돌려준다. */
     private Prepared prepare(Integer scheduleSeq) {
         RepaymentSchedule schedule = repaymentScheduleRepository
                 .findByScheduleSeqWithContractUsers(scheduleSeq)
@@ -132,13 +103,13 @@ public class AutoTransferService {
             return Prepared.skip(Result.SKIPPED);
         }
 
-        // 이전 이체의 결과가 확정되지 않았다면 새 이체를 시작하면 안 된다. 이미 나갔을 수 있다.
+        // 이전 이체가 미확정이면 이미 나갔을 수 있다.
         if ("REQUESTED".equals(schedule.getStatus())) {
             log.warn("[자동이체] scheduleSeq={} 이전 이체의 결과가 확정되지 않아 진입 차단.", scheduleSeq);
             return Prepared.skip(Result.BLOCKED);
         }
 
-        // 대상 목록을 뽑은 뒤 수동 이체 등으로 이미 처리됐을 수 있으므로 다시 확인한다.
+        // 목록 조회 후 수동 이체 등으로 바뀌었을 수 있다.
         if (!"NONPAID".equals(schedule.getStatus())) {
             log.info("[자동이체] scheduleSeq={} 상태가 {}(으)로 바뀌어 Skip.", scheduleSeq, schedule.getStatus());
             return Prepared.skip(Result.SKIPPED);
@@ -155,7 +126,7 @@ public class AutoTransferService {
             return Prepared.skip(Result.SKIPPED);
         }
 
-        // 선점 UPDATE가 영속성 컨텍스트를 비우므로, 엔티티에서 읽을 값은 선점 전에 모두 꺼낸다.
+        // 선점 UPDATE가 영속성 컨텍스트를 비우므로 값은 미리 꺼내 둔다.
         TransferPlan plan = new TransferPlan(
                 scheduleSeq,
                 schedule.getStatus(),
@@ -170,7 +141,6 @@ public class AutoTransferService {
         int claimed = repaymentScheduleRepository.claimForTransfer(
                 scheduleSeq, plan.previousStatus(), LocalDateTime.now());
         if (claimed == 0) {
-            // 조회와 선점 사이에 다른 요청(수동 이체 등)이 먼저 상태를 바꿨다.
             log.warn("[자동이체] scheduleSeq={} 다른 요청이 먼저 선점해 진입 차단.", scheduleSeq);
             return Prepared.skip(Result.BLOCKED);
         }
@@ -179,9 +149,8 @@ public class AutoTransferService {
         return Prepared.ready(plan);
     }
 
-    /** Tx2. 은행이 성공을 확인해 준 뒤에만 호출된다. */
     private void complete(TransferPlan plan) {
-        // 확인과 변경을 한 번에 한다. 정산이 먼저 확정했다면 0건이 되어 이벤트·알림을 다시 만들지 않는다.
+        // 정산이 먼저 확정했다면 0건 → 이벤트·알림을 다시 만들지 않는다.
         LocalDateTime now = LocalDateTime.now();
         int updated = repaymentScheduleRepository.markPaidIfRequested(plan.scheduleSeq(), now);
 
@@ -229,11 +198,7 @@ public class AutoTransferService {
         }
     }
 
-    /**
-     * 결과 불명은 상태가 바뀌지 않아 묶을 트랜잭션이 없으므로 따로 남긴다.
-     *
-     * <p>기록에 실패해도 회차는 REQUESTED로 남아 재이체가 막히고 정산이 확정하므로, 실패를 전파하지 않는다.</p>
-     */
+    // 이력 기록이 실패해도 회차는 REQUESTED로 남아 있으므로 예외를 넘기지 않는다.
     private void recordOutcomeUnknownSafely(Integer scheduleSeq, TransferOutcomeUnknownException e) {
         try {
             transactionTemplate.executeWithoutResult(status -> historyRecorder.record(
@@ -244,14 +209,7 @@ public class AutoTransferService {
         }
     }
 
-    // ──────────────── 알림 (실패해도 이체 결과를 롤백하지 않는다) ────────────────
-
-    /**
-     * 알림 전송은 이체의 부수 효과일 뿐이므로 실패를 전파하지 않습니다.
-     *
-     * <p>여기서 예외가 새어나가면 결과 반영(Tx2)이 롤백되어, 돈은 빠져나갔는데 회차는
-     * NONPAID로 남는 상태가 되므로 반드시 삼켜야 합니다.</p>
-     */
+    // 알림 실패로 Tx2가 롤백되면 돈은 나갔는데 기록이 없어진다. 예외를 삼킨다.
     private void sendRepaymentPaidNotificationsSafely(RepaymentSchedule schedule) {
         try {
             notificationCommandService.sendRepaymentPaidNotifications(schedule);
@@ -260,7 +218,6 @@ public class AutoTransferService {
         }
     }
 
-    /** @see #sendRepaymentPaidNotificationsSafely(RepaymentSchedule) */
     private void sendContractClosedNotificationsSafely(Contract contract) {
         try {
             notificationCommandService.sendContractClosedNotifications(contract);
@@ -269,7 +226,6 @@ public class AutoTransferService {
         }
     }
 
-    /** Tx1이 돌려주는 값. 진행할 계획이 있거나, 진행하지 않는 이유가 있다. */
     private record Prepared(Result skipResult, TransferPlan plan) {
         static Prepared skip(Result result) {
             return new Prepared(result, null);
@@ -280,11 +236,10 @@ public class AutoTransferService {
         }
     }
 
-    /** 트랜잭션 밖에서 API를 호출하는 데 필요한 값만 담는다. 엔티티를 들고 나가지 않는다. */
+    // 트랜잭션 밖으로 엔티티를 들고 나가지 않도록 필요한 값만 담는다.
     private record TransferPlan(
             Integer scheduleSeq,
-            /* 선점 직전 상태. 확정 실패 시 이 상태로 되돌린다. */
-            String previousStatus,
+            String previousStatus, // 거절 시 되돌릴 상태
             String withdrawalAccountNo,
             String depositAccountNo,
             BigDecimal amount,

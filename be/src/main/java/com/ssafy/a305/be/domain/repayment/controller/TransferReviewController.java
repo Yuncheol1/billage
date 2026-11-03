@@ -23,10 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 정산이 자동으로 판단하지 못한 이체를 운영자가 확인·확정하는 API.
- *
- * <p>사용자용 API가 아니므로 JWT 대신 {@code X-Ops-API-Key} 헤더로 인증한다.
- * 키가 설정되지 않은 환경에서는 모든 요청을 거절한다.</p>
+ * 미해결 이체 운영자 확인 API. JWT 대신 X-Ops-API-Key로 인증하고, 키가 없으면 전부 거절한다.
  */
 @RestController
 @RequestMapping("/api/v1/ops/transfers")
@@ -68,7 +65,7 @@ public class TransferReviewController {
                 Map.of("scheduleSeq", scheduleSeq, "result", result.name())));
     }
 
-    /** 키 미설정이면 항상 거절하고, 비교는 길이·내용 노출을 막기 위해 상수 시간으로 한다. */
+    // 타이밍 공격을 막기 위해 상수 시간 비교
     private void requireOpsKey(String apiKey) {
         if (opsApiKey.length == 0 || apiKey == null
                 || !MessageDigest.isEqual(opsApiKey, apiKey.getBytes(StandardCharsets.UTF_8))) {

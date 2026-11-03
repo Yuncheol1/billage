@@ -29,11 +29,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
- * 이체 응답 분류 테스트.
- *
- * <p>핵심 규칙은 하나다. <b>아는 거절만 "실패"로 확정하고, 모르면 "결과 불명"으로 둔다.</b>
- * 결과 불명을 실패로 단정하면 재시도가 곧 이중 출금이 되기 때문이다.
- * 이 테스트는 어떤 응답이 어느 쪽으로 분류되는지를 고정한다.</p>
+ * 이체 응답 분류 테스트. 확실한 거절만 실패, 나머지는 결과 불명
  */
 class SsafyTransferApiClientTest {
 

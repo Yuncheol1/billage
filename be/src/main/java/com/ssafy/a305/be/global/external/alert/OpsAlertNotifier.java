@@ -11,12 +11,8 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * 운영 알림을 웹훅으로 보낸다.
- *
- * <p>Slack·Mattermost의 Incoming Webhook 형식({@code {"text": ...}})을 따른다.
- * URL이 설정되지 않은 환경(로컬·테스트)에서는 보내지 않고 로그만 남긴다.</p>
- *
- * <p>알림은 부가 기능이다. 전송에 실패해도 예외를 던지지 않아, 알림 때문에 이체·정산이 멈추지 않는다.</p>
+ * 운영 알림 웹훅 (Slack·Mattermost). URL이 없으면 로그만 남긴다.
+ * 전송 실패로 이체·정산이 멈추지 않도록 예외를 던지지 않는다.
  */
 @Slf4j
 @Component

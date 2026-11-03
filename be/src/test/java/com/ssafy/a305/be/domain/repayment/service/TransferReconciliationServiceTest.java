@@ -46,11 +46,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 /**
- * 결과 불명 회차 정산 테스트.
- *
- * <p>거래내역 조회 결과에 따라 회차를 확정·복귀·보류하는지, 그리고 <b>다른 회차의 거래를 이
- * 회차의 것으로 오인하지 않는지</b>를 검증한다. 오인하면 나가지 않은 이체를 납부로 처리하거나,
- * 나간 이체를 미납으로 되돌려 이중 출금이 된다.</p>
+ * 결과 불명 회차 정산 테스트. 다른 회차의 거래를 이 회차로 오인하지 않는지도 확인
  */
 @ExtendWith(MockitoExtension.class)
 class TransferReconciliationServiceTest {

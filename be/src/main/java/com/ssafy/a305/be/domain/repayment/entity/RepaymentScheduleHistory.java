@@ -7,13 +7,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * 회차 상태 변경 이력. 추가만 하고 고치거나 지우지 않는다.
- *
- * <p>회차의 상태 칸은 마지막 값만 남으므로, 미납 → 처리 중 → 미납 → 처리 중 → 완료를 거쳐도
- * 완료만 보인다. "왜 그날 출금이 안 됐는지"를 답하려면 바뀔 때마다 한 줄씩 쌓아야 한다.</p>
- *
- * <p>상태를 바꾼 조건부 UPDATE와 같은 트랜잭션에서 저장하므로, 상태가 바뀌면 이력도 남고
- * 롤백되면 같이 사라진다. 결과 불명처럼 상태가 그대로인 기록만 예외로 별도 트랜잭션에 남긴다.</p>
+ * 회차 상태 변경 이력 (추가만 하고 수정·삭제하지 않음)
  */
 @Entity
 @Table(
@@ -45,12 +39,11 @@ public class RepaymentScheduleHistory {
     @Column(name = "reason", nullable = false, length = 40)
     private RepaymentScheduleChangeReason reason;
 
-    /** 바꾼 사용자. 스케줄러·정산·운영자 API처럼 사용자가 아닌 경로면 비어 있다. */
+    // 스케줄러·정산·운영자 API면 null
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "changed_by_user_seq")
     private User changedByUser;
 
-    /** 은행 응답, 확인 근거 등. */
     @Column(name = "detail", length = 500)
     private String detail;
 
