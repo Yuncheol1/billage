@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -68,6 +69,7 @@ public class ContractService {
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
+    private final TransactionTemplate transactionTemplate;
 
     // AI 분석 결과 캐시 (Key: contractSeq, Value: {lastUpdated: LocalDateTime, result: String})
     private final Map<Integer, AnalysisCacheEntry> analysisCache = new ConcurrentHashMap<>();
@@ -183,70 +185,77 @@ public class ContractService {
         contractRepository.flush();
         return clause;
     }
-    @Transactional
+    // AI 응답을 기다리는 동안 계약 행 락을 잡지 않도록 검증 → AI 호출 → 락 잡고 저장 순서로 나눈다.
     public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
-        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
-        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+        // 1. 검증하고 AI 요청을 만든다. 락은 잡지 않는다.
+        AiClauseRequestDto aiRequest = transactionTemplate.execute(status -> {
+            Contract contract = contractRepository.findById(contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+            validateAiClauseTarget(contract, userSeq);
 
-        // 2. 상태 검증
-        if (!"DRAFT".equals(contract.getStatus())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
-        }
+            String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
+                    contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
+            return AiClauseRequestDto.builder()
+                    .contractSeq(contractSeq)
+                    .userIntent(clauseContent)
+                    .contractContext(contractContext)
+                    .templateType("custom")
+                    .build();
+        });
 
-        // 3. 권한 검증
-        if (!contract.getCreditor().getUserSeq().equals(userSeq)
-                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
-        }
-
-        // 4. AI 서비스 연동 호출
-        String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
-                contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
-
-        AiClauseRequestDto aiRequest = AiClauseRequestDto.builder()
-                .contractSeq(contractSeq)
-                .userIntent(clauseContent)
-                .contractContext(contractContext)
-                .templateType("custom")
-                .build();
-
+        // 2. AI 호출 (트랜잭션 밖)
         AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // AI가 유효한 법률 특약을 생성하지 못하고 거절한 경우
-        if (aiResponse.getRejected() ||
-            aiResponse.getLegalClause() == null || 
+        if (Boolean.TRUE.equals(aiResponse.getRejected()) ||
+            aiResponse.getLegalClause() == null ||
             aiResponse.getLegalClause().trim().isEmpty()) {
-            
+
             String reason = (aiResponse.getRejectionReason() != null && !aiResponse.getRejectionReason().isBlank())
                     ? aiResponse.getRejectionReason()
                     : ((aiResponse.getExplanation() != null && !aiResponse.getExplanation().isBlank())
                         ? aiResponse.getExplanation()
                         : "입력하신 내용으로 유효한 법률 특약을 생성할 수 없습니다.");
-                        
+
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "특약 생성 거절: " + reason);
         }
 
-        // 5. ContractClause 엔티티 생성 및 추가
-        int nextOrderNo = contract.getClauses().size() + 1;
-        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isBlank())
-                ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
-        String newContent = aiResponse.getLegalClause();
-        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isBlank())
-                ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
+        // 3. 락을 잡고 순번을 정해 저장한다.
+        return transactionTemplate.execute(status -> {
+            Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+            // AI를 기다리는 사이 계약이 협상으로 넘어갔을 수 있어 다시 확인한다.
+            validateAiClauseTarget(contract, userSeq);
 
-        ContractClause clause = ContractClause.builder()
-                .contract(contract)
-                .clauseId(newClauseId)
-                .title(newTitle)
-                .content(newContent)
-                .orderNo(nextOrderNo)
-                .createdDttm(LocalDateTime.now())
-                .build();
+            int nextOrderNo = contract.getClauses().size() + 1;
+            String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isBlank())
+                    ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
+            String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isBlank())
+                    ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
-        contract.addClause(clause);
-        contractRepository.flush();
-        return clause;
+            ContractClause clause = ContractClause.builder()
+                    .contract(contract)
+                    .clauseId(newClauseId)
+                    .title(newTitle)
+                    .content(aiResponse.getLegalClause())
+                    .orderNo(nextOrderNo)
+                    .createdDttm(LocalDateTime.now())
+                    .build();
+
+            contract.addClause(clause);
+            contractRepository.flush();
+            return clause;
+        });
+    }
+
+    private void validateAiClauseTarget(Contract contract, Integer userSeq) {
+        if (!"DRAFT".equals(contract.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
+        }
+        if (!contract.getCreditor().getUserSeq().equals(userSeq)
+                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
+        }
     }
 
     @Transactional
