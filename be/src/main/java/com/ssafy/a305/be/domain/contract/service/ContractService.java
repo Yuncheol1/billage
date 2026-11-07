@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -68,6 +69,7 @@ public class ContractService {
 
     // AI 연동 서비스 (FastAPI 연동)
     private final AIService aiService;
+    private final TransactionTemplate transactionTemplate;
 
     // AI 분석 결과 캐시 (Key: contractSeq, Value: {lastUpdated: LocalDateTime, result: String})
     private final Map<Integer, AnalysisCacheEntry> analysisCache = new ConcurrentHashMap<>();
@@ -183,70 +185,77 @@ public class ContractService {
         contractRepository.flush();
         return clause;
     }
-    @Transactional
+    // AI 응답을 기다리는 동안 계약 행 락을 잡지 않도록 검증 → AI 호출 → 락 잡고 저장 순서로 나눈다.
     public ContractClause addAiClauses(Integer contractSeq, String clauseContent, Integer userSeq) {
-        // 1. 계약 조회 (동시성 방지를 위한 비관적 락 사용)
-        Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
-                .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+        // 1. 검증하고 AI 요청을 만든다. 락은 잡지 않는다.
+        AiClauseRequestDto aiRequest = transactionTemplate.execute(status -> {
+            Contract contract = contractRepository.findById(contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+            validateAiClauseTarget(contract, userSeq);
 
-        // 2. 상태 검증
-        if (!"DRAFT".equals(contract.getStatus())) {
-            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
-        }
+            String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
+                    contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
+            return AiClauseRequestDto.builder()
+                    .contractSeq(contractSeq)
+                    .userIntent(clauseContent)
+                    .contractContext(contractContext)
+                    .templateType("custom")
+                    .build();
+        });
 
-        // 3. 권한 검증
-        if (!contract.getCreditor().getUserSeq().equals(userSeq)
-                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
-            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
-        }
-
-        // 4. AI 서비스 연동 호출
-        String contractContext = String.format("원금: %s, 이자율: %s, 상환방식: %s",
-                contract.getPrincipalAmount(), contract.getInterestRate(), contract.getRepaymentMethod());
-
-        AiClauseRequestDto aiRequest = AiClauseRequestDto.builder()
-                .contractSeq(contractSeq)
-                .userIntent(clauseContent)
-                .contractContext(contractContext)
-                .templateType("custom")
-                .build();
-
+        // 2. AI 호출 (트랜잭션 밖)
         AiClauseResponseDto aiResponse = aiService.generateClause(aiRequest);
 
         // AI가 유효한 법률 특약을 생성하지 못하고 거절한 경우
-        if (aiResponse.getRejected() ||
-            aiResponse.getLegalClause() == null || 
+        if (Boolean.TRUE.equals(aiResponse.getRejected()) ||
+            aiResponse.getLegalClause() == null ||
             aiResponse.getLegalClause().trim().isEmpty()) {
-            
+
             String reason = (aiResponse.getRejectionReason() != null && !aiResponse.getRejectionReason().isBlank())
                     ? aiResponse.getRejectionReason()
                     : ((aiResponse.getExplanation() != null && !aiResponse.getExplanation().isBlank())
                         ? aiResponse.getExplanation()
                         : "입력하신 내용으로 유효한 법률 특약을 생성할 수 없습니다.");
-                        
+
             throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "특약 생성 거절: " + reason);
         }
 
-        // 5. ContractClause 엔티티 생성 및 추가
-        int nextOrderNo = contract.getClauses().size() + 1;
-        String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isBlank())
-                ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
-        String newContent = aiResponse.getLegalClause();
-        String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isBlank())
-                ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
+        // 3. 락을 잡고 순번을 정해 저장한다.
+        return transactionTemplate.execute(status -> {
+            Contract contract = contractRepository.findByIdWithPessimisticLock(contractSeq)
+                    .orElseThrow(() -> new CustomBusinessException(ErrorCode.CONTRACT_NOT_FOUND, "계약을 찾을 수 없습니다."));
+            // AI를 기다리는 사이 계약이 협상으로 넘어갔을 수 있어 다시 확인한다.
+            validateAiClauseTarget(contract, userSeq);
 
-        ContractClause clause = ContractClause.builder()
-                .contract(contract)
-                .clauseId(newClauseId)
-                .title(newTitle)
-                .content(newContent)
-                .orderNo(nextOrderNo)
-                .createdDttm(LocalDateTime.now())
-                .build();
+            int nextOrderNo = contract.getClauses().size() + 1;
+            String newTitle = (aiResponse.getTitle() != null && !aiResponse.getTitle().isBlank())
+                    ? aiResponse.getTitle() : ("특약사항 " + nextOrderNo);
+            String newClauseId = (aiResponse.getClauseId() != null && !aiResponse.getClauseId().isBlank())
+                    ? aiResponse.getClauseId() : ("SPECIAL_" + nextOrderNo);
 
-        contract.addClause(clause);
-        contractRepository.flush();
-        return clause;
+            ContractClause clause = ContractClause.builder()
+                    .contract(contract)
+                    .clauseId(newClauseId)
+                    .title(newTitle)
+                    .content(aiResponse.getLegalClause())
+                    .orderNo(nextOrderNo)
+                    .createdDttm(LocalDateTime.now())
+                    .build();
+
+            contract.addClause(clause);
+            contractRepository.flush();
+            return clause;
+        });
+    }
+
+    private void validateAiClauseTarget(Contract contract, Integer userSeq) {
+        if (!"DRAFT".equals(contract.getStatus())) {
+            throw new CustomBusinessException(ErrorCode.INVALID_CONTRACT_STATUS, "초안(DRAFT) 상태에서만 특약 추가가 가능합니다.");
+        }
+        if (!contract.getCreditor().getUserSeq().equals(userSeq)
+                && !contract.getDebtor().getUserSeq().equals(userSeq)) {
+            throw new CustomBusinessException(ErrorCode.ACCESS_DENIED, "해당 계약의 당사자가 아닌 사용자가 요청");
+        }
     }
 
     @Transactional
@@ -537,7 +546,7 @@ public class ContractService {
         }).collect(Collectors.toList());
     }
 
-    private void validateBusinessRules(ContractDraftRequestDto request) {
+    void validateBusinessRules(ContractDraftRequestDto request) {
         // 본인 거래 방지
         if (request.getCreditorUserSeq().equals(request.getDebtorUserSeq())) {
             throw new CustomBusinessException(ErrorCode.SELF_CONTRACT_NOT_ALLOWED);
@@ -562,7 +571,8 @@ public class ContractService {
             default -> 0; // LUMP_SUM 등
         };
 
-        if (intervalMonths > 0 && request.getTotalInstallments() < intervalMonths) {
+        // totalInstallments는 회차 수라 개월 수와 비교하지 않는다. 계약 기간이 한 주기 이상인지 본다.
+        if (intervalMonths > 0 && request.getStartDt().plusMonths(intervalMonths).isAfter(request.getEndDt())) {
             throw new CustomBusinessException(ErrorCode.INVALID_REPAYMENT_LOGIC, 
                 String.format("선택하신 상환 방식(%s)은 최소 %d개월 이상의 기간이 필요합니다.", method, intervalMonths));
         }
@@ -572,7 +582,7 @@ public class ContractService {
         }
     }
     //(LUMP_SUM =일시상환/ MONTHLY =1달마다/ QUARTERLY=3개월마다 / SEMI_ANNUAL=6개월마다 / ANNUAL=1년마다)
-    private void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
+    void generateRepaymentSchedules(Contract contract, ContractDraftRequestDto request) {
         String method = request.getRepaymentMethod();
         BigDecimal interestRating=request.getInterestRate();
         if ("LUMP_SUM".equals(method)&&interestRating.compareTo(BigDecimal.ZERO) != 0) {
@@ -636,22 +646,22 @@ public class ContractService {
                 default -> throw new CustomBusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 상환 방식입니다.");
             };
 
-            int installments = request.getTotalInstallments();
-            int paymentCycles = installments / intervalMonths;
-            
+            // totalInstallments는 상환 회차 수다. (앱은 분기 12개월이면 4를 보낸다)
+            // 회차는 주기(intervalMonths)마다 1번이고, 회차 이자는 그 주기 동안의 이자다.
+            int paymentCycles = request.getTotalInstallments();
+
             // paymentCycles가 0일 경우(이미 validateBusinessRules에서 걸러지겠지만 방어적으로 처리)
             if (paymentCycles <= 0) paymentCycles = 1;
 
-            BigDecimal principalPerMth = request.getPrincipalAmount().divide(new BigDecimal(paymentCycles), 2, RoundingMode.DOWN);
-
-            // 단순 월 분할 이자 계산 가정
-            BigDecimal interestPerMth = calculateInterest(request.getPrincipalAmount(), request.getInterestRate(),intervalMonths);
+            BigDecimal principalPerCycle = request.getPrincipalAmount().divide(new BigDecimal(paymentCycles), 2, RoundingMode.DOWN);
 
             BigDecimal remainingPrincipal = request.getPrincipalAmount();
 
-            for (int i = 1; i <= installments; i++) {
+            for (int cycle = 1; cycle <= paymentCycles; cycle++) {
+                boolean isLastCycle = (cycle == paymentCycles);
+
                 // 납부일자 계산 (repaymentDay 기반 엣지 케이스 처리)
-                LocalDate targetMonth = request.getStartDt().plusMonths((long) i * intervalMonths);
+                LocalDate targetMonth = request.getStartDt().plusMonths((long) cycle * intervalMonths);
                 int maxDaysInMonth = targetMonth.lengthOfMonth();
                 int actualDay = Math.min(request.getRepaymentDay(), maxDaysInMonth);
 
@@ -659,28 +669,26 @@ public class ContractService {
                 if (dueDt.isAfter(request.getEndDt())) {
                     dueDt = request.getEndDt(); // 만기일 초과 금지
                 }
-                BigDecimal currentPrincipalDue = BigDecimal.ZERO;
-                if (i % intervalMonths == 0) {
-                    // 마지막 회차에는 자투리 방지를 위해 남은 원금을 다 털어냄
-                    currentPrincipalDue = (i == installments) ? remainingPrincipal : principalPerMth;
-                }
+
+                // 이자는 남은 원금 기준, 주기 개월치
+                BigDecimal currentInterestDue = calculateInterest(remainingPrincipal, request.getInterestRate(), intervalMonths);
+                // 마지막 회차에는 자투리 방지를 위해 남은 원금을 다 털어냄
+                BigDecimal currentPrincipalDue = isLastCycle ? remainingPrincipal : principalPerCycle;
                 remainingPrincipal = remainingPrincipal.subtract(currentPrincipalDue);
+
                 RepaymentSchedule schedule = RepaymentSchedule.builder()
                         .contract(contract)
-                        .installmentNo(i)
+                        .installmentNo(cycle)
                         .dueDt(dueDt)
                         .principalDue(currentPrincipalDue)
-                        .interestDue(interestPerMth)
-                        .totalDue(currentPrincipalDue.add(interestPerMth))
+                        .interestDue(currentInterestDue)
+                        .totalDue(currentPrincipalDue.add(currentInterestDue))
                         .remainingBalanceAfter(remainingPrincipal)
                         .status("NONPAID")
                         .createdDttm(LocalDateTime.now())
                         .build();
 
                 contract.addRepaymentSchedule(schedule);
-                if (i % intervalMonths == 0) {
-                    interestPerMth = calculateInterest(remainingPrincipal, request.getInterestRate(), intervalMonths);
-                }
             }
         }
     }

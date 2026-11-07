@@ -1,7 +1,9 @@
 package com.ssafy.a305.be.domain.notification.service;
 
 import com.ssafy.a305.be.domain.repayment.entity.RepaymentSchedule;
+import com.ssafy.a305.be.domain.repayment.entity.RepaymentScheduleChangeReason;
 import com.ssafy.a305.be.domain.repayment.repository.RepaymentScheduleRepository;
+import com.ssafy.a305.be.domain.repayment.service.RepaymentScheduleHistoryRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,6 +24,7 @@ public class RepaymentNotificationScheduler {
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final NotificationCommandService notificationCommandService;
+    private final RepaymentScheduleHistoryRecorder historyRecorder;
 
     @Transactional
     @Scheduled(cron = "0 0 9 * * *")
@@ -56,7 +59,14 @@ public class RepaymentNotificationScheduler {
 
         schedules.forEach(schedule -> {
             if ("NONPAID".equals(schedule.getStatus())) {
+                // 조회 뒤 이체가 선점했을 수 있어 조건부로 바꾼다.
+                if (repaymentScheduleRepository.markOverdueIfNonpaid(schedule.getScheduleSeq()) == 0) {
+                    log.info("[알림 스케줄러] scheduleSeq={} 조회 후 상태가 바뀌어 연체 처리하지 않음", schedule.getScheduleSeq());
+                    return;
+                }
                 schedule.markOverdue();
+                historyRecorder.record(schedule.getScheduleSeq(), "NONPAID", "OVERDUE",
+                        RepaymentScheduleChangeReason.OVERDUE, null, null);
             }
             notificationCommandService.sendOverdueNotifications(schedule, today);
         });

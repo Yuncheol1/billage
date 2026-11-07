@@ -18,18 +18,19 @@ import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyInquireTransaction
 import com.ssafy.a305.be.domain.bank.client.dto.response.SsafyUpdateDemandDepositAccountDepositResponseDto;
 import com.ssafy.a305.be.global.exception.CustomBusinessException;
 import com.ssafy.a305.be.global.exception.dto.ErrorCode;
-import lombok.RequiredArgsConstructor;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 public class SsafyDemandDepositClient {
 
     private static final String CREATE_ACCOUNT_API_NAME = "createDemandDepositAccount";
@@ -39,9 +40,35 @@ public class SsafyDemandDepositClient {
     private static final String INQUIRE_TRANSACTION_HISTORY_API_NAME = "inquireTransactionHistory";
     private static final String UPDATE_ACCOUNT_DEPOSIT_API_NAME = "updateDemandDepositAccountDeposit";
 
-    private final RestClient.Builder restClientBuilder;
+    private static final Duration INQUIRY_CONNECT_TIMEOUT = Duration.ofSeconds(3);
+
+    // 조회는 실패해도 다음에 다시 보면 된다. 정산이 오래 걸리면 뒤의 자동이체가 밀리므로 짧게 둔다.
+    private static final Duration INQUIRY_READ_TIMEOUT = Duration.ofSeconds(5);
+
     private final SsafyApiProperties ssafyApiProperties;
     private final SsafyApiHeaderFactory ssafyApiHeaderFactory;
+
+    // 계좌 생성·입금용. 중간에 끊으면 처리 여부를 모르는데 호출부가 이를 다루지 않아 타임아웃을 두지 않는다.
+    private final RestClient restClient;
+
+    // 조회용
+    private final RestClient inquiryRestClient;
+
+    public SsafyDemandDepositClient(
+            RestClient.Builder restClientBuilder,
+            SsafyApiProperties ssafyApiProperties,
+            SsafyApiHeaderFactory ssafyApiHeaderFactory
+    ) {
+        this.ssafyApiProperties = ssafyApiProperties;
+        this.ssafyApiHeaderFactory = ssafyApiHeaderFactory;
+        this.inquiryRestClient = restClientBuilder.clone()
+                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(
+                        ClientHttpRequestFactorySettings.defaults()
+                                .withConnectTimeout(INQUIRY_CONNECT_TIMEOUT)
+                                .withReadTimeout(INQUIRY_READ_TIMEOUT)))
+                .build();
+        this.restClient = restClientBuilder.build();
+    }
 
     public SsafyCreateDemandDepositAccountResponseDto.Rec createDemandDepositAccount(String userKey, String accountTypeUniqueNo) {
         SsafyCreateDemandDepositAccountRequestDto request = new SsafyCreateDemandDepositAccountRequestDto(
@@ -49,6 +76,7 @@ public class SsafyDemandDepositClient {
                 accountTypeUniqueNo
         );
         SsafyCreateDemandDepositAccountResponseDto response = post(
+                restClient,
                 request,
                 ssafyApiProperties.getCreateDemandDepositAccountPath(),
                 SsafyCreateDemandDepositAccountResponseDto.class,
@@ -66,6 +94,7 @@ public class SsafyDemandDepositClient {
                 ssafyApiHeaderFactory.create(INQUIRE_ACCOUNT_LIST_API_NAME, userKey)
         );
         SsafyInquireDemandDepositAccountListResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountListPath(),
                 SsafyInquireDemandDepositAccountListResponseDto.class,
@@ -81,6 +110,7 @@ public class SsafyDemandDepositClient {
                 accountNo
         );
         SsafyInquireDemandDepositAccountResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireDemandDepositAccountPath(),
                 SsafyInquireDemandDepositAccountResponseDto.class,
@@ -113,6 +143,7 @@ public class SsafyDemandDepositClient {
                 orderByType
         );
         SsafyInquireTransactionHistoryListResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireTransactionHistoryListPath(),
                 SsafyInquireTransactionHistoryListResponseDto.class,
@@ -133,6 +164,7 @@ public class SsafyDemandDepositClient {
                 transactionUniqueNo
         );
         SsafyInquireTransactionHistoryResponseDto response = post(
+                inquiryRestClient,
                 request,
                 ssafyApiProperties.getInquireTransactionHistoryPath(),
                 SsafyInquireTransactionHistoryResponseDto.class,
@@ -158,6 +190,7 @@ public class SsafyDemandDepositClient {
                 transactionSummary
         );
         SsafyUpdateDemandDepositAccountDepositResponseDto response = post(
+                restClient,
                 request,
                 ssafyApiProperties.getUpdateDemandDepositAccountDepositPath(),
                 SsafyUpdateDemandDepositAccountDepositResponseDto.class,
@@ -171,6 +204,7 @@ public class SsafyDemandDepositClient {
     }
 
     private <T> T post(
+            RestClient client,
             Object requestBody,
             String path,
             Class<T> responseType,
@@ -180,7 +214,7 @@ public class SsafyDemandDepositClient {
         validateCommonConfiguration(path, pathPropertyKey);
 
         try {
-            T response = restClientBuilder.build()
+            T response = client
                     .post()
                     .uri(buildUrl(path))
                     .contentType(MediaType.APPLICATION_JSON)

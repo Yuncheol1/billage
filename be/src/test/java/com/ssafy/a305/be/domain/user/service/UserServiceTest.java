@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
-    private static final Set<String> BLOCKING_CONTRACT_STATUSES = Set.of("ACTIVE");
+    private static final Set<String> BLOCKING_CONTRACT_STATUSES = Set.of("SIGNED", "ACTIVE", "OVERDUE");
 
     @Mock
     private UserRepository userRepository;

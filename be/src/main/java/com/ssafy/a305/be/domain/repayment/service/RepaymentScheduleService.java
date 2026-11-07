@@ -44,8 +44,9 @@ public class RepaymentScheduleService {
 
     @Transactional(readOnly = true)
     public List<UpcomingScheduleResDto> getUpcomingSchedules(Integer userSeq) {
-        // 대상으로 삼을 상태: 미납 혹은 일부 미납 상태의 목록
-        List<String> validStatuses = List.of("NONPAID", "SOMEPAID");
+        // 대상으로 삼을 상태: 미납 혹은 일부 미납 상태의 목록. 이체 결과 확인 중(REQUESTED)인 회차도
+        // 아직 납부가 확정되지 않았으므로 포함한다. 빠지면 이체 직후 일정에서 사라져 보인다.
+        List<String> validStatuses = List.of("NONPAID", "SOMEPAID", "REQUESTED");
         LocalDate today = LocalDate.now();
 
         // 정렬은 쿼리에 있으므로, '앞에서 3개만 가져와라'라는 PageRequest 생성
