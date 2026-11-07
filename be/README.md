@@ -153,6 +153,7 @@ API 문서는 실행 후 `/swagger-ui.html`에서 볼 수 있습니다.
 ```
 
 `BeApplicationTests`와 `AuthServiceRedisIntegrationTest`는 MySQL, Redis가 떠 있어야 통과합니다.
+`RepaymentScheduleConcurrencyTest`는 Docker로 MySQL 컨테이너를 띄우며, Docker가 없으면 건너뜁니다.
 
 | 대상 | 방식 |
 |---|---|
@@ -160,8 +161,9 @@ API 문서는 실행 후 `/swagger-ui.html`에서 볼 수 있습니다.
 | 이체 API 응답 분류 | WireMock 가짜 은행 서버로 타임아웃·연결 끊김·5xx 재현 |
 | 은행 장애 → 대조까지 시나리오 | WireMock + 실제 이체·조회 클라이언트 |
 | 상환 회차 계산 | 단위 테스트 |
+| 회차 상태 동시 변경 (선점, 수동 완료, 연체 전환, 납부 확정) | Testcontainers MySQL 8에서 스레드 10개로 동시 요청, 30회 반복 |
+| 자동 확정 이벤트 유니크 인덱스 | `db/manual` SQL을 컨테이너에 그대로 실행해 확인 |
 
-DB 동시성은 아직 실제 MySQL로 검증하지 않았습니다.
 
 ## 문서
 

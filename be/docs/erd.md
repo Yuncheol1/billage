@@ -131,7 +131,7 @@ erDiagram
 
 `repayment_event`에는 신고, 반려, 확정 등 여러 기록이 쌓일 수 있어 `schedule_seq` 단독 유니크를 걸 수 없습니다. MySQL에는 부분 인덱스가 없어서, `AUTO_CONFIRMED`일 때만 `schedule_seq`를 담는 생성 컬럼을 만들고 거기에 유니크 인덱스를 겁니다.
 
-조건부 UPDATE가 버그로 뚫려도 같은 회차의 확정이 두 번 남지 않게 하는 마지막 방어선입니다. SQL은 `db/manual/20261013_add_repayment_event_auto_confirmed_unique.sql`에 있고 실제 DB에는 아직 적용하지 않았습니다.
+조건부 UPDATE가 버그로 뚫려도 같은 회차의 확정이 두 번 남지 않게 하는 마지막 방어선입니다. SQL은 `db/manual/20261013_add_repayment_event_auto_confirmed_unique.sql`에 있습니다. 테스트용 MySQL 컨테이너에서 이 파일을 그대로 실행해, 같은 회차의 두 번째 자동 확정이 거절되는 것을 확인했습니다. 
 
 ### 금액 컬럼
 

@@ -103,7 +103,7 @@ Mock으로 쓴 단위 테스트는 "내가 예상한 예외"만 던지기 때문
 
 ### 확인
 
-`RepaymentManualTransferServiceTest`, `RepaymentNotificationSchedulerTest`에서 UPDATE 결과가 0일 때 상태와 부수 효과가 바뀌지 않는지 확인합니다. Mock 기반이라 실제 DB 경합은 재현하지 않았습니다.
+`RepaymentManualTransferServiceTest`, `RepaymentNotificationSchedulerTest`에서 UPDATE 결과가 0일 때 상태와 부수 효과가 바뀌지 않는지 확인합니다. 실제 경합은 `RepaymentScheduleConcurrencyTest`에서 MySQL 컨테이너로 확인합니다. 이체 선점과 수동 완료·연체 전환을 동시에 보내 30번 반복해도 매번 한쪽만 이깁니다. 상태 조건을 빼고 돌리면 테스트가 실패하는 것도 확인했습니다.
 
 ### 배운 것
 
